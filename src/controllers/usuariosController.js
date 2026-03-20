@@ -50,3 +50,43 @@ const getUsuarioById = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// Actualizar usuario
+const updateUsuario = async (req, res) => {
+  const { id } = req.params;
+  const { nombre, email } = req.body;
+
+  try {
+    const result = await pool.query(
+      `UPDATE usuarios 
+       SET nombre=$1, email=$2
+       WHERE id=$3 RETURNING id, nombre, email, rol_id`,
+      [nombre, email, id]
+    );
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Eliminar usuario
+const deleteUsuario = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    await pool.query("DELETE FROM usuarios WHERE id = $1", [id]);
+    res.json({ message: "Usuario eliminado" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+module.exports = {
+  getUsuarios,
+  getUsuarioById,
+  createUsuario,
+  updateUsuario,
+  cambiarRol,
+  deleteUsuario
+};
