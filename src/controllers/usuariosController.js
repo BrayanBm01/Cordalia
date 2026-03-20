@@ -21,3 +21,12 @@ const createUsuario = async (req, res) => {
     }
 };
 
+// Obtener usuarios
+const getUsuarios = async (req, res) => {
+  try {
+    const result = await pool.query("SELECT id, nombre, email FROM usuarios");
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
