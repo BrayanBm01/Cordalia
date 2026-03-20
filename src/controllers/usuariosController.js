@@ -3,22 +3,30 @@ const bcrypt = require("bcryptjs");
 
 // Crear usuario (registro)
 const createUsuario = async (req, res) => {
-    const { nombre, email, password } = req.body;
+  const { nombre, email, password, rol_id } = req.body;
 
-    try {
-        // Encriptar contraseña
-        const hashedPassword = await bcrypt.hash(password, 10);
+  if (!nombre || !email || !password) {
+    return res.status(400).json({ error: "Faltan datos" });
+  }
 
-        const result = await pool.query(
-            `INSERT INTO usuarios (nombre, email, password)
-       VALUES ($1, $2, $3) RETURNING id, nombre, email`,
-            [nombre, email, hashedPassword]
-        );
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-        res.status(201).json(result.rows[0]);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
+    const result = await pool.query(
+      `INSERT INTO usuarios (nombre, email, password, rol_id)
+       VALUES ($1, $2, $3, $4) RETURNING id, nombre, email, rol_id`,
+      [
+        nombre,
+        email,
+        hashedPassword,
+        rol_id ?? 1  // 👈 CLAVE AQUÍ
+      ]
+    );
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 };
 
 // Obtener usuarios
@@ -87,6 +95,5 @@ module.exports = {
   getUsuarioById,
   createUsuario,
   updateUsuario,
-  cambiarRol,
   deleteUsuario
-};
+}; 2
