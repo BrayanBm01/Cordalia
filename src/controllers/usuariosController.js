@@ -1,5 +1,5 @@
 const pool = require("../config/db");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 
 // Crear usuario (registro)
 const createUsuario = async (req, res) => {
