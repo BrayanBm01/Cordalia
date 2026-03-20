@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 
-const app = express(); // 👈 ESTO DEBE IR ANTES DE USAR app
+const app = express();
 
 app.use(cors());
 app.use(express.json());
@@ -15,12 +15,9 @@ app.get("/test-db", async (req, res) => {
 // Rutas de la API
 app.use("/api", require("./routes/turismoRoutes"));
 
+// Ruta raíz
 app.get("/", (req, res) => {
   res.send("API de Turismo funcionando 🚀");
 });
 
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en puerto ${PORT}`);
-});
+module.exports = app;
