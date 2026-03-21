@@ -19,7 +19,7 @@ const createUsuario = async (req, res) => {
         nombre,
         email,
         hashedPassword,
-        rol_id ?? 1  // 👈 CLAVE AQUÍ
+        rol_id ?? 1  // CLAVE AQUÍ
       ]
     );
 
