@@ -1,5 +1,6 @@
-const db = require('../config/db');
 const bcrypt = require('bcrypt');
+const db = require('../config/db');
+const { generarToken } = require('../utils/jwtUtil');
 
 const login = async (req, res) => {
     const { email, password } = req.body;
@@ -16,10 +17,9 @@ const login = async (req, res) => {
 
         const usuario = result.rows[0];
 
-        // Comparar contraseña encriptada
-        const match = await bcrypt.compare(password, usuario.password);
+        const coincide = await bcrypt.compare(password, usuario.password);
 
-        if (!match) {
+        if (!coincide) {
             await db.query(
                 'INSERT INTO login (usuario_id, exito) VALUES ($1, $2)',
                 [usuario.id, false]
@@ -28,7 +28,9 @@ const login = async (req, res) => {
             return res.status(401).json({ mensaje: 'Contraseña incorrecta' });
         }
 
-        // Login correcto
+        // 🔥 GENERAR TOKEN
+        const token = generarToken(usuario.email, usuario.rol);
+
         await db.query(
             'INSERT INTO login (usuario_id, exito) VALUES ($1, $2)',
             [usuario.id, true]
@@ -36,9 +38,11 @@ const login = async (req, res) => {
 
         res.json({
             mensaje: 'Login exitoso',
+            token, // 👈 AQUÍ ESTÁ EL JWT
             usuario: {
                 id: usuario.id,
-                nombre: usuario.nombre
+                nombre: usuario.nombre,
+                rol: usuario.rol
             }
         });
 
