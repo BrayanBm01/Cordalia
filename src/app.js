@@ -15,6 +15,7 @@ app.get("/test-db", async (req, res) => {
 // Rutas de la API
 app.use("/api", require("./routes/turismoRoutes"));
 app.use("/api", require("./routes/usuariosRoutes"));
+app.use("/api", require("./routes/loginRoutes"));
 
 // Ruta raíz
 app.get("/", (req, res) => {
