@@ -5,7 +5,13 @@ const { generarToken } = require('../utils/jwtUtil');
 const login = async (req, res) => {
     const { email, password } = req.body;
 
+    // Validación de datos
+    if (!email || !password) {
+        return res.status(400).json({ mensaje: 'Datos incompletos' });
+    }
+
     try {
+        // Buscar usuario
         const result = await db.query(
             'SELECT * FROM usuarios WHERE email = $1',
             [email]
@@ -17,9 +23,11 @@ const login = async (req, res) => {
 
         const usuario = result.rows[0];
 
+        // Comparar contraseña
         const coincide = await bcrypt.compare(password, usuario.password);
 
         if (!coincide) {
+            // Guardar intento fallido
             await db.query(
                 'INSERT INTO login (usuario_id, exito) VALUES ($1, $2)',
                 [usuario.id, false]
@@ -28,17 +36,19 @@ const login = async (req, res) => {
             return res.status(401).json({ mensaje: 'Contraseña incorrecta' });
         }
 
-        // 🔥 GENERAR TOKEN
-        const token = generarToken(usuario.email, usuario.rol);
+        // Generar token (MEJOR usar ID en vez de email)
+        const token = generarToken(usuario.id, usuario.rol);
 
+        // Guardar intento exitoso
         await db.query(
             'INSERT INTO login (usuario_id, exito) VALUES ($1, $2)',
             [usuario.id, true]
         );
 
-        res.json({
+        // Respuesta
+        return res.status(200).json({
             mensaje: 'Login exitoso',
-            token, // 👈 AQUÍ ESTÁ EL JWT
+            token,
             usuario: {
                 id: usuario.id,
                 nombre: usuario.nombre,
@@ -47,8 +57,11 @@ const login = async (req, res) => {
         });
 
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ mensaje: 'Error en el servidor' });
+        console.error('Error en login:', error);
+
+        return res.status(500).json({
+            mensaje: 'Error en el servidor'
+        });
     }
 };
 

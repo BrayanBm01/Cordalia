@@ -5,15 +5,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Portal</title>
-  <link rel="stylesheet" href="../css/login.css">
-  <script src="https://cdn.tailwindcss.com"></script>
 
+  <!-- ✅ RUTA CORREGIDA -->
+  <link rel="stylesheet" href="../css/login.css">
+
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
 <body class="min-h-screen flex items-center justify-center bg-cover bg-center bg-no-repeat"
-  style="background-image: url('../img/fondo-login.jpg');">
+  style="background-image: url('/img/fondo-login.jpg');">
 
-  <!-- CONTENEDOR -->
   <div
     class="relative w-full max-w-5xl bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl overflow-hidden shadow-2xl flex flex-col md:flex-row">
 
@@ -29,79 +30,38 @@
       class="w-full md:w-1/2 flex items-center justify-center p-10 text-center text-white relative z-20 bg-black/40 backdrop-brightness-50">
       <div>
         <h1 class="text-4xl md:text-5xl font-bold text-white">
-          ¡Bienvenido a <span class="text-white">
-            tu portal!</span>
+          ¡Bienvenido a tu portal!
         </h1>
 
         <p class="mt-4 text-white text-xl md:text-2xl font-medium">
-          Ingresa a nuestras redes sociales para mas informacion.
+          Ingresa a nuestras redes sociales para más información.
         </p>
-
-        <!-- ICONOS -->
-        <div class="mt-10 flex items-center justify-center gap-8">
-          <a href="#" class="hover:scale-110 transition">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="black" viewBox="0 0 24 24" class="w-12 h-12">
-              <path
-                d="M22 12a10 10 0 1 0-11.5 9.9v-7H7v-3h3.5V9.5a4 4 0 0 1 4.3-4.4c1 0 2 .2 2 .2v3H15c-1.4 0-1.8.9-1.8 1.8V12H17l-.5 3h-2.3v7A10 10 0 0 0 22 12" />
-            </svg>
-          </a>
-
-          <a href="#" class="hover:scale-110 transition">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="black" viewBox="0 0 24 24" class="w-12 h-12">
-              <path
-                d="M7 2C4.2 2 2 4.2 2 7v10c0 2.8 2.2 5 5 5h10c2.8 0 5-2.2 5-5V7c0-2.8-2.2-5-5-5H7zm10 2c1.7 0 3 1.3 3 3v10c0 1.7-1.3 3-3 3H7c-1.7 0-3-1.3-3-3V7c0-1.7 1.3-3 3-3h10zm-5 3.2A4.8 4.8 0 1 0 16.8 12 4.8 4.8 0 0 0 12 7.2zm0 2A2.8 2.8 0 1 1 9.2 12 2.8 2.8 0 0 1 12 9.2zM17.3 6a1.1 1.1 0 1 0 1.1 1.1A1.1 1.1 0 0 0 17.3 6z" />
-            </svg>
-          </a>
-
-          <a href="#" class="hover:scale-110 transition">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="black" viewBox="0 0 24 24" class="w-12 h-12">
-              <path
-                d="M12 .5A12 12 0 0 0 8.2 23.9c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6a3.2 3.2 0 0 0-1.3-1.7c-1-.7.1-.7.1-.7a2.5 2.5 0 0 1 1.8 1.2 2.6 2.6 0 0 0 3.5 1 2.6 2.6 0 0 1 .8-1.6c-2.6-.3-5.4-1.3-5.4-6a4.8 4.8 0 0 1 1.3-3.3 4.5 4.5 0 0 1 .1-3.2s1-.3 3.3 1.3a11.3 11.3 0 0 1 6 0C17 5.3 18 5.6 18 5.6a4.5 4.5 0 0 1 .1 3.2 4.8 4.8 0 0 1 1.3 3.3c0 4.7-2.8 5.7-5.5 6a2.9 2.9 0 0 1 .9 2.2v3.2c0 .3.2.7.8.6A12 12 0 0 0 12 .5Z" />
-            </svg>
-          </a>
-        </div>
-
-
       </div>
     </div>
 
-    <!-- DERECHA - FORMULARIOS -->
+    <!-- DERECHA -->
     <div class="w-full md:w-1/2 bg-white p-10 relative z-20 flex items-center justify-center">
       <div class="w-full max-w-sm min-h-[520px] flex flex-col justify-center">
 
         <!-- LOGIN -->
         <div id="loginForm" class="fade-slide show">
-          <h2 class="text-2xl font-bold text-purple-800 mb-6 text-center">Inicia sesión</h2>
+          <h2 class="text-2xl font-bold text-blue-800 mb-6 text-center">Inicia sesión</h2>
 
           <form class="space-y-4">
-            <div>
-              <label class="text-sm font-medium text-purple-700">Correo electrónico</label>
-              <input type="email" class="w-full p-3 border border-purple-300 rounded-lg"
-                placeholder="tucorreo@mail.com">
-            </div>
+            <input id="loginEmail" type="email" placeholder="Correo"
+              class="w-full p-3 border border-blue-300 rounded-lg" required>
 
-            <div>
-              <label class="text-sm font-medium text-purple-700">Contraseña</label>
-              <input type="password" class="w-full p-3 border border-purple-300 rounded-lg" placeholder="********">
-            </div>
-
-            <div class="flex justify-between text-sm text-purple-700">
-              <label class="flex items-center gap-2">
-                <input type="checkbox" class="accent-purple-600">
-                Recuérdame
-              </label>
-
-              <a href="#" class="hover:text-purple-500">¿Olvidaste tu contraseña?</a>
-            </div>
+            <input id="loginPassword" type="password" placeholder="Contraseña"
+              class="w-full p-3 border border-blue-300 rounded-lg" required>
 
             <div class="flex gap-3 pt-4">
-              <a href="index.html"
-                class="w-full block text-center py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition">
+              <button type="button" onclick="loginUser()"
+                class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold">
                 Login
-              </a>
+              </button>
 
               <button type="button" onclick="showRegister()"
-                class="w-full py-3 border border-purple-600 text-purple-600 hover:bg-gray-300 rounded-lg font-semibold transition">
+                class="w-full py-3 border border-blue-600 text-blue-600 rounded-lg font-semibold">
                 Registrarse
               </button>
             </div>
@@ -110,54 +70,50 @@
 
         <!-- REGISTRO -->
         <div id="registerForm" class="fade-slide hidden">
-          <h2 class="text-2xl font-bold text-purple-800 mb-6 text-center">Crear cuenta</h2>
+          <h2 class="text-2xl font-bold text-blue-800 mb-6 text-center">Crear cuenta</h2>
 
-          <form id="registerFormElement" class="space-y-4">
-            <div>
-              <label class="text-sm font-medium text-purple-700">Nombre completo</label>
-              <input type="text" class="w-full p-3 border border-purple-300 rounded-lg" placeholder="Tu nombre">
-            </div>
+          <form class="space-y-4">
+            <input id="registerNombre" type="text" placeholder="Nombre"
+              class="w-full p-3 border border-blue-300 rounded-lg" required>
 
-            <div>
-              <label class="text-sm font-medium text-purple-700">Correo</label>
-              <input id="emailInput" type="email" class="w-full p-3 border border-purple-300 rounded-lg"
-                placeholder="ejemplo@gmail.com">
+            <input id="registerEmail" type="email" placeholder="Correo"
+              class="w-full p-3 border border-blue-300 rounded-lg" required>
 
-              <!-- Mensaje de error -->
-              <p id="emailError" class="text-red-600 text-sm mt-1 hidden">
-                El correo debe ser una dirección @gmail.com
-              </p>
-            </div>
+            <p id="emailError" class="text-red-600 text-sm hidden">
+              El correo debe ser @gmail.com
+            </p>
 
-            <div>
-              <label class="text-sm font-medium text-purple-700">Contraseña</label>
-              <input type="password" class="w-full p-3 border border-purple-300 rounded-lg" placeholder="********">
-            </div>
+            <input id="registerPassword" type="password" placeholder="Contraseña"
+              class="w-full p-3 border border-blue-300 rounded-lg" required>
 
             <div class="flex gap-3 pt-4">
               <button type="button" onclick="showLogin()"
-                class="w-full py-3 bg-white border border-purple-600 hover:bg-gray-300 text-gray-700 rounded-lg font-semibold transition">
+                class="w-full py-3 border border-blue-600 text-blue-600 rounded-lg">
                 Volver
               </button>
 
-              <button type="button" onclick="validateRegister()"
-                class="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition">
+              <button type="button" onclick="registerUser()"
+                class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
                 Registrar
               </button>
             </div>
           </form>
         </div>
 
-
       </div>
     </div>
 
   </div>
 
-  <!-- SCRIPT ANIMACIÓN -->
   <script>
     const loginForm = document.getElementById("loginForm");
     const registerForm = document.getElementById("registerForm");
+
+    // 🔥 REDIRIGIR SI YA ESTÁ LOGUEADO
+    const token = localStorage.getItem("token");
+    if (token) {
+      window.location.href = "/index.html";
+    }
 
     function switchForm(show, hide) {
       hide.classList.remove("show");
@@ -165,8 +121,6 @@
       setTimeout(() => {
         hide.classList.add("hidden");
         show.classList.remove("hidden");
-
-        // Reiniciar animación
         show.classList.remove("show");
         void show.offsetWidth;
         show.classList.add("show");
@@ -181,25 +135,81 @@
       switchForm(loginForm, registerForm);
     }
 
-    //-- SCRIPT DE VALIDACION DE GMAIL-->
+    // ✅ LOGIN
+    async function loginUser() {
+      const email = document.getElementById("loginEmail").value;
+      const password = document.getElementById("loginPassword").value;
 
-    function validateRegister() {
-      const email = document.getElementById("emailInput").value.trim();
-      const errorText = document.getElementById("emailError");
-
-      // Validar si termina en @gmail.com
-      if (!email.endsWith("@gmail.com")) {
-        errorText.classList.remove("hidden");
+      if (!email || !password) {
+        alert("Completa todos los campos");
         return;
       }
 
-      // Si es Gmail → ocultar error y continuar
-      errorText.classList.add("hidden");
+      try {
+        const res = await fetch("/api/login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ email, password })
+        });
 
-      alert("✔ Registro exitoso con correo Gmail");
+        const data = await res.json();
+
+        if (res.ok) {
+          localStorage.setItem("token", data.token);
+          alert(data.mensaje);
+          window.location.href = "/index.html";
+        } else {
+          alert(data.mensaje);
+        }
+
+      } catch (error) {
+        alert("Error al conectar con el servidor");
+      }
     }
 
+    // ✅ REGISTRO
+    async function registerUser() {
+      const nombre = document.getElementById("registerNombre").value;
+      const email = document.getElementById("registerEmail").value;
+      const password = document.getElementById("registerPassword").value;
+      const error = document.getElementById("emailError");
 
+      if (!nombre || !email || !password) {
+        alert("Completa todos los campos");
+        return;
+      }
+
+      if (!email.endsWith("@gmail.com")) {
+        error.classList.remove("hidden");
+        return;
+      }
+
+      error.classList.add("hidden");
+
+      try {
+        const res = await fetch("/api/usuarios/register", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ nombre, email, password })
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+          alert(data.mensaje);
+          showLogin();
+        } else {
+          alert(data.mensaje);
+        }
+
+      } catch (error) {
+        alert("Error al conectar con el servidor");
+      }
+    }
   </script>
 
 </body>
