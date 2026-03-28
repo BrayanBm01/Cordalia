@@ -9,10 +9,19 @@ const {
   deleteLugar,
 } = require("../controllers/turismoController");
 
+// Middlewares
+const verificarToken = require("../middlewares/jwtMiddleware");
+const verificarRol = require("../middlewares/rolMiddleware");
+
+// PÚBLICO (cualquiera puede ver)
 router.get("/lugares", getLugares);
 router.get("/lugares/:id", getLugarById);
-router.post("/lugares", createLugar);
-router.put("/lugares/:id", updateLugar);
-router.delete("/lugares/:id", deleteLugar);
+
+// SOLO USUARIOS AUTENTICADOS
+router.post("/lugares", verificarToken, createLugar);
+
+// SOLO ADMIN
+router.put("/lugares/:id", verificarToken, verificarRol("ADMIN"), updateLugar);
+router.delete("/lugares/:id", verificarToken, verificarRol("ADMIN"), deleteLugar);
 
 module.exports = router;
