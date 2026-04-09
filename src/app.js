@@ -5,29 +5,29 @@ require("dotenv").config();
 
 const app = express();
 
-// Middlewares
+// 🔧 Middlewares
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Archivos estáticos
+// 📁 Archivos estáticos
 app.use(express.static(path.join(__dirname, "view")));
 app.use("/css", express.static(path.join(__dirname, "css")));
-app.use("/img", express.static(path.join(__dirname, "img"))); // 🔥 para imágenes
+app.use("/img", express.static(path.join(__dirname, "img")));
 
-// Ruta de prueba
+// 🧪 Ruta de prueba
 app.get("/test-db", async (req, res) => {
   res.send("Ruta funcionando ✅");
 });
 
-// Rutas API
-app.use("/api", require("./routes/turismoRoutes"));
+// 🔐 RUTA LOGIN (FUERA DE /api)
+app.use("/", require("./routes/loginRoutes"));
+
+// 🌍 RUTAS API
 app.use("/api", require("./routes/usuariosRoutes"));
-app.use("/api", require("./routes/loginRoutes"));
+app.use("/api", require("./routes/turismoRoutes"));
 
-
-
-// Ruta principal → LOGIN
+// 🏠 Ruta principal → LOGIN
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "view", "login.html"));
 });

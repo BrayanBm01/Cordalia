@@ -146,7 +146,7 @@
       }
 
       try {
-        const res = await fetch("/api/login", {
+        const res = await fetch("/login", { // 🔥 CORREGIDO AQUÍ
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -156,15 +156,18 @@
 
         const data = await res.json();
 
-        if (res.ok) {
+        if (data.ok) { // 🔥 usamos lo que devuelve el backend corregido
           localStorage.setItem("token", data.token);
           alert(data.mensaje);
+
+          // 🚀 REDIRECCIÓN
           window.location.href = "/index.html";
         } else {
           alert(data.mensaje);
         }
 
       } catch (error) {
+        console.error(error);
         alert("Error al conectar con el servidor");
       }
     }
@@ -199,7 +202,7 @@
 
         const data = await res.json();
 
-        if (res.ok) {
+        if (data.ok || res.ok) { // 🔥 más flexible por si backend no usa "ok"
           alert(data.mensaje);
           showLogin();
         } else {
@@ -207,6 +210,7 @@
         }
 
       } catch (error) {
+        console.error(error);
         alert("Error al conectar con el servidor");
       }
     }

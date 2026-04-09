@@ -6,26 +6,22 @@ const {
   getUsuarioById,
   createUsuario,
   updateUsuario,
-  deleteUsuario
+  deleteUsuario,
+  register
 } = require("../controllers/usuariosController");
 
-// 🔥 IMPORTANTE: importar register
-const { register } = require("../controllers/usuariosController");
+// 🔐 Middlewares
+const verificarToken = require("../middlewares/jwtMiddleware");
+const verificarRol = require("../middlewares/rolMiddleware");
 
-// GET
-router.get("/usuarios", getUsuarios);
-router.get("/usuarios/:id", getUsuarioById);
-
-// POST
-router.post("/usuarios", createUsuario);
-
-// 🔥 NUEVA RUTA PARA REGISTRO
+// 🔓 REGISTRO (PÚBLICO)
 router.post("/usuarios/register", register);
 
-// PUT
-router.put("/usuarios/:id", updateUsuario);
-
-// DELETE
-router.delete("/usuarios/:id", deleteUsuario);
+// 🔐 SOLO ADMIN
+router.get("/usuarios", verificarToken, verificarRol("ADMIN"), getUsuarios);
+router.get("/usuarios/:id", verificarToken, verificarRol("ADMIN"), getUsuarioById);
+router.post("/usuarios", verificarToken, verificarRol("ADMIN"), createUsuario);
+router.put("/usuarios/:id", verificarToken, verificarRol("ADMIN"), updateUsuario);
+router.delete("/usuarios/:id", verificarToken, verificarRol("ADMIN"), deleteUsuario);
 
 module.exports = router;

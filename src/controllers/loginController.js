@@ -5,54 +5,65 @@ const { generarToken } = require('../utils/jwtUtil');
 const login = async (req, res) => {
     const { email, password } = req.body;
 
-    // Validación de datos
+    // 🔍 Validar datos
     if (!email || !password) {
-        return res.status(400).json({ mensaje: 'Datos incompletos' });
+        return res.status(400).json({
+            ok: false,
+            mensaje: 'Datos incompletos'
+        });
     }
 
     try {
-        // Buscar usuario
+        // 🔎 Buscar usuario
         const result = await db.query(
             'SELECT * FROM usuarios WHERE email = $1',
             [email]
         );
 
         if (result.rows.length === 0) {
-            return res.status(401).json({ mensaje: 'Usuario no encontrado' });
+            return res.status(401).json({
+                ok: false,
+                mensaje: 'Usuario no encontrado'
+            });
         }
 
         const usuario = result.rows[0];
 
-        // Comparar contraseña
+        // 🔐 Comparar contraseña
         const coincide = await bcrypt.compare(password, usuario.password);
 
         if (!coincide) {
-            // Guardar intento fallido
             await db.query(
                 'INSERT INTO login (usuario_id, exito) VALUES ($1, $2)',
                 [usuario.id, false]
             );
 
-            return res.status(401).json({ mensaje: 'Contraseña incorrecta' });
+            return res.status(401).json({
+                ok: false,
+                mensaje: 'Contraseña incorrecta'
+            });
         }
 
-        // Generar token (MEJOR usar ID en vez de email)
-        const token = generarToken(usuario.id, usuario.rol);
+        // 🔥 CORRECCIÓN CLAVE: usar rol_id
+        const token = generarToken(usuario.id, usuario.rol_id);
 
-        // Guardar intento exitoso
         await db.query(
             'INSERT INTO login (usuario_id, exito) VALUES ($1, $2)',
             [usuario.id, true]
         );
 
-        // Respuesta
+        // 🎭 Mapear rol bonito (opcional pero PRO)
+        const rolNombre = usuario.rol_id === 2 ? "ADMIN" : "USER";
+
         return res.status(200).json({
+            ok: true,
             mensaje: 'Login exitoso',
             token,
             usuario: {
                 id: usuario.id,
                 nombre: usuario.nombre,
-                rol: usuario.rol
+                rol: rolNombre,
+                rol_id: usuario.rol_id
             }
         });
 
@@ -60,6 +71,7 @@ const login = async (req, res) => {
         console.error('Error en login:', error);
 
         return res.status(500).json({
+            ok: false,
             mensaje: 'Error en el servidor'
         });
     }

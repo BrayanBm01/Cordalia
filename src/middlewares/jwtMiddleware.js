@@ -5,9 +5,12 @@ const SECRET_KEY = process.env.JWT_SECRET || 'miClaveSuperSecretaSeguraParaJWT12
 const verificarToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
 
-    // ❌ No hay token
+    // ❌ No hay token o formato incorrecto
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ error: 'No autenticado: se requiere token JWT' });
+        return res.status(401).json({
+            ok: false,
+            mensaje: 'No autenticado: token requerido'
+        });
     }
 
     const token = authHeader.split(' ')[1];
@@ -15,15 +18,27 @@ const verificarToken = (req, res, next) => {
     try {
         const decoded = jwt.verify(token, SECRET_KEY);
 
-        // Guardamos datos en request (como SecurityContext en Java)
-        req.usuario = {
-            email: decoded.email,
-            rol: decoded.rol
+        // 🔥 IMPORTANTE: usamos req.user (estándar)
+        req.user = {
+            id: decoded.id,
+            rol: decoded.rol // 0 = ADMIN, 1 = USER
         };
 
         next();
+
     } catch (error) {
-        return res.status(401).json({ error: 'Token inválido' });
+
+        if (error.name === "TokenExpiredError") {
+            return res.status(401).json({
+                ok: false,
+                mensaje: "Token expirado"
+            });
+        }
+
+        return res.status(401).json({
+            ok: false,
+            mensaje: "Token inválido"
+        });
     }
 };
 
