@@ -27,9 +27,17 @@ app.use("/", require("./routes/loginRoutes"));
 app.use("/api", require("./routes/usuariosRoutes"));
 app.use("/api", require("./routes/turismoRoutes"));
 
-// 🏠 Ruta principal → LOGIN
+// 🏠 Rutas de vistas principales
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "view", "login.html"));
+});
+
+app.get("/admin", (req, res) => {
+  res.sendFile(path.join(__dirname, "view", "index-admin.html"));
+});
+
+app.get("/usuario", (req, res) => {
+  res.sendFile(path.join(__dirname, "view", "index-usuario.html"));
 });
 
 module.exports = app;

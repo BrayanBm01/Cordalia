@@ -3,7 +3,7 @@ const bcrypt = require("bcryptjs");
 
 // 🔥 REGISTRO (para el login.html)
 const register = async (req, res) => {
-  const { nombre, email, password } = req.body;
+  const { nombre, email, password, rol } = req.body;
 
   if (!nombre || !email || !password) {
     return res.status(400).json({ mensaje: "Datos incompletos" });
@@ -23,12 +23,19 @@ const register = async (req, res) => {
     // 🔐 Encriptar contraseña
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 📝 Insertar usuario (rol 1 por defecto)
+    // 🎯 ASIGNAR ROL SEGÚN TU BD
+    let rol_id = 1; // usuario por defecto
+
+    if (rol === "admin" || rol == 0) {
+      rol_id = 0; // admin en tu BD
+    }
+
+    // 📝 Insertar usuario
     const result = await pool.query(
       `INSERT INTO usuarios (nombre, email, password, rol_id)
        VALUES ($1, $2, $3, $4)
        RETURNING id, nombre, email, rol_id`,
-      [nombre, email, hashedPassword, 1]
+      [nombre, email, hashedPassword, rol_id]
     );
 
     return res.status(201).json({
@@ -42,7 +49,7 @@ const register = async (req, res) => {
   }
 };
 
-// Crear usuario (manual)
+// 🔧 Crear usuario manual (admin puede usar esto)
 const createUsuario = async (req, res) => {
   const { nombre, email, password, rol_id } = req.body;
 
@@ -53,11 +60,17 @@ const createUsuario = async (req, res) => {
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // 🎯 Validar rol_id (solo 0 o 1)
+    let rolFinal = 1;
+    if (rol_id == 0) {
+      rolFinal = 0;
+    }
+
     const result = await pool.query(
       `INSERT INTO usuarios (nombre, email, password, rol_id)
        VALUES ($1, $2, $3, $4)
        RETURNING id, nombre, email, rol_id`,
-      [nombre, email, hashedPassword, rol_id ?? 1]
+      [nombre, email, hashedPassword, rolFinal]
     );
 
     res.json(result.rows[0]);
@@ -67,7 +80,7 @@ const createUsuario = async (req, res) => {
   }
 };
 
-// Obtener usuarios
+// 📋 Obtener usuarios
 const getUsuarios = async (req, res) => {
   try {
     const result = await pool.query(
@@ -79,7 +92,7 @@ const getUsuarios = async (req, res) => {
   }
 };
 
-// Obtener por ID
+// 🔍 Obtener usuario por ID
 const getUsuarioById = async (req, res) => {
   const { id } = req.params;
 
@@ -99,7 +112,7 @@ const getUsuarioById = async (req, res) => {
   }
 };
 
-// Actualizar usuario
+// ✏️ Actualizar usuario
 const updateUsuario = async (req, res) => {
   const { id } = req.params;
   const { nombre, email } = req.body;
@@ -119,7 +132,7 @@ const updateUsuario = async (req, res) => {
   }
 };
 
-// Eliminar usuario
+// 🗑️ Eliminar usuario
 const deleteUsuario = async (req, res) => {
   const { id } = req.params;
 
@@ -137,5 +150,5 @@ module.exports = {
   createUsuario,
   updateUsuario,
   deleteUsuario,
-  register // 🔥 MUY IMPORTANTE
+  register
 };
