@@ -2,40 +2,45 @@ const jwt = require('jsonwebtoken');
 
 const SECRET_KEY = process.env.JWT_SECRET || 'miClaveSuperSecretaSeguraParaJWT123456';
 
-// ✅ Generar token con email y rol
-const generarToken = (email, rol) => {
+// ✅ Generar token con id y rol
+const generarToken = (id, rol) => {
     return jwt.sign(
-        { email, rol },
+        { id, rol },
         SECRET_KEY,
-        { expiresIn: '24h' }
+        { expiresIn: '2h' }
     );
 };
 
-// ✅ Extraer correo
-const extraerCorreo = (token) => {
-    const decoded = jwt.verify(token, SECRET_KEY);
-    return decoded.email;
+// ✅ Decodificar token (MEJOR: una sola función)
+const decodificarToken = (token) => {
+    try {
+        return jwt.verify(token, SECRET_KEY);
+    } catch (error) {
+        return null;
+    }
+};
+
+// ✅ Extraer id
+const extraerId = (token) => {
+    const decoded = decodificarToken(token);
+    return decoded ? decoded.id : null;
 };
 
 // ✅ Extraer rol
 const extraerRol = (token) => {
-    const decoded = jwt.verify(token, SECRET_KEY);
-    return decoded.rol;
+    const decoded = decodificarToken(token);
+    return decoded ? decoded.rol : null;
 };
 
 // ✅ Validar token
 const validarToken = (token) => {
-    try {
-        jwt.verify(token, SECRET_KEY);
-        return true;
-    } catch (error) {
-        return false;
-    }
+    return decodificarToken(token) !== null;
 };
 
 module.exports = {
     generarToken,
-    extraerCorreo,
+    decodificarToken,
+    extraerId,
     extraerRol,
     validarToken
 };

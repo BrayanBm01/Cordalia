@@ -6,7 +6,10 @@ const login = async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return res.status(400).json({ mensaje: "Datos incompletos" });
+    return res.status(400).json({
+      ok: false,
+      mensaje: "Datos incompletos"
+    });
   }
 
   try {
@@ -16,13 +19,18 @@ const login = async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(401).json({ mensaje: "Usuario no encontrado" });
+      return res.status(401).json({
+        ok: false,
+        mensaje: "Usuario no encontrado"
+      });
     }
 
     const usuario = result.rows[0];
+
     const coincide = await bcrypt.compare(password, usuario.password);
 
     if (!coincide) {
+      // guardar intento fallido
       try {
         await db.query(
           "INSERT INTO login (usuario_id, exito) VALUES ($1, $2)",
@@ -32,11 +40,16 @@ const login = async (req, res) => {
         console.error("Error guardando intento fallido:", err);
       }
 
-      return res.status(401).json({ mensaje: "Contraseña incorrecta" });
+      return res.status(401).json({
+        ok: false,
+        mensaje: "Contraseña incorrecta"
+      });
     }
 
-    const token = generarToken(usuario.id, usuario.rol);
+    // 🔐 TOKEN CON ROL REAL
+    const token = generarToken(usuario.id, usuario.rol_id);
 
+    // guardar intento exitoso
     try {
       await db.query(
         "INSERT INTO login (usuario_id, exito) VALUES ($1, $2)",
@@ -47,15 +60,22 @@ const login = async (req, res) => {
     }
 
     return res.status(200).json({
+      ok: true,
       mensaje: "Login exitoso",
       token,
-      rol: usuario.rol, // 🔑 clave para frontend
-      usuario: { id: usuario.id, nombre: usuario.nombre }
+      rol: usuario.rol_id, // 🔥 CLAVE
+      usuario: {
+        id: usuario.id,
+        nombre: usuario.nombre
+      }
     });
 
   } catch (error) {
     console.error("Error en login:", error);
-    return res.status(500).json({ mensaje: "Error en el servidor" });
+    return res.status(500).json({
+      ok: false,
+      mensaje: "Error en el servidor"
+    });
   }
 };
 

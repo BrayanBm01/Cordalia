@@ -171,6 +171,13 @@
         // INIT
         cargarUsuarios();
     </script>
+    <script>
+        const rol = localStorage.getItem("rol");
+
+        if (!token || rol != 0) {
+            window.location.href = "/";
+        }
+    </script>
 
 </body>
 

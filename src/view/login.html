@@ -109,10 +109,34 @@
     const loginForm = document.getElementById("loginForm");
     const registerForm = document.getElementById("registerForm");
 
-    // 🔥 REDIRIGIR SI YA ESTÁ LOGUEADO
+    // 🔒 VERIFICAR TOKEN CON BACKEND + ROL
     const token = localStorage.getItem("token");
+    const rol = localStorage.getItem("rol");
+
     if (token) {
-      window.location.href = "/index.html";
+      fetch("/login/verify", {
+        headers: {
+          Authorization: "Bearer " + token
+        }
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.ok) {
+            // 🔥 REDIRECCIÓN SEGÚN ROL
+            if (rol == 0) {
+              window.location.href = "/admin";
+            } else {
+              window.location.href = "/usuario";
+            }
+          } else {
+            localStorage.removeItem("token");
+            localStorage.removeItem("rol");
+          }
+        })
+        .catch(() => {
+          localStorage.removeItem("token");
+          localStorage.removeItem("rol");
+        });
     }
 
     function switchForm(show, hide) {
@@ -146,7 +170,7 @@
       }
 
       try {
-        const res = await fetch("/login", { // 🔥 CORREGIDO AQUÍ
+        const res = await fetch("/login", {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -156,55 +180,20 @@
 
         const data = await res.json();
 
-        if (data.ok) { // 🔥 usamos lo que devuelve el backend corregido
+        if (data.ok) {
+          // 🔥 GUARDAR TOKEN Y ROL
           localStorage.setItem("token", data.token);
+          localStorage.setItem("rol", data.rol);
+
           alert(data.mensaje);
 
-          // 🚀 REDIRECCIÓN
-          window.location.href = "/index.html";
-        } else {
-          alert(data.mensaje);
-        }
+          // 🔥 REDIRECCIÓN POR ROL
+          if (data.rol == 0) {
+            window.location.href = "/admin";
+          } else {
+            window.location.href = "/usuario";
+          }
 
-      } catch (error) {
-        console.error(error);
-        alert("Error al conectar con el servidor");
-      }
-    }
-
-    // ✅ REGISTRO
-    async function registerUser() {
-      const nombre = document.getElementById("registerNombre").value;
-      const email = document.getElementById("registerEmail").value;
-      const password = document.getElementById("registerPassword").value;
-      const error = document.getElementById("emailError");
-
-      if (!nombre || !email || !password) {
-        alert("Completa todos los campos");
-        return;
-      }
-
-      if (!email.endsWith("@gmail.com")) {
-        error.classList.remove("hidden");
-        return;
-      }
-
-      error.classList.add("hidden");
-
-      try {
-        const res = await fetch("/api/usuarios/register", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({ nombre, email, password })
-        });
-
-        const data = await res.json();
-
-        if (data.ok || res.ok) { // 🔥 más flexible por si backend no usa "ok"
-          alert(data.mensaje);
-          showLogin();
         } else {
           alert(data.mensaje);
         }
@@ -215,7 +204,6 @@
       }
     }
   </script>
-
 </body>
 
 </html>
