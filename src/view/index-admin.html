@@ -23,9 +23,9 @@
         <input id="email" placeholder="Email" class="block mb-2 p-2 text-black w-full">
         <input id="password" placeholder="Password" class="block mb-2 p-2 text-black w-full">
 
-        <select id="rol" class="block mb-2 p-2 text-black w-full">
-            <option value="USER">USER</option>
-            <option value="ADMIN">ADMIN</option>
+        <select id="rol" class="block mb-4 p-2 text-black w-full">
+            <option value="0">Admin</option>
+            <option value="1">Usuario</option>
         </select>
 
         <button onclick="guardarUsuario()" class="bg-green-500 px-4 py-2 rounded">
@@ -50,48 +50,74 @@
     <script>
         let editandoId = null;
 
-        // 🔐 VERIFICAR TOKEN Y ROL
+        // 🔐 VERIFICAR TOKEN Y ROL (CORRECTO Y ESTABLE)
         const token = localStorage.getItem("token");
 
         if (!token) {
-            window.location.href = "/login.html";
-        }
+            window.location.href = "/";
+        } else {
+            fetch("/login/verify", {
+                headers: {
+                    Authorization: "Bearer " + token
+                }
+            })
+                .then(res => res.json())
+                .then(data => {
+                    console.log("VERIFY:", data); // 👈 DEBUG
 
-        // Decodificar token (simple)
-        const payload = JSON.parse(atob(token.split('.')[1]));
+                    if (!data.ok) {
+                        window.location.href = "/";
+                        return;
+                    }
 
-        if (payload.rol !== "ADMIN") {
-            alert("No tienes permisos");
-            window.location.href = "/login.html";
+                    const rol = Number(data.usuario?.rol); // 🔥 aseguramos número
+
+                    if (rol !== 0) {
+                        alert("No tienes permisos");
+                        window.location.href = "/";
+                        return;
+                    }
+
+                    // ✅ SOLO ADMIN
+                    cargarUsuarios();
+                })
+                .catch(() => {
+                    window.location.href = "/";
+                });
         }
 
         // 🚀 CARGAR USUARIOS
         async function cargarUsuarios() {
-            const res = await fetch("/api/usuarios", {
-                headers: {
-                    Authorization: "Bearer " + token
-                }
-            });
+            try {
+                const res = await fetch("/api/usuarios", {
+                    headers: {
+                        Authorization: "Bearer " + token
+                    }
+                });
 
-            const data = await res.json();
+                const data = await res.json();
 
-            const tabla = document.getElementById("tablaUsuarios");
-            tabla.innerHTML = "";
+                const tabla = document.getElementById("tablaUsuarios");
+                tabla.innerHTML = "";
 
-            data.forEach(u => {
-                tabla.innerHTML += `
-      <tr class="text-center border-t border-gray-700">
-        <td>${u.id}</td>
-        <td>${u.nombre}</td>
-        <td>${u.email}</td>
-        <td>${u.rol}</td>
-        <td>
-          <button onclick='editar(${JSON.stringify(u)})' class="bg-yellow-500 px-2 py-1 rounded">Editar</button>
-          <button onclick='eliminar(${u.id})' class="bg-red-500 px-2 py-1 rounded">Eliminar</button>
-        </td>
-      </tr>
-    `;
-            });
+                data.forEach(u => {
+                    tabla.innerHTML += `
+            <tr class="text-center border-t border-gray-700">
+                <td>${u.id}</td>
+                <td>${u.nombre}</td>
+                <td>${u.email}</td>
+                <td>${u.rol_id}</td>
+                <td>
+                    <button onclick='editar(${JSON.stringify(u)})' class="bg-yellow-500 px-2 py-1 rounded">Editar</button>
+                    <button onclick='eliminar(${u.id})' class="bg-red-500 px-2 py-1 rounded">Eliminar</button>
+                </td>
+            </tr>
+            `;
+                });
+
+            } catch (error) {
+                console.error("Error cargando usuarios:", error);
+            }
         }
 
         // ✏️ EDITAR
@@ -100,7 +126,7 @@
 
             document.getElementById("nombre").value = usuario.nombre;
             document.getElementById("email").value = usuario.email;
-            document.getElementById("rol").value = usuario.rol;
+            document.getElementById("rol").value = usuario.rol_id;
         }
 
         // 💾 GUARDAR
@@ -110,7 +136,8 @@
             const password = document.getElementById("password").value;
             const rol = document.getElementById("rol").value;
 
-            const body = { nombre, email, rol };
+            const body = { nombre, email, rol_id: Number(rol) };
+
             if (password) body.password = password;
 
             let url = "/api/usuarios";
@@ -121,40 +148,50 @@
                 method = "PUT";
             }
 
-            const res = await fetch(url, {
-                method,
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: "Bearer " + token
-                },
-                body: JSON.stringify(body)
-            });
+            try {
+                const res = await fetch(url, {
+                    method,
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: "Bearer " + token
+                    },
+                    body: JSON.stringify(body)
+                });
 
-            const data = await res.json();
-            alert(data.mensaje);
+                const data = await res.json();
+                alert(data.mensaje);
 
-            limpiar();
-            cargarUsuarios();
+                limpiar();
+                cargarUsuarios();
+
+            } catch (error) {
+                console.error("Error guardando:", error);
+            }
         }
 
         // 🗑️ ELIMINAR
         async function eliminar(id) {
             if (!confirm("¿Eliminar usuario?")) return;
 
-            const res = await fetch("/api/usuarios/" + id, {
-                method: "DELETE",
-                headers: {
-                    Authorization: "Bearer " + token
-                }
-            });
+            try {
+                const res = await fetch("/api/usuarios/" + id, {
+                    method: "DELETE",
+                    headers: {
+                        Authorization: "Bearer " + token
+                    }
+                });
 
-            const data = await res.json();
-            alert(data.mensaje);
+                const data = await res.json();
+                alert(data.mensaje);
 
-            cargarUsuarios();
+                cargarUsuarios();
+
+            } catch (error) {
+                console.error("Error eliminando:", error);
+            }
         }
 
-        // 🧹 LIMPIAR FORM
+        // 🧹 LIMPIAR
         function limpiar() {
             editandoId = null;
             document.getElementById("nombre").value = "";
@@ -164,17 +201,7 @@
 
         // 🚪 LOGOUT
         function logout() {
-            localStorage.removeItem("token");
-            window.location.href = "/login.html";
-        }
-
-        // INIT
-        cargarUsuarios();
-    </script>
-    <script>
-        const rol = localStorage.getItem("rol");
-
-        if (!token || rol != 0) {
+            localStorage.clear();
             window.location.href = "/";
         }
     </script>

@@ -7,11 +7,19 @@ const { login } = require("../controllers/loginController");
 // 🔐 LOGIN
 router.post("/", login);
 
-// 🔒 VERIFY TOKEN
+// 🔒 VERIFY TOKEN (CORREGIDO)
 router.get("/verify", (req, res) => {
   const auth = req.headers.authorization;
 
+  // ❌ No hay header
   if (!auth) {
+    console.log("❌ No Authorization header");
+    return res.json({ ok: false });
+  }
+
+  // ❌ Formato incorrecto
+  if (!auth.startsWith("Bearer ")) {
+    console.log("❌ Formato inválido:", auth);
     return res.json({ ok: false });
   }
 
@@ -23,13 +31,19 @@ router.get("/verify", (req, res) => {
       process.env.JWT_SECRET || "secreto"
     );
 
-    res.json({
+    console.log("✅ TOKEN OK:", decoded);
+
+    return res.json({
       ok: true,
-      usuario: decoded // aquí viene id y rol
+      usuario: decoded // { id, rol }
     });
 
   } catch (error) {
-    res.json({ ok: false });
+    console.log("❌ ERROR TOKEN:", error.message);
+
+    return res.json({
+      ok: false
+    });
   }
 });
 

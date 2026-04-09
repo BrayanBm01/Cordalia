@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 
-const SECRET_KEY = process.env.JWT_SECRET || 'miClaveSuperSecretaSeguraParaJWT123456';
+// 🔥 MISMO SECRET EN TODO EL PROYECTO
+const SECRET_KEY = process.env.JWT_SECRET || 'secreto';
 
 // ✅ Generar token con id y rol
 const generarToken = (id, rol) => {
@@ -11,11 +12,12 @@ const generarToken = (id, rol) => {
     );
 };
 
-// ✅ Decodificar token (MEJOR: una sola función)
+// ✅ Decodificar token
 const decodificarToken = (token) => {
     try {
         return jwt.verify(token, SECRET_KEY);
     } catch (error) {
+        console.log("❌ ERROR TOKEN:", error.message);
         return null;
     }
 };
@@ -36,7 +38,6 @@ const extraerRol = (token) => {
 const validarToken = (token) => {
     return decodificarToken(token) !== null;
 };
-
 module.exports = {
     generarToken,
     decodificarToken,
