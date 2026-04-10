@@ -4,22 +4,22 @@ const jwt = require("jsonwebtoken");
 
 const { login } = require("../controllers/loginController");
 
-// 🔐 LOGIN
+// LOGIN
 router.post("/", login);
 
-// 🔒 VERIFY TOKEN (CORREGIDO)
+// VERIFY TOKEN (CORREGIDO)
 router.get("/verify", (req, res) => {
   const auth = req.headers.authorization;
 
-  // ❌ No hay header
+  // No hay header
   if (!auth) {
-    console.log("❌ No Authorization header");
+    console.log(" No Authorization header");
     return res.json({ ok: false });
   }
 
-  // ❌ Formato incorrecto
+  // Formato incorrecto
   if (!auth.startsWith("Bearer ")) {
-    console.log("❌ Formato inválido:", auth);
+    console.log(" Formato inválido:", auth);
     return res.json({ ok: false });
   }
 
@@ -31,7 +31,7 @@ router.get("/verify", (req, res) => {
       process.env.JWT_SECRET || "secreto"
     );
 
-    console.log("✅ TOKEN OK:", decoded);
+    console.log("TOKEN OK:", decoded);
 
     return res.json({
       ok: true,
@@ -39,7 +39,7 @@ router.get("/verify", (req, res) => {
     });
 
   } catch (error) {
-    console.log("❌ ERROR TOKEN:", error.message);
+    console.log("ERROR TOKEN:", error.message);
 
     return res.json({
       ok: false

@@ -1,9 +1,9 @@
 const jwt = require('jsonwebtoken');
 
-// 🔥 MISMO SECRET EN TODO EL PROYECTO
+// MISMO SECRET EN TODO EL PROYECTO
 const SECRET_KEY = process.env.JWT_SECRET || 'secreto';
 
-// ✅ Generar token con id y rol
+// Generar token con id y rol
 const generarToken = (id, rol) => {
     return jwt.sign(
         { id, rol },
@@ -12,29 +12,29 @@ const generarToken = (id, rol) => {
     );
 };
 
-// ✅ Decodificar token
+// Decodificar token
 const decodificarToken = (token) => {
     try {
         return jwt.verify(token, SECRET_KEY);
     } catch (error) {
-        console.log("❌ ERROR TOKEN:", error.message);
+        console.log("ERROR TOKEN:", error.message);
         return null;
     }
 };
 
-// ✅ Extraer id
+// Extraer id
 const extraerId = (token) => {
     const decoded = decodificarToken(token);
     return decoded ? decoded.id : null;
 };
 
-// ✅ Extraer rol
+// Extraer rol
 const extraerRol = (token) => {
     const decoded = decodificarToken(token);
     return decoded ? decoded.rol : null;
 };
 
-// ✅ Validar token
+// Validar token
 const validarToken = (token) => {
     return decodificarToken(token) !== null;
 };

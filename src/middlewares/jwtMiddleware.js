@@ -5,7 +5,7 @@ const SECRET_KEY = process.env.JWT_SECRET || 'miClaveSuperSecretaSeguraParaJWT12
 const verificarToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
 
-    // ❌ No hay token
+    // No hay token
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ error: 'No autenticado: se requiere token JWT' });
     }

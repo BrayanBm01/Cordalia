@@ -9,18 +9,18 @@ const {
   deleteLugar,
 } = require("../controllers/turismoController");
 
-// 🔐 Middlewares
+// Middlewares
 const verificarToken = require("../middlewares/jwtMiddleware");
 const verificarRol = require("../middlewares/rolMiddleware");
 
-// 🔓 PÚBLICO
+// PÚBLICO
 router.get("/lugares", getLugares);
 router.get("/lugares/:id", getLugarById);
 
-// 🔐 USUARIOS AUTENTICADOS
+// USUARIOS AUTENTICADOS
 router.post("/lugares", verificarToken, createLugar);
 
-// 🔐 SOLO ADMIN
+// SOLO ADMIN
 router.put("/lugares/:id", verificarToken, verificarRol("ADMIN"), updateLugar);
 router.delete("/lugares/:id", verificarToken, verificarRol("ADMIN"), deleteLugar);
 

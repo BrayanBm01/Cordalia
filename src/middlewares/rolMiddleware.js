@@ -19,9 +19,9 @@ const verificarRol = (rolesPermitidos = []) => {
         process.env.JWT_SECRET || "secreto"
       );
 
-      const rol = decoded.rol; // 🔥 AQUÍ ESTÁ LA CLAVE
+      const rol = decoded.rol; // AQUÍ ESTÁ LA CLAVE
 
-      // 🔒 VALIDAR ROL
+      // VALIDAR ROL
       if (!rolesPermitidos.includes(rol)) {
         return res.status(403).json({
           ok: false,

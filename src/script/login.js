@@ -1,7 +1,7 @@
     const loginForm = document.getElementById("loginForm");
     const registerForm = document.getElementById("registerForm");
 
-    // 🔥 REDIRIGIR SI YA ESTÁ LOGUEADO
+    // REDIRIGIR SI YA ESTÁ LOGUEADO
     const token = localStorage.getItem("token");
     if (token) {
       window.location.href = "/index.html";
@@ -27,7 +27,7 @@
       switchForm(loginForm, registerForm);
     }
 
-    // ✅ LOGIN
+    // LOGIN
     async function loginUser() {
       const email = document.getElementById("loginEmail").value;
       const password = document.getElementById("loginPassword").value;
@@ -38,7 +38,7 @@
       }
 
       try {
-        const res = await fetch("/login", { // 🔥 CORREGIDO AQUÍ
+        const res = await fetch("/login", { // CORREGIDO AQUÍ
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -48,11 +48,11 @@
 
         const data = await res.json();
 
-        if (data.ok) { // 🔥 usamos lo que devuelve el backend corregido
+        if (data.ok) { // usamos lo que devuelve el backend corregido
           localStorage.setItem("token", data.token);
           alert(data.mensaje);
 
-          // 🚀 REDIRECCIÓN
+          // REDIRECCIÓN
           window.location.href = "/index.html";
         } else {
           alert(data.mensaje);
@@ -64,7 +64,7 @@
       }
     }
 
-    // ✅ REGISTRO
+    // REGISTRO
     async function registerUser() {
       const nombre = document.getElementById("registerNombre").value;
       const email = document.getElementById("registerEmail").value;
@@ -94,7 +94,7 @@
 
         const data = await res.json();
 
-        if (data.ok || res.ok) { // 🔥 más flexible por si backend no usa "ok"
+        if (data.ok || res.ok) { // más flexible por si backend no usa "ok"
           alert(data.mensaje);
           showLogin();
         } else {

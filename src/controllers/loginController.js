@@ -46,7 +46,7 @@ const login = async (req, res) => {
       });
     }
 
-    // 🔐 TOKEN CON ROL REAL
+    // TOKEN CON ROL REAL
     const token = generarToken(usuario.id, usuario.rol_id);
 
     // guardar intento exitoso
@@ -63,7 +63,7 @@ const login = async (req, res) => {
       ok: true,
       mensaje: "Login exitoso",
       token,
-      rol: usuario.rol_id, // 🔥 CLAVE
+      rol: usuario.rol_id, // CLAVE
       usuario: {
         id: usuario.id,
         nombre: usuario.nombre
