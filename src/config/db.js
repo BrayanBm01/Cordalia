@@ -1,11 +1,10 @@
 const { Pool } = require("pg");
 require("dotenv").config();
 
-// Usamos DATABASE_URL de Render para conexión más sencilla
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL, // External Database URL
   ssl: {
-    rejectUnauthorized: false // necesario para Render
+    rejectUnauthorized: false
   }
 });
 
@@ -13,8 +12,6 @@ const pool = new Pool({
 pool.connect()
   .then(client => {
     console.log("✅ Conectado a PostgreSQL");
-
-    // prueba real de consulta
     return client.query("SELECT NOW()");
   })
   .then(res => {
