@@ -1,47 +1,48 @@
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
 
-// MISMO SECRET EN TODO EL PROYECTO
-const SECRET_KEY = process.env.JWT_SECRET || 'secreto';
+// 🔥 Usa siempre el mismo SECRET
+const SECRET_KEY = process.env.JWT_SECRET || "secreto";
 
-// Generar token con id y rol
+// ✅ Generar token
 const generarToken = (id, rol) => {
-    return jwt.sign(
-        { id, rol },
-        SECRET_KEY,
-        { expiresIn: '2h' }
-    );
+  return jwt.sign(
+    { id, rol }, // 🔥 importante: incluir rol
+    SECRET_KEY,
+    { expiresIn: "2h" }
+  );
 };
 
-// Decodificar token
-const decodificarToken = (token) => {
-    try {
-        return jwt.verify(token, SECRET_KEY);
-    } catch (error) {
-        console.log("ERROR TOKEN:", error.message);
-        return null;
-    }
+// ✅ Verificar y decodificar token
+const verificarToken = (token) => {
+  try {
+    return jwt.verify(token, SECRET_KEY);
+  } catch (error) {
+    console.log("ERROR TOKEN:", error.message);
+    return null;
+  }
 };
 
-// Extraer id
+// ✅ Extraer ID
 const extraerId = (token) => {
-    const decoded = decodificarToken(token);
-    return decoded ? decoded.id : null;
+  const decoded = verificarToken(token);
+  return decoded ? decoded.id : null;
 };
 
-// Extraer rol
+// ✅ Extraer ROL
 const extraerRol = (token) => {
-    const decoded = decodificarToken(token);
-    return decoded ? decoded.rol : null;
+  const decoded = verificarToken(token);
+  return decoded ? decoded.rol : null;
 };
 
-// Validar token
+// ✅ Validar token
 const validarToken = (token) => {
-    return decodificarToken(token) !== null;
+  return verificarToken(token) !== null;
 };
+
 module.exports = {
-    generarToken,
-    decodificarToken,
-    extraerId,
-    extraerRol,
-    validarToken
+  generarToken,
+  verificarToken, // 🔥 mejor nombre que "decodificar"
+  extraerId,
+  extraerRol,
+  validarToken,
 };
