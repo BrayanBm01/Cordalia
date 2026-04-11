@@ -30,10 +30,15 @@ const login = async (req, res) => {
     const coincide = await bcrypt.compare(password, usuario.password);
 
     if (!coincide) {
-      await db.query(
-        "INSERT INTO login (usuario_id, exito) VALUES ($1, $2)",
-        [usuario.id, false]
-      );
+      // guardar intento fallido
+      try {
+        await db.query(
+          "INSERT INTO login (usuario_id, exito) VALUES ($1, $2)",
+          [usuario.id, false]
+        );
+      } catch (err) {
+        console.error("Error guardando intento fallido:", err);
+      }
 
       return res.status(401).json({
         ok: false,
@@ -41,22 +46,27 @@ const login = async (req, res) => {
       });
     }
 
-    // 🔥 TOKEN CON ROL (CORREGIDO)
-    const token = generarToken(usuario.id, usuario.rol);
+    // TOKEN CON ROL REAL
+    const token = generarToken(usuario.id, usuario.rol_id);
 
-    await db.query(
-      "INSERT INTO login (usuario_id, exito) VALUES ($1, $2)",
-      [usuario.id, true]
-    );
+    // guardar intento exitoso
+    try {
+      await db.query(
+        "INSERT INTO login (usuario_id, exito) VALUES ($1, $2)",
+        [usuario.id, true]
+      );
+    } catch (err) {
+      console.error("Error guardando intento exitoso:", err);
+    }
 
     return res.status(200).json({
       ok: true,
       mensaje: "Login exitoso",
       token,
+      rol: usuario.rol_id, // CLAVE
       usuario: {
         id: usuario.id,
-        nombre: usuario.nombre,
-        rol: usuario.rol // 🔥 IMPORTANTE
+        nombre: usuario.nombre
       }
     });
 

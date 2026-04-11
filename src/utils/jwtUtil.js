@@ -1,54 +1,47 @@
-const jwt = require("jsonwebtoken");
+const jwt = require('jsonwebtoken');
 
-// 🔥 MISMO SECRET EN TODO EL PROYECTO
-const SECRET_KEY = process.env.JWT_SECRET || "secreto";
+// MISMO SECRET EN TODO EL PROYECTO
+const SECRET_KEY = process.env.JWT_SECRET || 'secreto';
 
-// ✅ Generar token
+// Generar token con id y rol
 const generarToken = (id, rol) => {
-  return jwt.sign(
-    { id, rol },
-    SECRET_KEY,
-    { expiresIn: "2h" }
-  );
+    return jwt.sign(
+        { id, rol },
+        SECRET_KEY,
+        { expiresIn: '2h' }
+    );
 };
 
-// ✅ Verificar token (con errores claros)
-const verificarToken = (token) => {
-  try {
-    return jwt.verify(token, SECRET_KEY);
-  } catch (error) {
-    if (error.name === "TokenExpiredError") {
-      console.log("❌ Token expirado");
-    } else if (error.name === "JsonWebTokenError") {
-      console.log("❌ Token inválido");
-    } else {
-      console.log("❌ Error token:", error.message);
+// Decodificar token
+const decodificarToken = (token) => {
+    try {
+        return jwt.verify(token, SECRET_KEY);
+    } catch (error) {
+        console.log("ERROR TOKEN:", error.message);
+        return null;
     }
-    return null;
-  }
 };
 
-// ✅ Extraer ID
+// Extraer id
 const extraerId = (token) => {
-  const decoded = verificarToken(token);
-  return decoded?.id || null;
+    const decoded = decodificarToken(token);
+    return decoded ? decoded.id : null;
 };
 
-// ✅ Extraer ROL
+// Extraer rol
 const extraerRol = (token) => {
-  const decoded = verificarToken(token);
-  return decoded?.rol || null;
+    const decoded = decodificarToken(token);
+    return decoded ? decoded.rol : null;
 };
 
-// ✅ Validar token (true/false)
+// Validar token
 const validarToken = (token) => {
-  return !!verificarToken(token);
+    return decodificarToken(token) !== null;
 };
-
 module.exports = {
-  generarToken,
-  verificarToken,
-  extraerId,
-  extraerRol,
-  validarToken,
+    generarToken,
+    decodificarToken,
+    extraerId,
+    extraerRol,
+    validarToken
 };

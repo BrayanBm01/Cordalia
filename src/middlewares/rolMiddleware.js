@@ -1,27 +1,43 @@
+const jwt = require("jsonwebtoken");
+
 const verificarRol = (rolesPermitidos = []) => {
   return (req, res, next) => {
+    const auth = req.headers.authorization;
 
-    // 🔥 YA NO leemos el token aquí
-    // El jwtMiddleware ya lo hizo antes
-
-    if (!req.usuario) {
+    if (!auth) {
       return res.status(401).json({
         ok: false,
-        mensaje: "No autenticado"
+        mensaje: "No autorizado"
       });
     }
 
-    const { rol } = req.usuario;
+    const token = auth.split(" ")[1];
 
-    // 🔥 Validar rol (permite múltiples roles)
-    if (!rolesPermitidos.includes(rol)) {
-      return res.status(403).json({
+    try {
+      const decoded = jwt.verify(
+        token,
+        process.env.JWT_SECRET || "secreto"
+      );
+
+      const rol = decoded.rol; // AQUÍ ESTÁ LA CLAVE
+
+      // VALIDAR ROL
+      if (!rolesPermitidos.includes(rol)) {
+        return res.status(403).json({
+          ok: false,
+          mensaje: "No tienes permisos"
+        });
+      }
+
+      req.usuario = decoded;
+      next();
+
+    } catch (error) {
+      return res.status(401).json({
         ok: false,
-        mensaje: "No tienes permisos"
+        mensaje: "Token inválido"
       });
     }
-
-    next();
   };
 };
 

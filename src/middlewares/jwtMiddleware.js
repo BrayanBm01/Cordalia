@@ -1,34 +1,30 @@
-const jwt = require("jsonwebtoken");
+const jwt = require('jsonwebtoken');
 
-// 🔥 MISMO SECRET EN TODO EL PROYECTO
-const SECRET_KEY = process.env.JWT_SECRET || "secreto";
+const SECRET_KEY = process.env.JWT_SECRET || 'miClaveSuperSecretaSeguraParaJWT123456';
 
 const verificarToken = (req, res, next) => {
-  const authHeader = req.headers["authorization"];
+    const authHeader = req.headers['authorization'];
 
-  // ❌ No hay token o formato incorrecto
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({
-      error: "No autenticado: se requiere token JWT",
-    });
-  }
+    // No hay token
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'No autenticado: se requiere token JWT' });
+    }
 
-  const token = authHeader.split(" ")[1];
+    const token = authHeader.split(' ')[1];
 
-  try {
-    const decoded = jwt.verify(token, SECRET_KEY);
+    try {
+        const decoded = jwt.verify(token, SECRET_KEY);
 
-    // ✅ Guardar todo el payload (id + rol)
-    req.usuario = decoded;
+        // Guardamos datos en request (como SecurityContext en Java)
+        req.usuario = {
+            email: decoded.email,
+            rol: decoded.rol
+        };
 
-    next();
-  } catch (error) {
-    console.log("ERROR JWT:", error.message);
-
-    return res.status(403).json({
-      error: "Token inválido o expirado",
-    });
-  }
+        next();
+    } catch (error) {
+        return res.status(401).json({ error: 'Token inválido' });
+    }
 };
 
 module.exports = verificarToken;

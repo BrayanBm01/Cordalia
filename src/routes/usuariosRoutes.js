@@ -6,38 +6,26 @@ const {
   getUsuarioById,
   createUsuario,
   updateUsuario,
-  deleteUsuario,
-  register
+  deleteUsuario
 } = require("../controllers/usuariosController");
 
-// Middlewares
-const verificarToken = require("../middlewares/jwtMiddleware");
-const verificarRol = require("../middlewares/rolMiddleware");
+// IMPORTANTE: importar register
+const { register } = require("../controllers/usuariosController");
 
+// GET
+router.get("/usuarios", getUsuarios);
+router.get("/usuarios/:id", getUsuarioById);
 
-// 🔓 REGISTRO (PÚBLICO)
-router.post("/usuarios/register", register);
-
-
-// 🔓 (opcional) crear usuario sin login
-// si NO quieres esto público, elimínalo
+// POST
 router.post("/usuarios", createUsuario);
 
+// NUEVA RUTA PARA REGISTRO
+router.post("/usuarios/register", register);
 
-// 🔐 SOLO ADMIN puede ver todos los usuarios
-router.get("/usuarios", verificarToken, verificarRol("ADMIN"), getUsuarios);
+// PUT
+router.put("/usuarios/:id", updateUsuario);
 
-
-// 🔐 Usuario logeado puede ver su info (o admin)
-router.get("/usuarios/:id", verificarToken, getUsuarioById);
-
-
-// 🔐 SOLO ADMIN puede actualizar
-router.put("/usuarios/:id", verificarToken, verificarRol("ADMIN"), updateUsuario);
-
-
-// 🔐 SOLO ADMIN puede eliminar
-router.delete("/usuarios/:id", verificarToken, verificarRol("ADMIN"), deleteUsuario);
-
+// DELETE
+router.delete("/usuarios/:id", deleteUsuario);
 
 module.exports = router;
