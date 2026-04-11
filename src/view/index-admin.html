@@ -1,77 +1,103 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
     <meta charset="UTF-8">
     <title>Panel Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
-<body class="bg-gray-900 text-white p-6">
+<body class="bg-gray-900 text-white min-h-screen">
 
-    <h1 class="text-3xl font-bold mb-6">Panel de Administración</h1>
+    <!-- HEADER -->
+    <div class="flex flex-col md:flex-row justify-between items-center p-6 border-b border-gray-700">
+        <h1 class="text-2xl md:text-3xl font-bold mb-4 md:mb-0">
+            Panel de Administración
+        </h1>
 
-    <button onclick="logout()" class="bg-red-500 px-4 py-2 rounded mb-6">
-        Cerrar sesión
-    </button>
-
-    <!-- FORM CREAR / EDITAR -->
-    <div class="bg-gray-800 p-4 rounded mb-6">
-        <h2 class="text-xl mb-4">Crear / Editar Usuario</h2>
-
-        <input id="nombre" placeholder="Nombre" class="block mb-2 p-2 text-black w-full">
-        <input id="email" placeholder="Email" class="block mb-2 p-2 text-black w-full">
-        <input id="password" placeholder="Password" class="block mb-2 p-2 text-black w-full">
-
-        <select id="rol" class="block mb-4 p-2 text-black w-full">
-            <option value="0">Admin</option>
-            <option value="1">Usuario</option>
-        </select>
-
-        <button onclick="guardarUsuario()" class="bg-green-500 px-4 py-2 rounded">
-            Guardar
+        <button onclick="logout()" 
+            class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded transition">
+            Cerrar sesión
         </button>
     </div>
 
-    <!-- TABLA -->
-    <table class="w-full bg-gray-800 rounded">
-        <thead>
-            <tr class="bg-gray-700">
-                <th>ID</th>
-                <th>Nombre</th>
-                <th>Email</th>
-                <th>Rol</th>
-                <th>Acciones</th>
-            </tr>
-        </thead>
-        <tbody id="tablaUsuarios"></tbody>
-    </table>
+    <div class="p-4 md:p-6 max-w-6xl mx-auto">
+
+        <!-- FORM -->
+        <div class="bg-gray-800 p-6 rounded-xl shadow-lg mb-8">
+            <h2 class="text-xl font-semibold mb-4">
+                Crear / Editar Usuario
+            </h2>
+
+            <div class="grid md:grid-cols-2 gap-4">
+                <input id="nombre" placeholder="Nombre"
+                    class="p-2 rounded bg-gray-200 text-black w-full">
+
+                <input id="email" placeholder="Email"
+                    class="p-2 rounded bg-gray-200 text-black w-full">
+
+                <input id="password" placeholder="Password"
+                    class="p-2 rounded bg-gray-200 text-black w-full">
+
+                <select id="rol"
+                    class="p-2 rounded bg-gray-200 text-black w-full">
+                    <option value="0">Admin</option>
+                    <option value="1" selected>Usuario</option>
+                </select>
+            </div>
+
+            <div class="mt-4 flex gap-3">
+                <button onclick="guardarUsuario()"
+                    class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded transition">
+                    Guardar
+                </button>
+
+                <button onclick="limpiar()"
+                    class="bg-gray-500 hover:bg-gray-600 px-4 py-2 rounded transition">
+                    Limpiar
+                </button>
+            </div>
+        </div>
+
+        <!-- TABLA -->
+        <div class="bg-gray-800 rounded-xl shadow-lg p-4 overflow-x-auto">
+            <table class="w-full text-sm md:text-base">
+                <thead>
+                    <tr class="bg-gray-700 text-gray-200">
+                        <th class="p-2">ID</th>
+                        <th class="p-2">Nombre</th>
+                        <th class="p-2">Email</th>
+                        <th class="p-2">Rol</th>
+                        <th class="p-2">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaUsuarios"></tbody>
+            </table>
+        </div>
+
+    </div>
 
     <script>
         let editandoId = null;
         const token = localStorage.getItem("token");
 
-        // 🔐 VERIFICAR TOKEN Y ROL
         if (!token) {
             window.location.href = "/";
         } else {
             fetch("/login/verify", {
                 headers: { Authorization: "Bearer " + token }
             })
-                .then(res => res.json())
-                .then(data => {
-                    if (!data.ok || Number(data.usuario?.rol) !== 0) {
-                        alert("No tienes permisos");
-                        window.location.href = "/";
-                        return;
-                    }
-
-                    cargarUsuarios();
-                })
-                .catch(() => window.location.href = "/");
+            .then(res => res.json())
+            .then(data => {
+                if (!data.ok || Number(data.usuario?.rol) !== 0) {
+                    alert("No tienes permisos");
+                    window.location.href = "/";
+                    return;
+                }
+                cargarUsuarios();
+            })
+            .catch(() => window.location.href = "/");
         }
 
-        // 🚀 CARGAR USUARIOS
         async function cargarUsuarios() {
             try {
                 const res = await fetch("/api/usuarios", {
@@ -79,22 +105,27 @@
                 });
 
                 const data = await res.json();
-
                 const tabla = document.getElementById("tablaUsuarios");
                 tabla.innerHTML = "";
 
                 data.forEach(u => {
                     tabla.innerHTML += `
-            <tr class="text-center border-t border-gray-700">
-                <td>${u.id}</td>
-                <td>${u.nombre}</td>
-                <td>${u.email}</td>
-                <td>${u.rol_id}</td>
-                <td>
-                    <button onclick='editar(${JSON.stringify(u)})' class="bg-yellow-500 px-2 py-1 rounded">Editar</button>
-                    <button onclick='eliminar(${u.id})' class="bg-red-500 px-2 py-1 rounded">Eliminar</button>
-                </td>
-            </tr>`;
+                    <tr class="text-center border-t border-gray-700 hover:bg-gray-700">
+                        <td class="p-2">${u.id}</td>
+                        <td class="p-2">${u.nombre}</td>
+                        <td class="p-2">${u.email}</td>
+                        <td class="p-2">${u.rol_id == 0 ? 'Admin' : 'Usuario'}</td>
+                        <td class="p-2 flex flex-col md:flex-row gap-2 justify-center">
+                            <button onclick='editar(${JSON.stringify(u)})'
+                                class="bg-yellow-500 hover:bg-yellow-600 px-2 py-1 rounded">
+                                Editar
+                            </button>
+                            <button onclick='eliminar(${u.id})'
+                                class="bg-red-500 hover:bg-red-600 px-2 py-1 rounded">
+                                Eliminar
+                            </button>
+                        </td>
+                    </tr>`;
                 });
 
             } catch (error) {
@@ -102,23 +133,19 @@
             }
         }
 
-        // ✏️ EDITAR
         function editar(usuario) {
             editandoId = usuario.id;
-
             document.getElementById("nombre").value = usuario.nombre;
             document.getElementById("email").value = usuario.email;
             document.getElementById("rol").value = usuario.rol_id;
         }
 
-        // 💾 GUARDAR (CREATE + UPDATE)
         async function guardarUsuario() {
             const nombre = document.getElementById("nombre").value.trim();
             const email = document.getElementById("email").value.trim();
             const password = document.getElementById("password").value.trim();
             const rol = document.getElementById("rol").value;
 
-            // 🔴 VALIDACIONES
             if (!nombre || !email || !rol) {
                 alert("Completa nombre, email y rol");
                 return;
@@ -130,10 +157,7 @@
                 rol_id: Number(rol)
             };
 
-            // solo si escriben password
-            if (password) {
-                body.password = password;
-            }
+            if (password) body.password = password;
 
             let url = "/api/usuarios";
             let method = "POST";
@@ -144,8 +168,6 @@
             }
 
             try {
-                console.log("ENVIANDO:", body);
-
                 const res = await fetch(url, {
                     method,
                     headers: {
@@ -172,7 +194,6 @@
             }
         }
 
-        // 🗑️ ELIMINAR
         async function eliminar(id) {
             if (!confirm("¿Eliminar usuario?")) return;
 
@@ -192,17 +213,14 @@
             }
         }
 
-        // 🧹 LIMPIAR
         function limpiar() {
             editandoId = null;
-
             document.getElementById("nombre").value = "";
             document.getElementById("email").value = "";
             document.getElementById("password").value = "";
-            document.getElementById("rol").value = "1"; // 👈 default usuario
+            document.getElementById("rol").value = "1";
         }
 
-        // 🚪 LOGOUT
         function logout() {
             localStorage.clear();
             window.location.href = "/";
@@ -210,5 +228,4 @@
     </script>
 
 </body>
-
 </html>
