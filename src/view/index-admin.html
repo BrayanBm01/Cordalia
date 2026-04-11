@@ -49,50 +49,33 @@
 
     <script>
         let editandoId = null;
-
-        // 🔐 VERIFICAR TOKEN Y ROL (CORRECTO Y ESTABLE)
         const token = localStorage.getItem("token");
 
+        // 🔐 VERIFICAR TOKEN Y ROL
         if (!token) {
             window.location.href = "/";
         } else {
             fetch("/login/verify", {
-                headers: {
-                    Authorization: "Bearer " + token
-                }
+                headers: { Authorization: "Bearer " + token }
             })
                 .then(res => res.json())
                 .then(data => {
-                    console.log("VERIFY:", data); // 👈 DEBUG
-
-                    if (!data.ok) {
-                        window.location.href = "/";
-                        return;
-                    }
-
-                    const rol = Number(data.usuario?.rol); // 🔥 aseguramos número
-
-                    if (rol !== 0) {
+                    if (!data.ok || Number(data.usuario?.rol) !== 0) {
                         alert("No tienes permisos");
                         window.location.href = "/";
                         return;
                     }
 
-                    // ✅ SOLO ADMIN
                     cargarUsuarios();
                 })
-                .catch(() => {
-                    window.location.href = "/";
-                });
+                .catch(() => window.location.href = "/");
         }
 
         // 🚀 CARGAR USUARIOS
         async function cargarUsuarios() {
             try {
                 const res = await fetch("/api/usuarios", {
-                    headers: {
-                        Authorization: "Bearer " + token
-                    }
+                    headers: { Authorization: "Bearer " + token }
                 });
 
                 const data = await res.json();
@@ -111,8 +94,7 @@
                     <button onclick='editar(${JSON.stringify(u)})' class="bg-yellow-500 px-2 py-1 rounded">Editar</button>
                     <button onclick='eliminar(${u.id})' class="bg-red-500 px-2 py-1 rounded">Eliminar</button>
                 </td>
-            </tr>
-            `;
+            </tr>`;
                 });
 
             } catch (error) {
@@ -129,26 +111,41 @@
             document.getElementById("rol").value = usuario.rol_id;
         }
 
-        // 💾 GUARDAR
+        // 💾 GUARDAR (CREATE + UPDATE)
         async function guardarUsuario() {
-            const nombre = document.getElementById("nombre").value;
-            const email = document.getElementById("email").value;
-            const password = document.getElementById("password").value;
+            const nombre = document.getElementById("nombre").value.trim();
+            const email = document.getElementById("email").value.trim();
+            const password = document.getElementById("password").value.trim();
             const rol = document.getElementById("rol").value;
 
-            const body = { nombre, email, rol_id: Number(rol) };
+            // 🔴 VALIDACIONES
+            if (!nombre || !email || !rol) {
+                alert("Completa nombre, email y rol");
+                return;
+            }
 
-            if (password) body.password = password;
+            const body = {
+                nombre,
+                email,
+                rol_id: Number(rol)
+            };
+
+            // solo si escriben password
+            if (password) {
+                body.password = password;
+            }
 
             let url = "/api/usuarios";
             let method = "POST";
 
             if (editandoId) {
-                url += "/" + editandoId;
+                url = `/api/usuarios/${editandoId}`;
                 method = "PUT";
             }
 
             try {
+                console.log("ENVIANDO:", body);
+
                 const res = await fetch(url, {
                     method,
                     headers: {
@@ -159,7 +156,13 @@
                 });
 
                 const data = await res.json();
-                alert(data.mensaje);
+
+                if (!res.ok) {
+                    alert(data.mensaje || "Error");
+                    return;
+                }
+
+                alert(data.mensaje || "Guardado correctamente");
 
                 limpiar();
                 cargarUsuarios();
@@ -176,9 +179,7 @@
             try {
                 const res = await fetch("/api/usuarios/" + id, {
                     method: "DELETE",
-                    headers: {
-                        Authorization: "Bearer " + token
-                    }
+                    headers: { Authorization: "Bearer " + token }
                 });
 
                 const data = await res.json();
@@ -194,9 +195,11 @@
         // 🧹 LIMPIAR
         function limpiar() {
             editandoId = null;
+
             document.getElementById("nombre").value = "";
             document.getElementById("email").value = "";
             document.getElementById("password").value = "";
+            document.getElementById("rol").value = "1"; // 👈 default usuario
         }
 
         // 🚪 LOGOUT
