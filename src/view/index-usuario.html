@@ -1,24 +1,52 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Usuario</title>
+
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
-<body>
-    <h1>HOLA MUNDO</h1>
-    Lorem ipsum dolor sit amet consectetur adipisicing elit. Ut ullam, libero voluptas maxime quibusdam mollitia dolore
-    nesciunt quas obcaecati, eos sit, reprehenderit aperiam quo ratione enim perferendis rerum. A, nulla?
-</body>
-<script>
-    const token = localStorage.getItem("token");
-    const rol = localStorage.getItem("rol");
+<body class="bg-gray-900 text-white min-h-screen">
 
-    if (!token || rol != 1) {
-        window.location.href = "/";
-    }
-</script>
+    <!-- HEADER -->
+    <div class="flex justify-between items-center p-4 border-b border-gray-700">
+        <h1 class="text-xl font-bold">Panel Usuario</h1>
+
+        <button onclick="logout()" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded transition">
+            Cerrar sesión
+        </button>
+    </div>
+
+    <!-- CONTENIDO -->
+    <div class="p-6">
+        <h1 class="text-2xl font-bold mb-4">HOLA MUNDO</h1>
+
+        <p class="text-gray-300">
+            Lorem ipsum dolor sit amet consectetur adipisicing elit. Ut ullam, libero voluptas maxime quibusdam mollitia
+            dolore nesciunt quas obcaecati, eos sit, reprehenderit aperiam quo ratione enim perferendis rerum. A, nulla?
+        </p>
+    </div>
+
+    <script>
+        const token = localStorage.getItem("token");
+        const rol = localStorage.getItem("rol");
+
+        // 🔐 PROTECCIÓN DE RUTA
+        if (!token || rol != 1) {
+            window.location.href = "/";
+        }
+
+        // 🚪 LOGOUT
+        function logout() {
+            localStorage.clear();
+            window.location.href = "/";
+        }
+    </script>
+
+</body>
 
 </html>
