@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
 
-const SECRET_KEY = process.env.JWT_SECRET || "miClaveSuperSecretaSeguraParaJWT123456";
+// 🔥 MISMO SECRET EN TODO EL PROYECTO
+const SECRET_KEY = process.env.JWT_SECRET || "secreto";
 
 const verificarToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
@@ -17,11 +18,13 @@ const verificarToken = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, SECRET_KEY);
 
-    // ✅ Guardar TODO el payload
-    req.usuario = decoded; // 🔥 id + rol
+    // ✅ Guardar todo el payload (id + rol)
+    req.usuario = decoded;
 
     next();
   } catch (error) {
+    console.log("ERROR JWT:", error.message);
+
     return res.status(403).json({
       error: "Token inválido o expirado",
     });
