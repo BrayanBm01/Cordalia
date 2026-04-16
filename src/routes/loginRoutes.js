@@ -27,13 +27,9 @@ router.get("/verify", async (req, res) => {
 
     // 🔍 validar en DB (CLAVE PARA EVITAR BUCLES)
     const result = await db.query(
-      "SELECT id, rol_id, token_activo FROM usuarios WHERE id = $1",
+      "SELECT id, nombre, email, rol_id, token_activo FROM usuarios WHERE id = $1",
       [decoded.id]
     );
-
-    if (result.rows.length === 0) {
-      return res.json({ ok: false });
-    }
 
     const usuario = result.rows[0];
 
@@ -45,11 +41,13 @@ router.get("/verify", async (req, res) => {
       });
     }
 
-    // ✔ respuesta estable para frontend
+    // ✔ respuesta completa
     return res.json({
       ok: true,
       usuario: {
         id: usuario.id,
+        nombre: usuario.nombre,
+        email: usuario.email,
         rol: usuario.rol_id
       }
     });
