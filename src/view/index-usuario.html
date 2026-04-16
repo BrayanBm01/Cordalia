@@ -543,9 +543,7 @@
   </footer>
 
   <script>
-  /* =========================
-     🔥 SCROLL ANIMATION
-  ========================= */
+  /* SCROLL ANIMATION*/
   function reveal() {
     let reveals = document.querySelectorAll(".reveal");
 
@@ -563,9 +561,7 @@
   window.addEventListener("scroll", reveal);
 
 
-  /* =========================
-     📱 MENU MOVIL
-  ========================= */
+  /* MENU MOVIL*/
   const menuBtn = document.getElementById("menuBtn");
   const menu = document.getElementById("mobileMenu");
   const overlay = document.getElementById("overlay");
@@ -608,7 +604,7 @@
             <div class="flex items-center gap-4">
 
               <span class="hidden sm:block text-sm text-gray-300">
-                ${usuario.nombre}
+                ${usuario.nombre || usuario.email || "Usuario"}
               </span>
 
               <button onclick="logout()"
