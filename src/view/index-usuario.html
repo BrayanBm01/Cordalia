@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <title>Explora Turismo</title>
-  <link rel="stylesheet" href="stile.css">
+  <link rel="stylesheet" href="../css/index.css">
   <script src="https://unpkg.com/heroicons@2.0.18/dist/heroicons.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
 
@@ -543,108 +543,129 @@
   </footer>
 
   <script>
-  /* SCROLL ANIMATION*/
-  function reveal() {
-    let reveals = document.querySelectorAll(".reveal");
+    /* SCROLL ANIMATION */
+    function reveal() {
+      const reveals = document.querySelectorAll(".reveal");
 
-    reveals.forEach(section => {
-      let windowHeight = window.innerHeight;
-      let elementTop = section.getBoundingClientRect().top;
-      let visible = 100;
+      reveals.forEach(section => {
+        const windowHeight = window.innerHeight;
+        const elementTop = section.getBoundingClientRect().top;
+        const visible = 50; // 👈 mejor para móvil
 
-      if (elementTop < windowHeight - visible) {
-        section.classList.add("active");
-      }
+        if (elementTop < windowHeight - visible) {
+          section.classList.add("active");
+        }
+      });
+    }
+
+    window.addEventListener("scroll", reveal);
+    window.addEventListener("load", reveal); // 👈 asegura animación al cargar
+
+
+    /* MENU MOVIL */
+    const menuBtn = document.getElementById("menuBtn");
+    const menu = document.getElementById("mobileMenu");
+    const overlay = document.getElementById("overlay");
+
+    menuBtn.addEventListener("click", () => {
+      menu.classList.toggle("active");
+      overlay.classList.toggle("active");
     });
-  }
 
-  window.addEventListener("scroll", reveal);
+    overlay.addEventListener("click", () => {
+      menu.classList.remove("active");
+      overlay.classList.remove("active");
+    });
 
-
-  /* MENU MOVIL*/
-  const menuBtn = document.getElementById("menuBtn");
-  const menu = document.getElementById("mobileMenu");
-  const overlay = document.getElementById("overlay");
-
-  menuBtn.addEventListener("click", () => {
-    menu.classList.toggle("active");
-    overlay.classList.toggle("active");
-  });
-
-  overlay.addEventListener("click", () => {
-    menu.classList.remove("active");
-    overlay.classList.remove("active");
-  });
+    // 👇 cerrar menú al hacer click en links (mejora UX móvil)
+    document.querySelectorAll("#mobileMenu a").forEach(link => {
+      link.addEventListener("click", () => {
+        menu.classList.remove("active");
+        overlay.classList.remove("active");
+      });
+    });
 
 
-  /* =========================
-     🔐 AUTH + USUARIO
-  ========================= */
-  const token = localStorage.getItem("token");
-  const userSection = document.getElementById("userSection");
+    /* =========================
+       🔐 AUTH + USUARIO
+    ========================= */
+    const token = localStorage.getItem("token");
+    const userSection = document.getElementById("userSection");
 
-  if (!token) {
-    window.location.href = "/";
-  } else {
-    fetch("/login/verify", {
-      headers: {
-        Authorization: "Bearer " + token
+    // 👇 primero intenta usar localStorage (más rápido)
+    let usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
+
+    if (!token) {
+      window.location.href = "/";
+    } else {
+
+      // 👇 pintar usuario inmediatamente si existe
+      if (usuario && (usuario.nombre || usuario.email)) {
+        renderUser(usuario);
       }
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (!data.ok) {
-          localStorage.clear();
-          window.location.href = "/";
-        } else {
-          const usuario = data.usuario;
 
-          // pintar usuario + logout
-          userSection.innerHTML = `
-            <div class="flex items-center gap-4">
-
-              <span class="hidden sm:block text-sm text-gray-300">
-                ${usuario.nombre || usuario.email || "Usuario"}
-              </span>
-
-              <button onclick="logout()"
-                class="flex items-center gap-2 bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg font-bold transition transform hover:scale-105 shadow-lg">
-
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M17 16l4-4m0 0l-4-4m4 4H7" />
-                </svg>
-
-                Salir
-              </button>
-
-            </div>
-          `;
+      // 👇 verificar con backend
+      fetch("/login/verify", {
+        headers: {
+          Authorization: "Bearer " + token
         }
       })
-      .catch(() => {
-        localStorage.clear();
-        window.location.href = "/";
-      });
-  }
+        .then(res => res.json())
+        .then(data => {
+          console.log("VERIFY:", data); // 👈 debug
+
+          if (!data.ok) {
+            localStorage.clear();
+            window.location.href = "/";
+          } else {
+            usuario = data.usuario || {};
+
+            // 🔥 guardar actualizado
+            localStorage.setItem("usuario", JSON.stringify(usuario));
+
+            renderUser(usuario);
+          }
+        })
+        .catch(() => {
+          localStorage.clear();
+          window.location.href = "/";
+        });
+    }
 
 
-  /* =========================
-     🚪 LOGOUT
-  ========================= */
-  function logout() {
-    localStorage.clear();
-    window.location.href = "/";
-  }
+    // 👇 función separada (más limpio)
+    function renderUser(usuario) {
+      userSection.innerHTML = `
+    <div class="flex items-center gap-4">
+
+      <span class="hidden sm:block text-sm text-gray-300">
+        ${usuario?.nombre ?? usuario?.email ?? "Usuario"}
+      </span>
+
+      <button onclick="logout()"
+        class="flex items-center gap-2 bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg font-bold transition transform hover:scale-105 shadow-lg">
+
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M17 16l4-4m0 0l-4-4m4 4H7" />
+        </svg>
+
+        Salir
+      </button>
+
+    </div>
+  `;
+    }
 
 
-  //🚀 LOAD INICIAL
- 
-  window.onload = () => {
-    window.scrollTo(0, 0);
-    reveal(); // 👈 importante para activar animaciones al cargar
-  };
-</script>
+    /* =========================
+       🚪 LOGOUT
+    ========================= */
+    function logout() {
+      localStorage.clear();
+      window.location.href = "/";
+    }
+  </script>
 
 </body>
 
