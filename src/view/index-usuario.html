@@ -78,15 +78,7 @@
         </a>
 
         <!-- botón extra -->
-        <button onclick="logout()"
-          class="ml-4 flex items-center gap-2 bg-red-500 hover:bg-red-600 px-5 py-2 rounded-lg font-bold transition transform hover:scale-105 shadow-lg">
-
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7" />
-          </svg>
-
-          Cerrar sesión
-        </button>
+        <div id="userSection" class="ml-4"></div>
 
       </div>
 
@@ -551,9 +543,50 @@
   </footer>
 
   <script>
-  const token = localStorage.getItem("token");
+  /* =========================
+     🔥 SCROLL ANIMATION
+  ========================= */
+  function reveal() {
+    let reveals = document.querySelectorAll(".reveal");
 
-  // 🔐 VALIDACIÓN REAL
+    reveals.forEach(section => {
+      let windowHeight = window.innerHeight;
+      let elementTop = section.getBoundingClientRect().top;
+      let visible = 100;
+
+      if (elementTop < windowHeight - visible) {
+        section.classList.add("active");
+      }
+    });
+  }
+
+  window.addEventListener("scroll", reveal);
+
+
+  /* =========================
+     📱 MENU MOVIL
+  ========================= */
+  const menuBtn = document.getElementById("menuBtn");
+  const menu = document.getElementById("mobileMenu");
+  const overlay = document.getElementById("overlay");
+
+  menuBtn.addEventListener("click", () => {
+    menu.classList.toggle("active");
+    overlay.classList.toggle("active");
+  });
+
+  overlay.addEventListener("click", () => {
+    menu.classList.remove("active");
+    overlay.classList.remove("active");
+  });
+
+
+  /* =========================
+     🔐 AUTH + USUARIO
+  ========================= */
+  const token = localStorage.getItem("token");
+  const userSection = document.getElementById("userSection");
+
   if (!token) {
     window.location.href = "/";
   } else {
@@ -564,11 +597,33 @@
     })
       .then(res => res.json())
       .then(data => {
-        if (!data.ok || data.usuario.rol != 1) {
+        if (!data.ok) {
           localStorage.clear();
           window.location.href = "/";
         } else {
-          localStorage.setItem("rol", data.usuario.rol);
+          const usuario = data.usuario;
+
+          // pintar usuario + logout
+          userSection.innerHTML = `
+            <div class="flex items-center gap-4">
+
+              <span class="hidden sm:block text-sm text-gray-300">
+                ${usuario.nombre}
+              </span>
+
+              <button onclick="logout()"
+                class="flex items-center gap-2 bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg font-bold transition transform hover:scale-105 shadow-lg">
+
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M17 16l4-4m0 0l-4-4m4 4H7" />
+                </svg>
+
+                Salir
+              </button>
+
+            </div>
+          `;
         }
       })
       .catch(() => {
@@ -577,11 +632,22 @@
       });
   }
 
-  // 🚪 LOGOUT
+
+  /* =========================
+     🚪 LOGOUT
+  ========================= */
   function logout() {
     localStorage.clear();
     window.location.href = "/";
   }
+
+
+  //🚀 LOAD INICIAL
+ 
+  window.onload = () => {
+    window.scrollTo(0, 0);
+    reveal(); // 👈 importante para activar animaciones al cargar
+  };
 </script>
 
 </body>
