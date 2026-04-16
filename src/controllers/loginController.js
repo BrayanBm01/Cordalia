@@ -16,9 +16,9 @@ const login = async (req, res) => {
     email = email.trim();
     password = password.trim();
 
-    // 🔍 buscar usuario (POSTGRESQL)
+    // 🔍 buscar usuario
     const result = await db.query(
-      "SELECT * FROM usuarios WHERE email = $1",
+      "SELECT id, nombre, email, password, rol_id FROM usuarios WHERE email = $1",
       [email]
     );
 
@@ -35,7 +35,6 @@ const login = async (req, res) => {
     const coincide = await bcrypt.compare(password, usuario.password);
 
     if (!coincide) {
-      // log intento fallido
       try {
         await db.query(
           "INSERT INTO login (usuario_id, exito) VALUES ($1, $2)",
@@ -51,16 +50,16 @@ const login = async (req, res) => {
       });
     }
 
-    // 🔑 generar token JWT
+    // 🔑 generar token
     const token = generarToken(usuario.id, usuario.rol_id);
 
-    // 🔥 SESIÓN ÚNICA (CLAVE DEL SISTEMA)
+    // 🔥 sesión única (IMPORTANTE)
     await db.query(
       "UPDATE usuarios SET token_activo = $1 WHERE id = $2",
       [token, usuario.id]
     );
 
-    // log intento exitoso
+    // log exitoso
     try {
       await db.query(
         "INSERT INTO login (usuario_id, exito) VALUES ($1, $2)",
@@ -70,6 +69,7 @@ const login = async (req, res) => {
       console.error("Error log exitoso:", err);
     }
 
+    // ✔ respuesta estable (IMPORTANTE PARA EVITAR BUGS FRONTEND)
     return res.status(200).json({
       ok: true,
       mensaje: "Login exitoso",
@@ -78,7 +78,8 @@ const login = async (req, res) => {
       usuario: {
         id: usuario.id,
         nombre: usuario.nombre,
-        email: usuario.email
+        email: usuario.email,
+        rol: usuario.rol_id
       }
     });
 

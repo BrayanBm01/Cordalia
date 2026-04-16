@@ -7,7 +7,7 @@ const verificarToken = async (req, res, next) => {
 
     // 🔒 validar header
     if (!auth || !auth.startsWith("Bearer ")) {
-      return res.status(401).json({ mensaje: "Token requerido" });
+      return res.status(401).json({ ok: false, mensaje: "Token requerido" });
     }
 
     const token = auth.split(" ")[1];
@@ -15,26 +15,27 @@ const verificarToken = async (req, res, next) => {
     // 🔐 verificar JWT
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // 🔍 buscar usuario
+    // 🔍 buscar usuario en DB
     const result = await pool.query(
       "SELECT id, rol_id, token_activo FROM usuarios WHERE id = $1",
       [decoded.id]
     );
 
     if (result.rows.length === 0) {
-      return res.status(401).json({ mensaje: "Usuario no existe" });
+      return res.status(401).json({ ok: false, mensaje: "Usuario no existe" });
     }
 
     const usuario = result.rows[0];
 
-    // 🔥 sesión única
+    // 🔥 sesión única real
     if (usuario.token_activo !== token) {
-      return res.status(403).json({
+      return res.status(401).json({
+        ok: false,
         mensaje: "Sesión cerrada desde otro dispositivo"
       });
     }
 
-    // 👤 usuario disponible en rutas
+    // 👤 guardar usuario en request
     req.usuario = {
       id: usuario.id,
       rol: usuario.rol_id
@@ -43,7 +44,7 @@ const verificarToken = async (req, res, next) => {
     next();
 
   } catch (error) {
-    return res.status(401).json({ mensaje: "Token inválido" });
+    return res.status(401).json({ ok: false, mensaje: "Token inválido" });
   }
 };
 

@@ -106,140 +106,147 @@
   </div>
 
   <script>
-    const loginForm = document.getElementById("loginForm");
-    const registerForm = document.getElementById("registerForm");
+  const loginForm = document.getElementById("loginForm");
+  const registerForm = document.getElementById("registerForm");
 
-    // 🔒 VERIFICAR SESIÓN AL CARGAR (SEGURA)
-    const token = localStorage.getItem("token");
+  // 🚨 evitar múltiples verificaciones
+  let verifying = false;
 
-    if (token) {
-      fetch("/login/verify", {
-        method: "GET",
-        headers: {
-          Authorization: "Bearer " + token
-        }
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.ok) {
-            const rol = data.usuario.rol;
+  // 🔒 VERIFICAR SESIÓN SOLO EN LOGIN PAGE
+  const token = localStorage.getItem("token");
 
-            if (rol == 0) {
-              window.location.href = "/admin";
-            } else {
-              window.location.href = "/usuario";
-            }
-          } else {
-            localStorage.removeItem("token");
-          }
-        })
-        .catch(() => {
-          localStorage.removeItem("token");
-        });
-    }
+  if (token && !verifying && window.location.pathname === "/") {
+    verifying = true;
 
-    // 🔁 SWITCH FORM
-    function switchForm(show, hide) {
-      hide.classList.remove("show");
-
-      setTimeout(() => {
-        hide.classList.add("hidden");
-        show.classList.remove("hidden");
-        show.classList.remove("show");
-        void show.offsetWidth;
-        show.classList.add("show");
-      }, 200);
-    }
-
-    function showRegister() {
-      switchForm(registerForm, loginForm);
-    }
-
-    function showLogin() {
-      switchForm(loginForm, registerForm);
-    }
-
-    // 🔑 LOGIN
-    async function loginUser() {
-      const email = document.getElementById("loginEmail").value;
-      const password = document.getElementById("loginPassword").value;
-
-      if (!email || !password) {
-        alert("Completa todos los campos");
-        return;
+    fetch("/login/verify", {
+      method: "GET",
+      headers: {
+        Authorization: "Bearer " + token
       }
-
-      try {
-        const res = await fetch("/login", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({ email, password })
-        });
-
-        const data = await res.json();
-
+    })
+      .then(res => res.json())
+      .then(data => {
         if (data.ok) {
-          localStorage.setItem("token", data.token);
-
-          const rol = data.rol;
+          const rol = data.usuario.rol;
 
           if (rol == 0) {
-            window.location.href = "/admin";
+            window.location.replace("/admin");
           } else {
-            window.location.href = "/usuario";
+            window.location.replace("/usuario");
           }
-
         } else {
-          alert(data.mensaje || "Credenciales incorrectas");
+          localStorage.removeItem("token");
+          verifying = false;
         }
+      })
+      .catch(() => {
+        localStorage.removeItem("token");
+        verifying = false;
+      });
+  }
 
-      } catch (error) {
-        console.error(error);
-        alert("Error al conectar con el servidor");
-      }
+  // 🔁 SWITCH FORM
+  function switchForm(show, hide) {
+    hide.classList.remove("show");
+
+    setTimeout(() => {
+      hide.classList.add("hidden");
+      show.classList.remove("hidden");
+      show.classList.remove("show");
+      void show.offsetWidth;
+      show.classList.add("show");
+    }, 200);
+  }
+
+  function showRegister() {
+    switchForm(registerForm, loginForm);
+  }
+
+  function showLogin() {
+    switchForm(loginForm, registerForm);
+  }
+
+  // 🔑 LOGIN
+  async function loginUser() {
+    const email = document.getElementById("loginEmail").value;
+    const password = document.getElementById("loginPassword").value;
+
+    if (!email || !password) {
+      alert("Completa todos los campos");
+      return;
     }
 
-    // 🧾 REGISTER (CORREGIDO)
-    async function registerUser() {
-      const nombre = document.getElementById("registerNombre").value;
-      const email = document.getElementById("registerEmail").value;
-      const password = document.getElementById("registerPassword").value;
+    try {
+      const res = await fetch("/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ email, password })
+      });
 
-      if (!nombre || !email || !password) {
-        alert("Completa todos los campos");
-        return;
-      }
+      const data = await res.json();
 
-      try {
-        const res = await fetch("/api/usuarios/register", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            nombre,
-            email,
-            password,
-            rol_id: 1
-          })
-        });
+      if (data.ok) {
+        localStorage.setItem("token", data.token);
 
-        const data = await res.json();
+        const rol = data.rol;
 
-        alert(data.mensaje || "Usuario registrado");
-
-        if (res.ok) {
-          showLogin();
+        if (rol == 0) {
+          window.location.replace("/admin");
+        } else {
+          window.location.replace("/usuario");
         }
 
-      } catch (error) {
-        console.error(error);
-        alert("Error al registrar");
+      } else {
+        alert(data.mensaje || "Credenciales incorrectas");
       }
+
+    } catch (error) {
+      console.error(error);
+      alert("Error al conectar con el servidor");
     }
-  </script>
+  }
+
+  // 🧾 REGISTER
+  async function registerUser() {
+    const nombre = document.getElementById("registerNombre").value;
+    const email = document.getElementById("registerEmail").value;
+    const password = document.getElementById("registerPassword").value;
+
+    if (!nombre || !email || !password) {
+      alert("Completa todos los campos");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/usuarios/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          nombre,
+          email,
+          password,
+          rol_id: 1
+        })
+      });
+
+      const data = await res.json();
+
+      alert(data.mensaje || "Usuario registrado");
+
+      if (res.ok) {
+        showLogin();
+      }
+
+    } catch (error) {
+      console.error(error);
+      alert("Error al registrar");
+    }
+  }
+</script>
 </body>
 
 </html>
