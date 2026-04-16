@@ -32,20 +32,39 @@
     </div>
 
     <script>
-        const token = localStorage.getItem("token");
-        const rol = localStorage.getItem("rol");
+  const token = localStorage.getItem("token");
 
-        // 🔐 PROTECCIÓN DE RUTA
-        if (!token || rol != 1) {
-            window.location.href = "/";
+  // 🔐 VALIDACIÓN REAL (NO SOLO LOCALSTORAGE)
+  if (!token) {
+    window.location.href = "/";
+  } else {
+    fetch("/login/verify", {
+      headers: {
+        Authorization: "Bearer " + token
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (!data.ok || data.usuario.rol != 1) {
+          localStorage.clear();
+          window.location.href = "/";
+        } else {
+          // 🔥 sincronizar rol por seguridad
+          localStorage.setItem("rol", data.usuario.rol);
         }
+      })
+      .catch(() => {
+        localStorage.clear();
+        window.location.href = "/";
+      });
+  }
 
-        // 🚪 LOGOUT
-        function logout() {
-            localStorage.clear();
-            window.location.href = "/";
-        }
-    </script>
+  // 🚪 LOGOUT
+  function logout() {
+    localStorage.clear();
+    window.location.href = "/";
+  }
+</script>
 
 </body>
 

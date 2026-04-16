@@ -105,14 +105,13 @@
 
   </div>
 
-  <script>
+ <script>
   const loginForm = document.getElementById("loginForm");
   const registerForm = document.getElementById("registerForm");
 
-  // 🚨 evitar múltiples verificaciones
   let verifying = false;
 
-  // 🔒 VERIFICAR SESIÓN SOLO EN LOGIN PAGE
+  // 🔒 VERIFICAR SESIÓN SOLO EN LOGIN
   const token = localStorage.getItem("token");
 
   if (token && !verifying && window.location.pathname === "/") {
@@ -129,18 +128,21 @@
         if (data.ok) {
           const rol = data.usuario.rol;
 
+          // 🔥 guardar rol correctamente
+          localStorage.setItem("rol", rol);
+
           if (rol == 0) {
             window.location.replace("/admin");
           } else {
             window.location.replace("/usuario");
           }
         } else {
-          localStorage.removeItem("token");
+          localStorage.clear();
           verifying = false;
         }
       })
       .catch(() => {
-        localStorage.removeItem("token");
+        localStorage.clear();
         verifying = false;
       });
   }
@@ -188,11 +190,11 @@
       const data = await res.json();
 
       if (data.ok) {
+        // 🔥 GUARDAR TODO CORRECTAMENTE
         localStorage.setItem("token", data.token);
+        localStorage.setItem("rol", data.rol);
 
-        const rol = data.rol;
-
-        if (rol == 0) {
+        if (data.rol == 0) {
           window.location.replace("/admin");
         } else {
           window.location.replace("/usuario");
