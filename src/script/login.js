@@ -1,108 +1,142 @@
-    const loginForm = document.getElementById("loginForm");
-    const registerForm = document.getElementById("registerForm");
+const loginForm = document.getElementById("loginForm");
+  const registerForm = document.getElementById("registerForm");
 
-    // REDIRIGIR SI YA ESTÁ LOGUEADO
-    const token = localStorage.getItem("token");
-    if (token) {
-      window.location.href = "/index.html";
-    }
+  let verifying = false;
 
-    function switchForm(show, hide) {
-      hide.classList.remove("show");
+  // 🔒 VERIFICAR SESIÓN SOLO EN LOGIN
+  const token = localStorage.getItem("token");
 
-      setTimeout(() => {
-        hide.classList.add("hidden");
-        show.classList.remove("hidden");
-        show.classList.remove("show");
-        void show.offsetWidth;
-        show.classList.add("show");
-      }, 200);
-    }
+  if (token && !verifying && window.location.pathname === "/") {
+    verifying = true;
 
-    function showRegister() {
-      switchForm(registerForm, loginForm);
-    }
-
-    function showLogin() {
-      switchForm(loginForm, registerForm);
-    }
-
-    // LOGIN
-    async function loginUser() {
-      const email = document.getElementById("loginEmail").value;
-      const password = document.getElementById("loginPassword").value;
-
-      if (!email || !password) {
-        alert("Completa todos los campos");
-        return;
+    fetch("/login/verify", {
+      method: "GET",
+      headers: {
+        Authorization: "Bearer " + token
       }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.ok) {
+          const rol = data.usuario.rol;
 
-      try {
-        const res = await fetch("/login", { // CORREGIDO AQUÍ
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({ email, password })
-        });
+          // 🔥 guardar rol correctamente
+          localStorage.setItem("rol", rol);
 
-        const data = await res.json();
-
-        if (data.ok) { // usamos lo que devuelve el backend corregido
-          localStorage.setItem("token", data.token);
-          alert(data.mensaje);
-
-          // REDIRECCIÓN
-          window.location.href = "/index.html";
+          if (rol == 0) {
+            window.location.replace("/admin");
+          } else {
+            window.location.replace("/usuario");
+          }
         } else {
-          alert(data.mensaje);
+          localStorage.clear();
+          verifying = false;
+        }
+      })
+      .catch(() => {
+        localStorage.clear();
+        verifying = false;
+      });
+  }
+
+  // 🔁 SWITCH FORM
+  function switchForm(show, hide) {
+    hide.classList.remove("show");
+
+    setTimeout(() => {
+      hide.classList.add("hidden");
+      show.classList.remove("hidden");
+      show.classList.remove("show");
+      void show.offsetWidth;
+      show.classList.add("show");
+    }, 200);
+  }
+
+  function showRegister() {
+    switchForm(registerForm, loginForm);
+  }
+
+  function showLogin() {
+    switchForm(loginForm, registerForm);
+  }
+
+  // 🔑 LOGIN
+  async function loginUser() {
+    const email = document.getElementById("loginEmail").value;
+    const password = document.getElementById("loginPassword").value;
+
+    if (!email || !password) {
+      alert("Completa todos los campos");
+      return;
+    }
+
+    try {
+      const res = await fetch("/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await res.json();
+
+      if (data.ok) {
+        // 🔥 GUARDAR TODO CORRECTAMENTE
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("rol", data.rol);
+
+        if (data.rol == 0) {
+          window.location.replace("/admin");
+        } else {
+          window.location.replace("/usuario");
         }
 
-      } catch (error) {
-        console.error(error);
-        alert("Error al conectar con el servidor");
+      } else {
+        alert(data.mensaje || "Credenciales incorrectas");
       }
+
+    } catch (error) {
+      console.error(error);
+      alert("Error al conectar con el servidor");
+    }
+  }
+
+  // 🧾 REGISTER
+  async function registerUser() {
+    const nombre = document.getElementById("registerNombre").value;
+    const email = document.getElementById("registerEmail").value;
+    const password = document.getElementById("registerPassword").value;
+
+    if (!nombre || !email || !password) {
+      alert("Completa todos los campos");
+      return;
     }
 
-    // REGISTRO
-    async function registerUser() {
-      const nombre = document.getElementById("registerNombre").value;
-      const email = document.getElementById("registerEmail").value;
-      const password = document.getElementById("registerPassword").value;
-      const error = document.getElementById("emailError");
+    try {
+      const res = await fetch("/api/usuarios/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          nombre,
+          email,
+          password,
+          rol_id: 1
+        })
+      });
 
-      if (!nombre || !email || !password) {
-        alert("Completa todos los campos");
-        return;
+      const data = await res.json();
+
+      alert(data.mensaje || "Usuario registrado");
+
+      if (res.ok) {
+        showLogin();
       }
 
-      if (!email.endsWith("@gmail.com")) {
-        error.classList.remove("hidden");
-        return;
-      }
-
-      error.classList.add("hidden");
-
-      try {
-        const res = await fetch("/api/usuarios/register", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({ nombre, email, password })
-        });
-
-        const data = await res.json();
-
-        if (data.ok || res.ok) { // más flexible por si backend no usa "ok"
-          alert(data.mensaje);
-          showLogin();
-        } else {
-          alert(data.mensaje);
-        }
-
-      } catch (error) {
-        console.error(error);
-        alert("Error al conectar con el servidor");
-      }
+    } catch (error) {
+      console.error(error);
+      alert("Error al registrar");
     }
+  }
