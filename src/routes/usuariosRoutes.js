@@ -12,25 +12,20 @@ const {
 
 const verificarToken = require("../middlewares/jwtMiddleware");
 
-// RUTAS PÚBLICAS
-
-// Registro (NO requiere token)
-router.post("/usuarios/register", register);
-
-
-// RUTAS PROTEGIDAS
+// REGISTRO (PÚBLICO)
+router.post("/register", register);
 
 // GET
-router.get("/usuarios", verificarToken, getUsuarios);
-router.get("/usuarios/:id", verificarToken, getUsuarioById);
+router.get("/", verificarToken, getUsuarios);
+router.get("/:id", verificarToken, getUsuarioById);
 
 // POST
-router.post("/usuarios", verificarToken, createUsuario);
+router.post("/", verificarToken, createUsuario);
 
 // PUT
-router.put("/usuarios/:id", verificarToken, updateUsuario);
+router.put("/:id", verificarToken, updateUsuario);
 
 // DELETE
-router.delete("/usuarios/:id", verificarToken, deleteUsuario);
+router.delete("/:id", verificarToken, deleteUsuario);
 
 module.exports = router;
