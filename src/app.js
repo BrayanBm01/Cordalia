@@ -25,9 +25,13 @@ app.get("/test-db", (req, res) => {
 // LOGIN
 app.use("/login", require("./routes/loginRoutes"));
 
-// APIS PROTEGIDAS (con middleware de autenticación)
-app.use("/api", verificarToken, require("./routes/usuariosRoutes"));
-app.use("/api", verificarToken, require("./routes/turismoRoutes"));
+/// 🔓 RUTAS PÚBLICAS
+app.use("/api/usuarios", require("./routes/usuariosRoutes")); // register y create
+
+// 🔒 RUTAS PROTEGIDAS
+const verificarToken = require("./middlewares/jwtMiddleware");
+
+app.use("/api/turismo", verificarToken, require("./routes/turismoRoutes"));
 
 // RUTAS VISTAS (CONTROLADAS)
 app.get("/", (req, res) => {

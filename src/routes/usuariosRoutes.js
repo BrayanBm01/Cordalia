@@ -6,26 +6,31 @@ const {
   getUsuarioById,
   createUsuario,
   updateUsuario,
-  deleteUsuario
+  deleteUsuario,
+  register
 } = require("../controllers/usuariosController");
 
-// IMPORTANTE: importar register
-const { register } = require("../controllers/usuariosController");
+const verificarToken = require("../middlewares/jwtMiddleware");
 
-// GET
-router.get("/usuarios", getUsuarios);
-router.get("/usuarios/:id", getUsuarioById);
+// RUTAS PÚBLICAS
 
-// POST
-router.post("/usuarios", createUsuario);
-
-// NUEVA RUTA PARA REGISTRO
+// Registro (NO requiere token)
 router.post("/usuarios/register", register);
 
+
+// RUTAS PROTEGIDAS
+
+// GET
+router.get("/usuarios", verificarToken, getUsuarios);
+router.get("/usuarios/:id", verificarToken, getUsuarioById);
+
+// POST
+router.post("/usuarios", verificarToken, createUsuario);
+
 // PUT
-router.put("/usuarios/:id", updateUsuario);
+router.put("/usuarios/:id", verificarToken, updateUsuario);
 
 // DELETE
-router.delete("/usuarios/:id", deleteUsuario);
+router.delete("/usuarios/:id", verificarToken, deleteUsuario);
 
 module.exports = router;
