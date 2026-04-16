@@ -13,10 +13,10 @@ const login = async (req, res) => {
   }
 
   try {
-    // 🧹 limpiar datos
     email = email.trim();
     password = password.trim();
 
+    // 🔍 buscar usuario (POSTGRESQL)
     const result = await db.query(
       "SELECT * FROM usuarios WHERE email = $1",
       [email]
@@ -31,17 +31,18 @@ const login = async (req, res) => {
 
     const usuario = result.rows[0];
 
+    // 🔐 verificar contraseña
     const coincide = await bcrypt.compare(password, usuario.password);
 
     if (!coincide) {
-      // guardar intento fallido
+      // log intento fallido
       try {
         await db.query(
           "INSERT INTO login (usuario_id, exito) VALUES ($1, $2)",
           [usuario.id, false]
         );
       } catch (err) {
-        console.error("Error guardando intento fallido:", err);
+        console.error("Error log fallido:", err);
       }
 
       return res.status(401).json({
@@ -50,27 +51,23 @@ const login = async (req, res) => {
       });
     }
 
-    // 🔑 GENERAR TOKEN
+    // 🔑 generar token JWT
     const token = generarToken(usuario.id, usuario.rol_id);
 
-    // 🔥 GUARDAR TOKEN (CLAVE PARA EVITAR MULTISESIONES)
-    try {
-      await db.query(
-        "UPDATE usuarios SET token_actual = $1 WHERE id = $2",
-        [token, usuario.id]
-      );
-    } catch (err) {
-      console.error("Error guardando token:", err);
-    }
+    // 🔥 SESIÓN ÚNICA (CLAVE DEL SISTEMA)
+    await db.query(
+      "UPDATE usuarios SET token_activo = $1 WHERE id = $2",
+      [token, usuario.id]
+    );
 
-    // guardar intento exitoso
+    // log intento exitoso
     try {
       await db.query(
         "INSERT INTO login (usuario_id, exito) VALUES ($1, $2)",
         [usuario.id, true]
       );
     } catch (err) {
-      console.error("Error guardando intento exitoso:", err);
+      console.error("Error log exitoso:", err);
     }
 
     return res.status(200).json({
@@ -80,7 +77,8 @@ const login = async (req, res) => {
       rol: usuario.rol_id,
       usuario: {
         id: usuario.id,
-        nombre: usuario.nombre
+        nombre: usuario.nombre,
+        email: usuario.email
       }
     });
 

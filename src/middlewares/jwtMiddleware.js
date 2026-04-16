@@ -2,25 +2,22 @@ const jwt = require("jsonwebtoken");
 const pool = require("../config/db");
 
 const verificarToken = async (req, res, next) => {
-  const auth = req.headers.authorization;
-
-  // 🔒 Verificar si viene el token
-  if (!auth) {
-    return res.status(401).json({ mensaje: "Token requerido" });
-  }
-
-  const token = auth.split(" ")[1];
-
   try {
-    // Verificar token
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "secreto"
-    );
+    const auth = req.headers.authorization;
 
-    // Buscar usuario en DB
+    // 🔒 validar header
+    if (!auth || !auth.startsWith("Bearer ")) {
+      return res.status(401).json({ mensaje: "Token requerido" });
+    }
+
+    const token = auth.split(" ")[1];
+
+    // 🔐 verificar JWT
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // 🔍 buscar usuario
     const result = await pool.query(
-      "SELECT token_actual FROM usuarios WHERE id = $1",
+      "SELECT id, rol_id, token_activo FROM usuarios WHERE id = $1",
       [decoded.id]
     );
 
@@ -28,18 +25,25 @@ const verificarToken = async (req, res, next) => {
       return res.status(401).json({ mensaje: "Usuario no existe" });
     }
 
-    // Validar sesión activa (evita múltiples logins)
-    if (result.rows[0].token_actual !== token) {
-      return res.status(403).json({ mensaje: "Sesión inválida" });
+    const usuario = result.rows[0];
+
+    // 🔥 sesión única
+    if (usuario.token_activo !== token) {
+      return res.status(403).json({
+        mensaje: "Sesión cerrada desde otro dispositivo"
+      });
     }
 
-    // Guardar usuario en request
-    req.usuario = decoded;
+    // 👤 usuario disponible en rutas
+    req.usuario = {
+      id: usuario.id,
+      rol: usuario.rol_id
+    };
 
     next();
 
   } catch (error) {
-    return res.status(403).json({ mensaje: "Token inválido" });
+    return res.status(401).json({ mensaje: "Token inválido" });
   }
 };
 
