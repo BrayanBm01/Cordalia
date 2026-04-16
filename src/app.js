@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const verificarToken = require("./middlewares/jwtMiddleware");
 require("dotenv").config();
 
 const app = express();
@@ -24,9 +25,9 @@ app.get("/test-db", (req, res) => {
 // LOGIN
 app.use("/login", require("./routes/loginRoutes"));
 
-// API
-app.use("/api", require("./routes/usuariosRoutes"));
-app.use("/api", require("./routes/turismoRoutes"));
+// APIS PROTEGIDAS (con middleware de autenticación)
+app.use("/api", verificarToken, require("./routes/usuariosRoutes"));
+app.use("/api", verificarToken, require("./routes/turismoRoutes"));
 
 // RUTAS VISTAS (CONTROLADAS)
 app.get("/", (req, res) => {

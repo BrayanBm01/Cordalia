@@ -1,9 +1,9 @@
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 const db = require("../config/db");
 const { generarToken } = require("../utils/jwtUtil");
 
 const login = async (req, res) => {
-  const { email, password } = req.body;
+  let { email, password } = req.body;
 
   if (!email || !password) {
     return res.status(400).json({
@@ -13,6 +13,10 @@ const login = async (req, res) => {
   }
 
   try {
+    // 🧹 limpiar datos
+    email = email.trim();
+    password = password.trim();
+
     const result = await db.query(
       "SELECT * FROM usuarios WHERE email = $1",
       [email]
@@ -46,8 +50,18 @@ const login = async (req, res) => {
       });
     }
 
-    // TOKEN CON ROL REAL
+    // 🔑 GENERAR TOKEN
     const token = generarToken(usuario.id, usuario.rol_id);
+
+    // 🔥 GUARDAR TOKEN (CLAVE PARA EVITAR MULTISESIONES)
+    try {
+      await db.query(
+        "UPDATE usuarios SET token_actual = $1 WHERE id = $2",
+        [token, usuario.id]
+      );
+    } catch (err) {
+      console.error("Error guardando token:", err);
+    }
 
     // guardar intento exitoso
     try {
@@ -63,7 +77,7 @@ const login = async (req, res) => {
       ok: true,
       mensaje: "Login exitoso",
       token,
-      rol: usuario.rol_id, // CLAVE
+      rol: usuario.rol_id,
       usuario: {
         id: usuario.id,
         nombre: usuario.nombre

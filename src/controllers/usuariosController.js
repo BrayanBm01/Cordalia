@@ -1,18 +1,21 @@
 const pool = require("../config/db");
 const bcrypt = require("bcryptjs");
 
-
-// REGISTRO (LOGIN)
+// REGISTRO
 const register = async (req, res) => {
-  const { nombre, email, password } = req.body;
+  let { nombre, email, password } = req.body;
 
   if (!nombre || !email || !password) {
     return res.status(400).json({ mensaje: "Datos incompletos" });
   }
 
   try {
+    nombre = nombre.trim();
+    email = email.trim();
+    password = password.trim();
+
     const existe = await pool.query(
-      "SELECT * FROM usuarios WHERE email = $1",
+      "SELECT id FROM usuarios WHERE email = $1",
       [email]
     );
 
@@ -26,32 +29,35 @@ const register = async (req, res) => {
       `INSERT INTO usuarios (nombre, email, password, rol_id)
        VALUES ($1, $2, $3, $4)
        RETURNING id, nombre, email, rol_id`,
-      [nombre, email, hashedPassword, 1] // 👈 siempre usuario
+      [nombre, email, hashedPassword, 1]
     );
 
-    res.status(201).json({
+    return res.status(201).json({
       mensaje: "Usuario registrado correctamente",
       usuario: result.rows[0]
     });
 
   } catch (error) {
     console.error("Error en register:", error);
-    res.status(500).json({ mensaje: "Error en el servidor" });
+    return res.status(500).json({ mensaje: "Error en el servidor" });
   }
 };
 
-//  CREAR USUARIO (ADMIN)
+// CREAR USUARIO (ADMIN)
 const createUsuario = async (req, res) => {
-  const { nombre, email, password, rol_id } = req.body;
+  let { nombre, email, password, rol_id } = req.body;
 
   if (!nombre || !email || !password) {
     return res.status(400).json({ mensaje: "Faltan datos" });
   }
 
   try {
-    // verificar duplicado
+    nombre = nombre.trim();
+    email = email.trim();
+    password = password.trim();
+
     const existe = await pool.query(
-      "SELECT * FROM usuarios WHERE email = $1",
+      "SELECT id FROM usuarios WHERE email = $1",
       [email]
     );
 
@@ -59,7 +65,7 @@ const createUsuario = async (req, res) => {
       return res.status(400).json({ mensaje: "El usuario ya existe" });
     }
 
-    const hashedPassword = await bcrypt.hash(password.trim(), 10);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     const rolFinal = rol_id == 0 ? 0 : 1;
 
@@ -67,17 +73,17 @@ const createUsuario = async (req, res) => {
       `INSERT INTO usuarios (nombre, email, password, rol_id)
        VALUES ($1, $2, $3, $4)
        RETURNING id, nombre, email, rol_id`,
-      [nombre.trim(), email.trim(), hashedPassword, rolFinal]
+      [nombre, email, hashedPassword, rolFinal]
     );
 
-    res.json({
+    return res.status(201).json({
       mensaje: "Usuario creado correctamente",
       usuario: result.rows[0]
     });
 
   } catch (error) {
     console.error("Error creando usuario:", error);
-    res.status(500).json({ mensaje: "Error al crear usuario" });
+    return res.status(500).json({ mensaje: "Error al crear usuario" });
   }
 };
 
@@ -88,10 +94,10 @@ const getUsuarios = async (req, res) => {
       "SELECT id, nombre, email, rol_id FROM usuarios ORDER BY id ASC"
     );
 
-    res.json(result.rows);
+    return res.status(200).json(result.rows);
 
   } catch (error) {
-    res.status(500).json({ mensaje: error.message });
+    return res.status(500).json({ mensaje: error.message });
   }
 };
 
@@ -109,14 +115,14 @@ const getUsuarioById = async (req, res) => {
       return res.status(404).json({ mensaje: "Usuario no encontrado" });
     }
 
-    res.json(result.rows[0]);
+    return res.status(200).json(result.rows[0]);
 
   } catch (error) {
-    res.status(500).json({ mensaje: error.message });
+    return res.status(500).json({ mensaje: error.message });
   }
 };
 
-//  ACTUALIZAR (FIX 🔥)
+// ACTUALIZAR
 const updateUsuario = async (req, res) => {
   const { id } = req.params;
   let { nombre, email, password, rol_id } = req.body;
@@ -129,7 +135,6 @@ const updateUsuario = async (req, res) => {
     nombre = nombre.trim();
     email = email.trim();
 
-    // limpiar password
     if (password) {
       password = password.trim();
     }
@@ -137,7 +142,6 @@ const updateUsuario = async (req, res) => {
     let result;
 
     if (password && password.length > 0) {
-      // 🔐 actualizar con password
       const hashedPassword = await bcrypt.hash(password, 10);
 
       result = await pool.query(
@@ -149,7 +153,6 @@ const updateUsuario = async (req, res) => {
       );
 
     } else {
-      // 👉 actualizar sin password
       result = await pool.query(
         `UPDATE usuarios 
          SET nombre=$1, email=$2, rol_id=$3
@@ -163,14 +166,14 @@ const updateUsuario = async (req, res) => {
       return res.status(404).json({ mensaje: "Usuario no encontrado" });
     }
 
-    res.json({
+    return res.status(200).json({
       mensaje: "Usuario actualizado correctamente",
       usuario: result.rows[0]
     });
 
   } catch (error) {
     console.error("Error actualizando:", error);
-    res.status(500).json({ mensaje: "Error al actualizar usuario" });
+    return res.status(500).json({ mensaje: "Error al actualizar usuario" });
   }
 };
 
@@ -188,13 +191,14 @@ const deleteUsuario = async (req, res) => {
       return res.status(404).json({ mensaje: "Usuario no encontrado" });
     }
 
-    res.json({ mensaje: "Usuario eliminado correctamente" });
+    return res.status(200).json({
+      mensaje: "Usuario eliminado correctamente"
+    });
 
   } catch (error) {
-    res.status(500).json({ mensaje: error.message });
+    return res.status(500).json({ mensaje: error.message });
   }
 };
-
 
 module.exports = {
   register,
