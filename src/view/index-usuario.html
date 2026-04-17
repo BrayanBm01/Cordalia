@@ -105,52 +105,80 @@
 
   <!-- menú lateral -->
   <div id="mobileMenu"
-    class="menu fixed top-0 left-0 h-full w-72 bg-white shadow-2xl z-50 p-8 transform -translate-x-full transition duration-300">
+    class="menu fixed top-0 left-0 h-full w-72 bg-white shadow-2xl z-50 p-8 transform -translate-x-full transition duration-300 flex flex-col justify-between">
 
-    <div class="flex items-center gap-2 mb-10">
+    <!-- parte superior -->
+    <div>
 
-      <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-blue-500" fill="none" viewBox="0 0 24 24"
-        stroke="currentColor">
+      <div class="flex items-center gap-2 mb-10">
 
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7l9-4 9 4-9 4-9-4z" />
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-blue-500" fill="none" viewBox="0 0 24 24"
+          stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7l9-4 9 4-9 4-9-4z" />
+        </svg>
 
-      </svg>
+        <h2 class="text-2xl font-bold text-blue-600">
+          Explora
+        </h2>
 
-      <h2 class="text-2xl font-bold text-blue-600">
-        Explora
-      </h2>
+      </div>
+
+      <div class="flex flex-col gap-7 font-semibold text-lg text-gray-700">
+
+        <a href="#inicio" class="flex items-center gap-3 hover:text-blue-600 transition">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3" />
+          </svg>
+          Inicio
+        </a>
+
+        <a href="#destinos" class="hover:text-blue-600 transition">
+          Destinos
+        </a>
+
+        <a href="#actividades" class="hover:text-blue-600 transition">
+          Actividades
+        </a>
+
+        <a href="#gastronomia" class="hover:text-blue-600 transition">
+          Gastronomía
+        </a>
+
+        <a href="#galeria" class="hover:text-blue-600 transition">
+          Galería
+        </a>
+
+      </div>
 
     </div>
 
-    <div class="flex flex-col gap-7 font-semibold text-lg text-gray-700">
+    <!-- parte inferior -->
+    <div class="border-t pt-4 flex flex-col gap-3">
 
-      <a href="#inicio" class="flex items-center gap-3 hover:text-blue-600 transition">
+      <!-- usuario -->
+      <div class="flex items-center gap-3 text-gray-700 font-semibold">
 
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-blue-500" fill="none" viewBox="0 0 24 24"
+          stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3" />
-
+            d="M5.121 17.804A9 9 0 1118.364 4.56M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
 
-        Inicio
-      </a>
+        <span id="mobileUserName">Usuario</span>
+      </div>
 
-      <a href="#destinos" class="hover:text-blue-600 transition">
-        Destinos
-      </a>
+      <!-- botón cerrar sesión -->
+      <button id="logoutBtnMobile"
+        class="flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white py-2 rounded-lg shadow-md transition">
 
-      <a href="#actividades" class="hover:text-blue-600 transition">
-        Actividades
-      </a>
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1m0-10V5" />
+        </svg>
 
-      <a href="#gastronomia" class="hover:text-blue-600 transition">
-        Gastronomía
-      </a>
-
-      <a href="#galeria" class="hover:text-blue-600 transition">
-        Galería
-      </a>
+        Cerrar sesión
+      </button>
 
     </div>
 
