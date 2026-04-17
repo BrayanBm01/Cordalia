@@ -661,13 +661,15 @@
     }
 
 
-    // 👇 función separada (más limpio)
     function renderUser(usuario) {
+      const nombre = usuario?.nombre ?? usuario?.email ?? "Usuario";
+
+      // escritorio
       userSection.innerHTML = `
     <div class="flex items-center gap-4">
 
       <span class="hidden sm:block text-sm text-gray-300">
-        ${usuario?.nombre ?? usuario?.email ?? "Usuario"}
+        ${nombre}
       </span>
 
       <button onclick="logout()"
@@ -683,8 +685,19 @@
 
     </div>
   `;
+
+      // móvil
+      const mobileName = document.getElementById("mobileUserName");
+      if (mobileName) {
+        mobileName.textContent = nombre;
+      }
     }
 
+    const logoutMobile = document.getElementById("logoutBtnMobile");
+
+    if (logoutMobile) {
+      logoutMobile.addEventListener("click", logout);
+    }
 
     /* =========================
        🚪 LOGOUT
