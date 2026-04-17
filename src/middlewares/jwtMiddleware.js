@@ -48,10 +48,15 @@ const verificarToken = async (req, res, next) => {
       });
     }
 
+    // 🧠 MAPEAR ROL (CLAVE 🔥)
+    let rolNombre = "USER";
+    if (usuario.rol_id === 1) rolNombre = "ADMIN";
+    // puedes agregar más roles aquí si quieres
+
     // 👤 guardar usuario en request
     req.usuario = {
       id: usuario.id,
-      rol: usuario.rol_id
+      rol: rolNombre
     };
 
     next();
