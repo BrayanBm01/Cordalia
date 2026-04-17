@@ -5,14 +5,14 @@ const verificarToken = async (req, res, next) => {
   try {
     const auth = req.headers.authorization;
 
-    // 🔒 validar header
+    // validar header
     if (!auth || !auth.startsWith("Bearer ")) {
       return res.status(401).json({ ok: false, mensaje: "Token requerido" });
     }
 
     const token = auth.split(" ")[1];
 
-    // 🔐 verificar JWT
+    // verificar JWT
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -23,12 +23,12 @@ const verificarToken = async (req, res, next) => {
       return res.status(401).json({ ok: false, mensaje: "Token inválido" });
     }
 
-    // 🔍 validar payload
+    // validar payload
     if (!decoded.id) {
       return res.status(401).json({ ok: false, mensaje: "Token mal formado" });
     }
 
-    // 🔍 buscar usuario en DB
+    // buscar usuario en DB
     const result = await pool.query(
       "SELECT id, rol_id, token_activo FROM usuarios WHERE id = $1",
       [decoded.id]
@@ -40,7 +40,7 @@ const verificarToken = async (req, res, next) => {
 
     const usuario = result.rows[0];
 
-    // 🔥 sesión única
+    // validar sesión única
     if (usuario.token_activo !== token) {
       return res.status(401).json({
         ok: false,
@@ -48,12 +48,13 @@ const verificarToken = async (req, res, next) => {
       });
     }
 
-    // 🧠 MAPEAR ROL (CLAVE 🔥)
+    // mapear rol (0 = ADMIN, 1 = USER)
     let rolNombre = "USER";
-    if (usuario.rol_id === 1) rolNombre = "ADMIN";
-    // puedes agregar más roles aquí si quieres
+    if (usuario.rol_id === 0) {
+      rolNombre = "ADMIN";
+    }
 
-    // 👤 guardar usuario en request
+    // guardar usuario en request
     req.usuario = {
       id: usuario.id,
       rol: rolNombre
