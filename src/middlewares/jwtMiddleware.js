@@ -13,7 +13,20 @@ const verificarToken = async (req, res, next) => {
     const token = auth.split(" ")[1];
 
     // 🔐 verificar JWT
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      if (err.name === "TokenExpiredError") {
+        return res.status(401).json({ ok: false, mensaje: "Token expirado" });
+      }
+      return res.status(401).json({ ok: false, mensaje: "Token inválido" });
+    }
+
+    // 🔍 validar payload
+    if (!decoded.id) {
+      return res.status(401).json({ ok: false, mensaje: "Token mal formado" });
+    }
 
     // 🔍 buscar usuario en DB
     const result = await pool.query(
@@ -27,7 +40,7 @@ const verificarToken = async (req, res, next) => {
 
     const usuario = result.rows[0];
 
-    // 🔥 sesión única real
+    // 🔥 sesión única
     if (usuario.token_activo !== token) {
       return res.status(401).json({
         ok: false,
@@ -44,7 +57,8 @@ const verificarToken = async (req, res, next) => {
     next();
 
   } catch (error) {
-    return res.status(401).json({ ok: false, mensaje: "Token inválido" });
+    console.error("Error en verificarToken:", error);
+    return res.status(500).json({ ok: false, mensaje: "Error interno del servidor" });
   }
 };
 

@@ -13,15 +13,15 @@ const {
 const verificarToken = require("../middlewares/jwtMiddleware");
 const verificarRol = require("../middlewares/rolMiddleware");
 
-// PÚBLICO
-router.get("/lugares", getLugares);
-router.get("/lugares/:id", getLugarById);
+// 🔐 TODOS autenticados pueden ver
+router.get("/lugares", verificarToken, getLugares);
+router.get("/lugares/:id", verificarToken, getLugarById);
 
-// USUARIOS AUTENTICADOS
-router.post("/lugares", verificarToken, createLugar);
+// 🔒 SOLO ADMIN puede crear
+router.post("/lugares", verificarToken, verificarRol(["ADMIN"]), createLugar);
 
-// SOLO ADMIN
-router.put("/lugares/:id", verificarToken, verificarRol("ADMIN"), updateLugar);
-router.delete("/lugares/:id", verificarToken, verificarRol("ADMIN"), deleteLugar);
+// 🔒 SOLO ADMIN
+router.put("/lugares/:id", verificarToken, verificarRol(["ADMIN"]), updateLugar);
+router.delete("/lugares/:id", verificarToken, verificarRol(["ADMIN"]), deleteLugar);
 
 module.exports = router;

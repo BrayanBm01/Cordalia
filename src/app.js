@@ -1,7 +1,6 @@
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
-const verificarToken = require("./middlewares/jwtMiddleware");
 require("dotenv").config();
 
 const app = express();
@@ -22,14 +21,10 @@ app.get("/test-db", (req, res) => {
   res.send("Ruta funcionando ");
 });
 
-// LOGIN
+// RUTAS
 app.use("/login", require("./routes/loginRoutes"));
-
-// RUTAS PÚBLICAS
 app.use("/api/usuarios", require("./routes/usuariosRoutes"));
-
-// RUTAS PROTEGIDAS
-app.use("/api/turismo", verificarToken, require("./routes/turismoRoutes"));
+app.use("/api/turismo", require("./routes/turismoRoutes")); // 🔥 sin verificarToken aquí
 
 // VISTAS
 app.get("/", (req, res) => {
