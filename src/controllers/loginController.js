@@ -46,22 +46,22 @@ const login = async (req, res) => {
       });
     }
 
-    // Validar que el usuario tenga rol asignado
+    // Usuario sin rol → 401 (como definiste)
     if (usuario.rol_id === null) {
-      return res.status(403).json({
+      return res.status(401).json({
         ok: false,
         mensaje: "Usuario sin rol asignado. Contacta al administrador"
       });
     }
 
-    // Mapear rol a nombre
+    // Mapear rol
     let rolNombre;
     if (usuario.rol_id === 0) {
       rolNombre = "ADMIN";
     } else if (usuario.rol_id === 1) {
       rolNombre = "USER";
     } else {
-      return res.status(403).json({
+      return res.status(401).json({
         ok: false,
         mensaje: "Rol inválido"
       });
