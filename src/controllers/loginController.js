@@ -16,7 +16,7 @@ const login = async (req, res) => {
     email = email.trim();
     password = password.trim();
 
-    // 🔍 buscar usuario
+    // Buscar usuario
     const result = await db.query(
       "SELECT id, nombre, email, password, rol_id FROM usuarios WHERE email = $1",
       [email]
@@ -31,18 +31,14 @@ const login = async (req, res) => {
 
     const usuario = result.rows[0];
 
-    // 🔐 verificar contraseña
+    // Verificar contraseña
     const coincide = await bcrypt.compare(password, usuario.password);
 
     if (!coincide) {
-      try {
-        await db.query(
-          "INSERT INTO login (usuario_id, exito) VALUES ($1, $2)",
-          [usuario.id, false]
-        );
-      } catch (err) {
-        console.error("Error log fallido:", err);
-      }
+      await db.query(
+        "INSERT INTO login (usuario_id, exito) VALUES ($1, $2)",
+        [usuario.id, false]
+      );
 
       return res.status(401).json({
         ok: false,
@@ -50,36 +46,53 @@ const login = async (req, res) => {
       });
     }
 
-    // 🔑 generar token
-    const token = generarToken(usuario.id, usuario.rol_id);
+    // Validar que el usuario tenga rol asignado
+    if (usuario.rol_id === null) {
+      return res.status(403).json({
+        ok: false,
+        mensaje: "Usuario sin rol asignado. Contacta al administrador"
+      });
+    }
 
-    // 🔥 sesión única (IMPORTANTE)
+    // Mapear rol a nombre
+    let rolNombre;
+    if (usuario.rol_id === 0) {
+      rolNombre = "ADMIN";
+    } else if (usuario.rol_id === 1) {
+      rolNombre = "USER";
+    } else {
+      return res.status(403).json({
+        ok: false,
+        mensaje: "Rol inválido"
+      });
+    }
+
+    // Generar token
+    const token = generarToken(usuario.id, rolNombre);
+
+    // Guardar sesión única
     await db.query(
       "UPDATE usuarios SET token_activo = $1 WHERE id = $2",
       [token, usuario.id]
     );
 
-    // log exitoso
-    try {
-      await db.query(
-        "INSERT INTO login (usuario_id, exito) VALUES ($1, $2)",
-        [usuario.id, true]
-      );
-    } catch (err) {
-      console.error("Error log exitoso:", err);
-    }
+    // Registrar login exitoso
+    await db.query(
+      "INSERT INTO login (usuario_id, exito) VALUES ($1, $2)",
+      [usuario.id, true]
+    );
 
-    // ✔ respuesta estable (IMPORTANTE PARA EVITAR BUGS FRONTEND)
+    // Respuesta
     return res.status(200).json({
       ok: true,
       mensaje: "Login exitoso",
       token,
-      rol: usuario.rol_id,
+      rol: rolNombre,
       usuario: {
         id: usuario.id,
         nombre: usuario.nombre,
         email: usuario.email,
-        rol: usuario.rol_id
+        rol: rolNombre
       }
     });
 
