@@ -17,21 +17,23 @@ if (token && !verifying && window.location.pathname === "/") {
   })
     .then(res => res.json())
     .then(data => {
-      console.log("VERIFY DATA:", data); // 👈 DEBUG
+      console.log("VERIFY DATA:", data);
 
       if (data.ok) {
         const usuario = data.usuario || {};
         const rol = usuario.rol;
 
-        // 🔥 guardar TODO (no solo rol)
+        // 🔥 guardar datos
         localStorage.setItem("rol", rol);
         localStorage.setItem("usuario", JSON.stringify(usuario));
 
-        if (rol == 0) {
+        // ✅ REDIRECCIÓN CORREGIDA
+        if (rol === "ADMIN") {
           window.location.replace("/admin");
-        } else {
+        } else if (rol === "USER") {
           window.location.replace("/usuario");
         }
+
       } else {
         localStorage.clear();
         verifying = false;
@@ -85,19 +87,18 @@ async function loginUser() {
 
     const data = await res.json();
 
-    console.log("LOGIN DATA:", data); // 👈 DEBUG
+    console.log("LOGIN DATA:", data);
 
     if (data.ok) {
-      // 🔥 guardar TODO correctamente
+      // 🔥 guardar datos
       localStorage.setItem("token", data.token);
       localStorage.setItem("rol", data.rol);
-
-      // 👇 IMPORTANTE: guardar usuario completo
       localStorage.setItem("usuario", JSON.stringify(data.usuario || {}));
 
-      if (data.rol == 0) {
+      // ✅ REDIRECCIÓN CORREGIDA
+      if (data.rol === "ADMIN") {
         window.location.replace("/admin");
-      } else {
+      } else if (data.rol === "USER") {
         window.location.replace("/usuario");
       }
 
@@ -132,7 +133,7 @@ async function registerUser() {
         nombre,
         email,
         password,
-        rol_id: 1
+        rol_id: 1 // por defecto USER
       })
     });
 
