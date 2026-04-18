@@ -10,8 +10,15 @@ const verificarRol = (rolesPermitidos = []) => {
 
     const rol = req.usuario.rol;
 
+    if (!rol) {
+      return res.status(401).json({
+        ok: false,
+        mensaje: "Usuario sin rol asignado. Contacta al administrador"
+      });
+    }
+
     if (!rolesPermitidos.includes(rol)) {
-      return res.status(403).json({
+      return res.status(401).json({
         ok: false,
         mensaje: "No autorizado para acceder a este recurso"
       });

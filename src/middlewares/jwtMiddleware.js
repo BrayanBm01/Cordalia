@@ -45,11 +45,11 @@ const verificarToken = async (req, res, next) => {
       });
     }
 
-    // usuario sin rol → bloquear aquí
+    // usuario sin rol → 401 como quieres
     if (usuario.rol_id === null) {
-      return res.status(403).json({
+      return res.status(401).json({
         ok: false,
-        mensaje: "Usuario sin rol asignado"
+        mensaje: "Usuario sin rol asignado. Contacta al administrador"
       });
     }
 
@@ -59,7 +59,7 @@ const verificarToken = async (req, res, next) => {
     } else if (usuario.rol_id === 1) {
       rolNombre = "USER";
     } else {
-      return res.status(403).json({
+      return res.status(401).json({
         ok: false,
         mensaje: "Rol inválido"
       });
