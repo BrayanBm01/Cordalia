@@ -48,13 +48,28 @@ const verificarToken = async (req, res, next) => {
       });
     }
 
-    // mapear rol (0 = ADMIN, 1 = USER)
-    let rolNombre = "USER";
-    if (usuario.rol_id === 0) {
-      rolNombre = "ADMIN";
+    // BLOQUEO CLAVE: usuario sin rol
+    if (usuario.rol_id === null) {
+      return res.status(403).json({
+        ok: false,
+        mensaje: "Acceso denegado: usuario sin rol"
+      });
     }
 
-    // guardar usuario en request
+    // mapear rol correctamente
+    let rolNombre;
+    if (usuario.rol_id === 0) {
+      rolNombre = "ADMIN";
+    } else if (usuario.rol_id === 1) {
+      rolNombre = "USER";
+    } else {
+      return res.status(403).json({
+        ok: false,
+        mensaje: "Rol inválido"
+      });
+    }
+
+    // guardar en request
     req.usuario = {
       id: usuario.id,
       rol: rolNombre

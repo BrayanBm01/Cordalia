@@ -1,7 +1,7 @@
 const verificarRol = (rolesPermitidos = []) => {
   return (req, res, next) => {
 
-    // 🔒 debe venir del jwtMiddleware
+    // autenticación
     if (!req.usuario) {
       return res.status(401).json({
         ok: false,
@@ -11,7 +11,15 @@ const verificarRol = (rolesPermitidos = []) => {
 
     const rol = req.usuario.rol;
 
-    // 🔍 validar rol
+    // BLOQUEO CLAVE: usuario sin rol
+    if (!rol) {
+      return res.status(403).json({
+        ok: false,
+        mensaje: "Acceso denegado: usuario sin rol"
+      });
+    }
+
+    // rol no permitido
     if (!rolesPermitidos.includes(rol)) {
       return res.status(403).json({
         ok: false,
