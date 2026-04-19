@@ -3,7 +3,7 @@ const registerForm = document.getElementById("registerForm");
 
 let verifying = false;
 
-// 🔒 VERIFICAR SESIÓN SOLO EN LOGIN
+// VERIFICAR SESIÓN SOLO EN LOGIN
 const token = localStorage.getItem("token");
 
 if (token && !verifying && window.location.pathname === "/") {
@@ -23,14 +23,12 @@ if (token && !verifying && window.location.pathname === "/") {
         const usuario = data.usuario || {};
         const rol = usuario.rol;
 
-        // 🔥 guardar datos
         localStorage.setItem("rol", rol);
         localStorage.setItem("usuario", JSON.stringify(usuario));
 
-        // ✅ REDIRECCIÓN CORREGIDA
-        if (rol === "ADMIN") {
+        if (rol === 0 || rol === "ADMIN") {
           window.location.replace("/admin");
-        } else if (rol === "USER") {
+        } else if (rol === 1 || rol === "USER") {
           window.location.replace("/usuario");
         }
 
@@ -45,7 +43,7 @@ if (token && !verifying && window.location.pathname === "/") {
     });
 }
 
-// 🔁 SWITCH FORM
+// SWITCH FORM
 function switchForm(show, hide) {
   hide.classList.remove("show");
 
@@ -66,7 +64,7 @@ function showLogin() {
   switchForm(loginForm, registerForm);
 }
 
-// 🔑 LOGIN
+// LOGIN
 async function loginUser() {
   const email = document.getElementById("loginEmail").value;
   const password = document.getElementById("loginPassword").value;
@@ -89,13 +87,17 @@ async function loginUser() {
 
     console.log("LOGIN DATA:", data);
 
+    // BLOQUEO POR SESIÓN ACTIVA
+    if (res.status === 403) {
+      alert("Ya hay una sesión iniciada en otro dispositivo");
+      return;
+    }
+
     if (data.ok) {
-      // 🔥 guardar datos
       localStorage.setItem("token", data.token);
       localStorage.setItem("rol", data.rol);
       localStorage.setItem("usuario", JSON.stringify(data.usuario || {}));
 
-      // ✅ REDIRECCIÓN CORREGIDA
       if (data.rol === "ADMIN") {
         window.location.replace("/admin");
       } else if (data.rol === "USER") {
@@ -112,7 +114,26 @@ async function loginUser() {
   }
 }
 
-// 🧾 REGISTER
+// LOGOUT
+async function logoutUser() {
+  const token = localStorage.getItem("token");
+
+  try {
+    await fetch("/login/logout", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + token
+      }
+    });
+  } catch (error) {
+    console.error(error);
+  }
+
+  localStorage.clear();
+  window.location.href = "/";
+}
+
+// REGISTER
 async function registerUser() {
   const nombre = document.getElementById("registerNombre").value;
   const email = document.getElementById("registerEmail").value;
@@ -133,7 +154,7 @@ async function registerUser() {
         nombre,
         email,
         password,
-        rol_id: 1 // por defecto USER
+        rol_id: 1
       })
     });
 

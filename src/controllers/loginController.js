@@ -16,9 +16,9 @@ const login = async (req, res) => {
     email = email.trim();
     password = password.trim();
 
-    // Buscar usuario
+    // Buscar usuario incluyendo token_activo
     const result = await db.query(
-      "SELECT id, nombre, email, password, rol_id FROM usuarios WHERE email = $1",
+      "SELECT id, nombre, email, password, rol_id, token_activo FROM usuarios WHERE email = $1",
       [email]
     );
 
@@ -46,7 +46,15 @@ const login = async (req, res) => {
       });
     }
 
-    // Usuario sin rol → 401 (como definiste)
+    // Verificar si ya hay sesión activa
+    if (usuario.token_activo) {
+      return res.status(403).json({
+        ok: false,
+        mensaje: "Ya hay una sesión iniciada en otro dispositivo"
+      });
+    }
+
+    // Validar rol
     if (usuario.rol_id === null) {
       return res.status(401).json({
         ok: false,
@@ -54,7 +62,6 @@ const login = async (req, res) => {
       });
     }
 
-    // Mapear rol
     let rolNombre;
     if (usuario.rol_id === 0) {
       rolNombre = "ADMIN";
@@ -70,7 +77,7 @@ const login = async (req, res) => {
     // Generar token
     const token = generarToken(usuario.id, rolNombre);
 
-    // Guardar sesión única
+    // Guardar token como sesión activa
     await db.query(
       "UPDATE usuarios SET token_activo = $1 WHERE id = $2",
       [token, usuario.id]
@@ -82,7 +89,6 @@ const login = async (req, res) => {
       [usuario.id, true]
     );
 
-    // Respuesta
     return res.status(200).json({
       ok: true,
       mensaje: "Login exitoso",
@@ -105,4 +111,27 @@ const login = async (req, res) => {
   }
 };
 
-module.exports = { login };
+const logout = async (req, res) => {
+  try {
+    const userId = req.usuario.id;
+
+    await db.query(
+      "UPDATE usuarios SET token_activo = NULL WHERE id = $1",
+      [userId]
+    );
+
+    return res.json({
+      ok: true,
+      mensaje: "Sesión cerrada correctamente"
+    });
+
+  } catch (error) {
+    console.error("Error en logout:", error);
+    return res.status(500).json({
+      ok: false,
+      mensaje: "Error al cerrar sesión"
+    });
+  }
+};
+
+module.exports = { login, logout };
