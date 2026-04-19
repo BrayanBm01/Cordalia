@@ -123,7 +123,7 @@
 
       </div>
 
-      <div class="flex flex-col gap-7 font-semibold text-lg text-gray-700">
+      <div class="flex flex-col gap-7 font-semibold text-lg text-white-700">
 
         <a href="#inicio" class="flex items-center gap-3 hover:text-blue-600 transition">
           <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -578,7 +578,7 @@
       reveals.forEach(section => {
         const windowHeight = window.innerHeight;
         const elementTop = section.getBoundingClientRect().top;
-        const visible = 50; // 👈 mejor para móvil
+        const visible = 50;
 
         if (elementTop < windowHeight - visible) {
           section.classList.add("active");
@@ -587,7 +587,7 @@
     }
 
     window.addEventListener("scroll", reveal);
-    window.addEventListener("load", reveal); // 👈 asegura animación al cargar
+    window.addEventListener("load", reveal);
 
 
     /* MENU MOVIL */
@@ -605,7 +605,6 @@
       overlay.classList.remove("active");
     });
 
-    // 👇 cerrar menú al hacer click en links (mejora UX móvil)
     document.querySelectorAll("#mobileMenu a").forEach(link => {
       link.addEventListener("click", () => {
         menu.classList.remove("active");
@@ -615,24 +614,21 @@
 
 
     /* =========================
-       🔐 AUTH + USUARIO
+       AUTH + USUARIO
     ========================= */
     const token = localStorage.getItem("token");
     const userSection = document.getElementById("userSection");
 
-    // 👇 primero intenta usar localStorage (más rápido)
     let usuario = JSON.parse(localStorage.getItem("usuario") || "{}");
 
     if (!token) {
       window.location.href = "/";
     } else {
 
-      // 👇 pintar usuario inmediatamente si existe
       if (usuario && (usuario.nombre || usuario.email)) {
         renderUser(usuario);
       }
 
-      // 👇 verificar con backend
       fetch("/login/verify", {
         headers: {
           Authorization: "Bearer " + token
@@ -640,17 +636,14 @@
       })
         .then(res => res.json())
         .then(data => {
-          console.log("VERIFY:", data); // 👈 debug
+          console.log("VERIFY:", data);
 
           if (!data.ok) {
             localStorage.clear();
             window.location.href = "/";
           } else {
             usuario = data.usuario || {};
-
-            // 🔥 guardar actualizado
             localStorage.setItem("usuario", JSON.stringify(usuario));
-
             renderUser(usuario);
           }
         })
@@ -664,29 +657,25 @@
     function renderUser(usuario) {
       const nombre = usuario?.nombre ?? usuario?.email ?? "Usuario";
 
-      // escritorio
       userSection.innerHTML = `
-    <div class="flex items-center gap-4">
+      <div class="flex items-center gap-4">
+        <span class="hidden sm:block text-sm text-gray-300">
+          ${nombre}
+        </span>
 
-      <span class="hidden sm:block text-sm text-gray-300">
-        ${nombre}
-      </span>
+        <button onclick="logout()"
+          class="flex items-center gap-2 bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg font-bold transition transform hover:scale-105 shadow-lg">
 
-      <button onclick="logout()"
-        class="flex items-center gap-2 bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg font-bold transition transform hover:scale-105 shadow-lg">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M17 16l4-4m0 0l-4-4m4 4H7" />
+          </svg>
 
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M17 16l4-4m0 0l-4-4m4 4H7" />
-        </svg>
+          Salir
+        </button>
+      </div>
+    `;
 
-        Salir
-      </button>
-
-    </div>
-  `;
-
-      // móvil
       const mobileName = document.getElementById("mobileUserName");
       if (mobileName) {
         mobileName.textContent = nombre;
@@ -699,10 +688,24 @@
       logoutMobile.addEventListener("click", logout);
     }
 
+
     /* =========================
-       🚪 LOGOUT
+       LOGOUT
     ========================= */
-    function logout() {
+    async function logout() {
+      const token = localStorage.getItem("token");
+
+      try {
+        await fetch("/login/logout", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer " + token
+          }
+        });
+      } catch (error) {
+        console.error("Error en logout:", error);
+      }
+
       localStorage.clear();
       window.location.href = "/";
     }
