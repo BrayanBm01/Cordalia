@@ -106,6 +106,13 @@ const getUsuarioById = async (req, res) => {
   const { id } = req.params;
 
   try {
+    //  VALIDACIÓN CLAVE
+    if (req.usuario.rol !== "ADMIN" && req.usuario.id != id) {
+      return res.status(403).json({
+        mensaje: "No tienes permiso para ver este usuario"
+      });
+    }
+
     const result = await pool.query(
       "SELECT id, nombre, email, rol_id FROM usuarios WHERE id = $1",
       [id]
@@ -127,6 +134,18 @@ const updateUsuario = async (req, res) => {
   const { id } = req.params;
   let { nombre, email, password, rol_id } = req.body;
 
+  // VALIDACIÓN
+  if (req.usuario.rol !== "ADMIN" && req.usuario.id != id) {
+    return res.status(403).json({
+      mensaje: "No tienes permiso para editar este usuario"
+    });
+  }
+
+  // USER NO PUEDE CAMBIAR ROL
+  if (req.usuario.rol !== "ADMIN") {
+    rol_id = 1;
+  }
+
   if (!nombre || !email || rol_id === undefined) {
     return res.status(400).json({ mensaje: "Datos incompletos" });
   }
@@ -135,14 +154,10 @@ const updateUsuario = async (req, res) => {
     nombre = nombre.trim();
     email = email.trim();
 
-    if (password) {
-      password = password.trim();
-    }
-
     let result;
 
-    if (password && password.length > 0) {
-      const hashedPassword = await bcrypt.hash(password, 10);
+    if (password && password.trim().length > 0) {
+      const hashedPassword = await bcrypt.hash(password.trim(), 10);
 
       result = await pool.query(
         `UPDATE usuarios 
@@ -151,7 +166,6 @@ const updateUsuario = async (req, res) => {
          RETURNING id, nombre, email, rol_id`,
         [nombre, email, hashedPassword, rol_id, id]
       );
-
     } else {
       result = await pool.query(
         `UPDATE usuarios 
@@ -172,7 +186,6 @@ const updateUsuario = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Error actualizando:", error);
     return res.status(500).json({ mensaje: "Error al actualizar usuario" });
   }
 };

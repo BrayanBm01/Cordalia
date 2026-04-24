@@ -11,27 +11,26 @@ const {
 } = require("../controllers/usuariosController");
 
 const verificarToken = require("../middlewares/jwtMiddleware");
+const verificarRol = require("../middlewares/rolMiddleware");
 
-
-// 🔓 RUTA PÚBLICA (REGISTRO)
+// 🔓 RUTA PÚBLICA
 router.post("/register", register);
 
+// 🔒 RUTAS PROTEGIDAS
 
-// 🔒 RUTAS PROTEGIDAS (requieren token)
+// SOLO ADMIN → ver todos
+router.get("/", verificarToken, verificarRol(["ADMIN"]), getUsuarios);
 
-// Obtener todos los usuarios
-router.get("/", verificarToken, getUsuarios);
-
-// Obtener usuario por ID
+// ADMIN o el mismo usuario
 router.get("/:id", verificarToken, getUsuarioById);
 
-// Crear usuario (ADMIN o sistema interno)
-router.post("/", verificarToken, createUsuario);
+// SOLO ADMIN → crear
+router.post("/", verificarToken, verificarRol(["ADMIN"]), createUsuario);
 
-// Actualizar usuario
+// ADMIN o el mismo usuario
 router.put("/:id", verificarToken, updateUsuario);
 
-// Eliminar usuario
-router.delete("/:id", verificarToken, deleteUsuario);
+// SOLO ADMIN → eliminar
+router.delete("/:id", verificarToken, verificarRol(["ADMIN"]), deleteUsuario);
 
 module.exports = router;
