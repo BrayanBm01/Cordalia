@@ -1,25 +1,20 @@
 {
-  "name": "api-turismo",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "explora-turismo",
+  "version": "2.0.0",
+  "description": "Explora Turismo - Plataforma de turismo colombiano con React + Express + PostgreSQL",
+  "private": true,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "start": "cd backend && npm start",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install"
   },
-  "keywords": [],
+  "keywords": ["turismo", "colombia", "react", "express", "postgresql"],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
-  "dependencies": {
-    "bcrypt": "^6.0.0",
-    "bcryptjs": "^3.0.3",
-    "cors": "^2.8.6",
-    "dotenv": "^17.3.1",
-    "express": "^5.2.1",
-    "jsonwebtoken": "^9.0.3",
-    "pg": "^8.20.0"
-  },
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "concurrently": "^9.1.2"
   }
 }

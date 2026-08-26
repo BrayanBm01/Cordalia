@@ -1,93 +1,422 @@
-# lenguaje-Avanzado-2-grupo-1
+# Explora Turismo
 
+Plataforma web para descubrir los mejores destinos turisticos de Colombia. Permite a los usuarios explorar destinos, buscar por nombre, ver detalles completos (actividades, puntos turisticos, gastronomia) y gestionar su perfil. Incluye un panel de administracion para gestionar usuarios, lugares y monitorear actividad del sistema.
 
+## Funcionalidades
 
-## Getting started
+### Usuarios
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+- Registro con nombre, email y contrasena
+- Inicio de sesion con JWT
+- Cierre de sesion
+- Perfil: ver y editar datos personales
+- Sesion unica: solo una sesion activa por usuario
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+### Destinos
 
-## Add your files
+- Listado de 12 destinos turisticos colombianos
+- Busqueda por nombre
+- Paginacion
+- Vista detallada de cada destino:
+  - Descripcion general
+  - Galeria de imagenes
+  - Actividades disponibles
+  - Puntos turisticos
+  - Gastronomia y restaurantes
+  - Zonas del destino
+  - Consejos praticos (mejor epoca, como llegar, duracion, presupuesto)
+  - Destinos relacionados
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+### Administrador
+
+- Dashboard con estadisticas (usuarios, lugares, logins exitosos/fallidos)
+- Gestion de usuarios: crear, editar, eliminar, ver sesion activa, revocar sesion
+- Gestion de lugares: crear, editar, eliminar
+- Historial de intentos de acceso
+- Sistema de notificaciones con historial de logins
+
+## Tecnologias
+
+### Frontend
+
+- React 19
+- Vite
+- Tailwind CSS v4
+- Framer Motion (animaciones)
+- Lucide React (iconografia)
+- Recharts (graficos en dashboard)
+- React Hook Form + Zod (formularios y validacion)
+- Sonner (notificaciones toast)
+- React Router DOM (enrutamiento)
+
+### Backend
+
+- Node.js
+- Express 5
+- PostgreSQL
+- JSON Web Token (JWT)
+- bcryptjs (hash de contrasenas)
+- pg (cliente PostgreSQL)
+- dotenv (variables de entorno)
+- CORS
+
+### Base de datos
+
+- PostgreSQL
+
+## Arquitectura
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/brayan-borja-madrid/lenguaje-avanzado-2-grupo-1.git
-git branch -M main
-git push -uf origin main
+Frontend (React + Vite, puerto 5173)
+        |
+        |  HTTP (proxy /api -> localhost:3000)
+        v
+Backend (Express, puerto 3000)
+        |
+        |  SQL parametrizado
+        v
+PostgreSQL (turismo_db)
 ```
 
-## Integrate with your tools
+- **Frontend**: SPA construida con React, se comunica con el backend a traves de una API REST. En desarrollo, Vite actua como proxy redirigiendo `/api/*` al backend.
+- **Backend**: API REST con Express. Autenticacion basada en JWT con sistema de sesion unica. Middleware para proteccion de rutas y control de roles.
+- **Base de datos**: PostgreSQL con tres tablas principales: `usuarios`, `lugares` e `login` (historial de accesos).
 
-* [Set up project integrations](https://gitlab.com/brayan-borja-madrid/lenguaje-avanzado-2-grupo-1/-/settings/integrations)
+## Estructura del proyecto
 
-## Collaborate with your team
+```
+Explora-Turismo/
+├── README.md
+├── MANUAL_USUARIO.md
+├── package.json                    # Scripts globales (concurrently)
+├── .gitignore
+│
+├── backend/
+│   ├── .env                        # Variables de entorno (no versionado)
+│   ├── .env.example                # Plantilla de variables
+│   ├── package.json
+│   ├── setup-admin.js              # Script: crear usuario admin
+│   ├── revoke-session.js           # Script: recuperar sesion admin
+│   └── src/
+│       ├── app.js                  # Configuracion Express (CORS, rutas)
+│       ├── server.js               # Inicio del servidor
+│       ├── config/
+│       │   └── db.js               # Conexion PostgreSQL
+│       ├── controllers/
+│       │   ├── authController.js   # Register, login, logout, perfil
+│       │   ├── adminController.js  # Stats, historial de login
+│       │   ├── lugaresController.js# CRUD de lugares
+│       │   └── usuarioController.js# CRUD de usuarios + revocar sesion
+│       ├── middlewares/
+│       │   ├── authMiddleware.js   # Verifica JWT y token_activo
+│       │   ├── adminMiddleware.js  # Verifica rol de administrador
+│       │   └── errorHandler.js     # Manejo centralizado de errores
+│       ├── models/
+│       │   ├── loginModel.js       # Consultas historial de login
+│       │   ├── lugarModel.js       # Consultas de lugares
+│       │   └── usuarioModel.js     # Consultas de usuarios
+│       ├── routes/
+│       │   ├── authRoutes.js       # /api/auth/*
+│       │   ├── adminRoutes.js      # /api/admin/*
+│       │   ├── lugaresRoutes.js    # /api/lugares/*
+│       │   └── usuarioRoutes.js    # /api/usuarios/*
+│       └── utils/
+│           ├── jwt.js              # Firmar y verificar tokens
+│           ├── password.js         # Hash y comparacion de contrasenas
+│           └── validators.js       # Validaciones de entrada
+│
+├── frontend/
+│   ├── index.html
+│   ├── package.json
+│   ├── vite.config.js
+│   ├── public/
+│   │   └── favicon.svg
+│   └── src/
+│       ├── main.jsx
+│       ├── App.jsx                 # Rutas de la aplicacion
+│       ├── index.css               # Tema Tailwind (colores, fuentes)
+│       ├── assets/
+│       │   └── (hero image)
+│       ├── components/
+│       │   ├── AdminRoute.jsx      # Ruta protegida para admin
+│       │   ├── ConfirmModal.jsx    # Modal de confirmacion
+│       │   ├── EmptyState.jsx      # Estado vacio generico
+│       │   ├── LoadingSpinner.jsx  # Indicador de carga
+│       │   ├── Modal.jsx           # Modal generico
+│       │   └── ProtectedRoute.jsx  # Ruta protegida para usuarios
+│       ├── context/
+│       │   └── AuthContext.jsx     # Estado global de autenticacion
+│       ├── data/
+│       │   └── destinos.js         # Datos detallados de 12 destinos
+│       ├── layouts/
+│       │   ├── AdminLayout.jsx     # Layout del panel admin
+│       │   ├── AuthLayout.jsx      # Layout para login/registro
+│       │   └── PublicLayout.jsx    # Layout publico (navbar + footer)
+│       ├── pages/
+│       │   ├── Home.jsx
+│       │   ├── Login.jsx
+│       │   ├── Registro.jsx
+│       │   ├── Lugares.jsx
+│       │   ├── LugarDetalle.jsx
+│       │   ├── Perfil.jsx
+│       │   ├── NotFound.jsx
+│       │   └── admin/
+│       │       ├── AdminDashboard.jsx
+│       │       ├── AdminUsuarios.jsx
+│       │       ├── AdminDestinos.jsx
+│       │       └── AdminHistorial.jsx
+│       └── services/
+│           └── api.js              # Cliente HTTP (axios)
+│
+└── database/
+    ├── schema.sql                  # Estructura de tablas
+    └── seed.sql                    # Datos iniciales (12 destinos)
+```
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+## Requisitos previos
 
-## Test and Deploy
+- [Node.js](https://nodejs.org/) v18 o superior
+- [PostgreSQL](https://www.postgresql.org/) v14 o superior
+- npm
 
-Use the built-in continuous integration in GitLab.
+## Instalacion
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+### 1. Clonar el repositorio
 
-***
+```bash
+git clone https://gitlab.com/brayan-borja-madrid/lenguaje-avanzado-2-grupo-1.git
+cd lenguaje-avanzado-2-grupo-1
+```
 
-# Editing this README
+### 2. Instalar dependencias
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+```bash
+npm run install:all
+```
 
-## Suggestions for a good README
+Esto instala dependencias en la raiz, `backend/` y `frontend/`.
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+### 3. Configurar la base de datos
 
-## Name
-Choose a self-explaining name for your project.
+Crear la base de datos en PostgreSQL:
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+```sql
+CREATE DATABASE turismo_db;
+```
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+### 4. Configurar variables de entorno
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+Copiar el archivo de ejemplo y completar los valores:
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+```bash
+cp backend/.env.example backend/.env
+```
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+Editar `backend/.env`:
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+```env
+DATABASE_URL=postgresql://postgres:tu_password@localhost:5432/turismo_db
+JWT_SECRET=una_clave_secreta_larga_y_aleatoria
+PORT=3000
+```
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+### 5. Crear las tablas
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+```bash
+psql -U postgres -d turismo_db -f database/schema.sql
+```
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+### 6. Cargar datos iniciales
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+```bash
+psql -U postgres -d turismo_db -f database/seed.sql
+```
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+Esto carga los 12 destinos turisticos de ejemplo.
 
-## License
-For open source projects, say how it is licensed.
+### 7. Crear usuario administrador
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+```bash
+cd backend
+node setup-admin.js
+```
+
+El script solicitara nombre, email y contrasena. El usuario se crea con rol de administrador (`rol_id = 0`).
+
+### 8. Iniciar la aplicacion
+
+Desde la raiz del proyecto:
+
+```bash
+npm run dev
+```
+
+Esto inicia simultaneamente:
+
+- **Backend**: http://localhost:3000
+- **Frontend**: http://localhost:5173
+
+## Base de datos
+
+### Tablas
+
+**usuarios**
+
+| Columna | Tipo | Descripcion |
+|---------|------|-------------|
+| id | SERIAL PK | Identificador unico |
+| nombre | VARCHAR(100) | Nombre del usuario |
+| email | VARCHAR(150) | Email (unico) |
+| password | TEXT | Contrasena hasheada con bcrypt |
+| rol_id | INTEGER | 0 = admin, 1 = usuario |
+| token_activo | TEXT | Token JWT actual (sesion unica) |
+
+**lugares**
+
+| Columna | Tipo | Descripcion |
+|---------|------|-------------|
+| id | SERIAL PK | Identificador unico |
+| nombre | VARCHAR(150) | Nombre del destino |
+| descripcion | TEXT | Descripcion del destino |
+| ubicacion | VARCHAR(200) | Ubicacion geografica |
+| imagen | TEXT | URL de imagen |
+
+**login**
+
+| Columna | Tipo | Descripcion |
+|---------|------|-------------|
+| id | SERIAL PK | Identificador unico |
+| usuario_id | INTEGER FK | Referencia a usuarios.id |
+| exito | BOOLEAN | true = exitoso, false = fallido |
+| fecha | TIMESTAMP | Fecha y hora del intento |
+
+### Relaciones
+
+- `login.usuario_id` -> `usuarios.id` (ON DELETE CASCADE)
+
+## Autenticacion
+
+### JWT (JSON Web Token)
+
+1. Al iniciar sesion, el backend genera un token JWT firmado con `JWT_SECRET`.
+2. El token se almacena en `usuarios.token_activo` en la base de datos.
+3. El frontend envia el token en el header `Authorization: Bearer <token>` en cada peticion protegida.
+4. El middleware `authMiddleware` verifica:
+   - Que el token sea valido (firmado correctamente).
+   - Que `token_activo` en la BD coincida con el token enviado.
+5. Si cualquiera de las verificaciones falla, se retorna 401.
+
+### Sesion unica
+
+- Solo puede existir una sesion activa por usuario.
+- Al iniciar sesion, se reemplaza el `token_activo` anterior.
+- Si un usuario cierra el navegador sin logout y luego intenta iniciar sesion desde otro dispositivo, recibira un error 403 ("Ya hay una sesion activa").
+- Un administrador puede revocar la sesion desde el panel de usuarios.
+- Para recuperar la sesion del administrador, usar `revoke-session.js`.
+
+### Roles
+
+| Rol | rol_id | Permisos |
+|-----|--------|----------|
+| Usuario | 1 | Ver destinos, buscar, ver perfil, editar perfil |
+| Administrador | 0 | Todo lo del usuario + gestionar usuarios, lugares, ver estadisticas, historial, revocar sesiones |
+
+## API
+
+### Autenticacion
+
+| Metodo | Ruta | Auth | Descripcion |
+|--------|------|------|-------------|
+| POST | `/api/auth/register` | No | Registrar nuevo usuario |
+| POST | `/api/auth/login` | No | Iniciar sesion |
+| POST | `/api/auth/logout` | Si | Cerrar sesion (limpia token_activo) |
+| GET | `/api/auth/me` | Si | Obtener perfil del usuario actual |
+| PUT | `/api/auth/me` | Si | Actualizar perfil del usuario actual |
+
+### Lugares
+
+| Metodo | Ruta | Auth | Rol | Descripcion |
+|--------|------|------|-----|-------------|
+| GET | `/api/lugares` | Si | Cualquiera | Listar lugares (busqueda opcional via `?search=`) |
+| GET | `/api/lugares/:id` | Si | Cualquiera | Obtener lugar por ID |
+| POST | `/api/lugares` | Si | Admin | Crear lugar |
+| PUT | `/api/lugares/:id` | Si | Admin | Actualizar lugar |
+| DELETE | `/api/lugares/:id` | Si | Admin | Eliminar lugar |
+
+### Usuarios (solo admin)
+
+| Metodo | Ruta | Auth | Rol | Descripcion |
+|--------|------|------|-----|-------------|
+| GET | `/api/usuarios` | Si | Admin | Listar usuarios con estado de sesion |
+| GET | `/api/usuarios/:id` | Si | Admin | Obtener usuario por ID |
+| POST | `/api/usuarios` | Si | Admin | Crear usuario |
+| PUT | `/api/usuarios/:id` | Si | Admin | Actualizar usuario |
+| DELETE | `/api/usuarios/:id` | Si | Admin | Eliminar usuario |
+| POST | `/api/usuarios/:id/revoke-session` | Si | Admin | Revocar sesion de un usuario |
+
+### Admin (solo admin)
+
+| Metodo | Ruta | Auth | Rol | Descripcion |
+|--------|------|------|-----|-------------|
+| GET | `/api/admin/stats` | Si | Admin | Estadisticas del sistema |
+| GET | `/api/admin/login-history` | Si | Admin | Historial de intentos de acceso |
+
+## Seguridad
+
+- **Contrasenas**: Almacenadas con bcrypt (10 rounds de salt). Nunca se guardan en texto plano.
+- **JWT**: Tokens firmados con `JWT_SECRET` definido en variables de entorno.
+- **SQL parametrizado**: Todas las consultas usan parametrizacion ($1, $2...) para prevenir inyeccion SQL.
+- **Sesion unica**: Un usuario solo puede tener una sesion activa. Revocar una sesion invalida inmediatamente el token.
+- **Roles**: Middleware `adminMiddleware` protege endpoints que requieren privilegios de administrador.
+- **CORS**: Configurado para permitir solo origenes especificos.
+- **Variables de entorno**: Secretos almacenados en `.env` (no versionado). El archivo `.env.example` muestra solo los nombres de las variables.
+
+## Scripts
+
+### setup-admin.js
+
+Crea un usuario con rol de administrador.
+
+```bash
+cd backend
+node setup-admin.js
+```
+
+Solicita interactivamente: nombre, email, contrasena. Verifica si el email ya existe antes de crear.
+
+### revoke-session.js
+
+Revoca la sesion activa de un usuario por email. Util para recuperar acceso cuando el administrador queda bloqueado.
+
+```bash
+cd backend
+node revoke-session.js usuario@ejemplo.com
+```
+
+Muestra los datos del usuario, pide confirmacion, y elimina `token_activo` si se confirma.
+
+## Comandos disponibles
+
+### Desde la raiz
+
+| Comando | Descripcion |
+|---------|-------------|
+| `npm run dev` | Iniciar frontend y backend en paralelo |
+| `npm run build` | Construir el frontend para produccion |
+| `npm start` | Iniciar solo el backend |
+| `npm run install:all` | Instalar todas las dependencias |
+
+### En frontend/
+
+| Comando | Descripcion |
+|---------|-------------|
+| `npm run dev` | Iniciar servidor de desarrollo Vite |
+| `npm run build` | Construir para produccion |
+| `npm run lint` | Ejecutar linter (oxlint) |
+
+### En backend/
+
+| Comando | Descripcion |
+|---------|-------------|
+| `npm run dev` | Iniciar con nodemon (auto-reload) |
+| `npm start` | Iniciar en modo produccion |
