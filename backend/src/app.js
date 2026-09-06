@@ -51,6 +51,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/usuarios", require("./routes/usuarioRoutes"));
 app.use("/api/lugares", require("./routes/lugaresRoutes"));
+app.use("/api/businesses", require("./routes/businessRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
 
 app.get("/api/health", (req, res) => {

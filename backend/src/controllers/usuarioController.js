@@ -106,7 +106,20 @@ exports.update = async (req, res) => {
 
     if (rol_id !== undefined && req.usuario.rol === "ADMIN") {
       const rolNum = Number(rol_id);
-      fields.rol_id = [0, 1, 2].includes(rolNum) ? rolNum : 1;
+      const rolFinal = [0, 1, 2].includes(rolNum) ? rolNum : 1;
+      if (rolFinal !== 0) {
+        const target = await UsuarioModel.findById(id);
+        if (target && target.rol_id === 0) {
+          const admins = await UsuarioModel.countAdmins();
+          if (admins <= 1) {
+            return res.status(403).json({
+              success: false,
+              message: "No se puede quitar el rol de administrador al último administrador",
+            });
+          }
+        }
+      }
+      fields.rol_id = rolFinal;
     }
 
     if (Object.keys(fields).length === 0) {
@@ -128,10 +141,29 @@ exports.update = async (req, res) => {
 exports.remove = async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await UsuarioModel.delete(id);
-    if (!deleted) {
+
+    const usuario = await UsuarioModel.findById(id);
+    if (!usuario) {
       return res.status(404).json({ success: false, message: "Usuario no encontrado" });
     }
+
+    if (usuario.rol_id === 0) {
+      if (Number(id) === req.usuario.id) {
+        return res.status(403).json({
+          success: false,
+          message: "Un administrador no puede eliminarse a sí mismo",
+        });
+      }
+      const admins = await UsuarioModel.countAdmins();
+      if (admins <= 1) {
+        return res.status(403).json({
+          success: false,
+          message: "No se puede eliminar al último administrador",
+        });
+      }
+    }
+
+    const deleted = await UsuarioModel.delete(id);
     return res.json({ success: true, message: "Usuario eliminado correctamente" });
   } catch (error) {
     console.error("Error remove usuario:", error);

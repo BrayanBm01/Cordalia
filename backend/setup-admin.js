@@ -1,5 +1,6 @@
 const { Pool } = require("pg");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 require("dotenv").config();
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -22,7 +23,7 @@ async function setupAdmin() {
 
     const email = "admin@exploraturismo.local";
     const nombre = "Administrador";
-    const password = "Admin" + Date.now().toString(36) + "!";
+    const password = crypto.randomBytes(12).toString("base64url") + "A1!";
     const hashed = await bcrypt.hash(password, 10);
 
     await client.query(

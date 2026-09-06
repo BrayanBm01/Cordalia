@@ -1,4 +1,5 @@
 const LugarModel = require("../models/lugarModel");
+const BusinessModel = require("../models/businessModel");
 const { isNonEmptyString, sanitizeString } = require("../utils/validators");
 const { slugify } = require("../utils/slug");
 
@@ -40,6 +41,23 @@ exports.getBySlug = async (req, res) => {
   } catch (error) {
     console.error("Error getBySlug lugar:", error);
     return res.status(500).json({ success: false, message: "Error al obtener lugar" });
+  }
+};
+
+exports.getBusinesses = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const lugar = await LugarModel.findById(id);
+    if (!lugar) {
+      return res.status(404).json({ success: false, message: "Lugar no encontrado" });
+    }
+    const rol = req.usuario?.rol || null;
+    const userId = req.usuario?.id || null;
+    const negocios = await BusinessModel.listByDestination(id, rol, userId);
+    return res.json({ success: true, data: negocios });
+  } catch (error) {
+    console.error("Error getBusinesses lugar:", error);
+    return res.status(500).json({ success: false, message: "Error al obtener negocios del lugar" });
   }
 };
 

@@ -53,4 +53,35 @@ async function pool_findToken(id) {
   return rows[0] || null;
 }
 
+/**
+ * Auth opcional: si el usuario envía un Bearer token válido lo resuelve;
+ * si no envía token (o el token es inválido/expirado) continua como anónimo.
+ * Pensado para rutas públicas que enriquecen la respuesta según el rol.
+ */
+async function optionalAuth(req, res, next) {
+  try {
+    const auth = req.headers.authorization;
+    if (!auth || !auth.startsWith("Bearer ")) return next();
+
+    const token = auth.split(" ")[1];
+    let decoded;
+    try {
+      decoded = verificarToken(token);
+    } catch {
+      return next();
+    }
+    if (!decoded || !decoded.id) return next();
+
+    const fullUser = await pool_findToken(decoded.id);
+    if (!fullUser || fullUser.token_activo !== token || fullUser.rol_id === null) return next();
+
+    const rol = Number(fullUser.rol_id) === 0 ? "ADMIN" : Number(fullUser.rol_id) === 2 ? "BUSINESS" : "TOURIST";
+    req.usuario = { id: decoded.id, rol };
+    next();
+  } catch {
+    next();
+  }
+}
+
 module.exports = requireAuth;
+module.exports.optionalAuth = optionalAuth;

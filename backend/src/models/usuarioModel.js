@@ -107,6 +107,13 @@ const UsuarioModel = {
     return rows[0].count;
   },
 
+  async countAdmins() {
+    const { rows } = await pool.query(
+      "SELECT COUNT(*)::int as count FROM usuarios WHERE rol_id = 0"
+    );
+    return rows[0].count;
+  },
+
   async setToken(id, token) {
     await pool.query("UPDATE usuarios SET token_activo = $1 WHERE id = $2", [token, id]);
   },
