@@ -3,17 +3,64 @@ const LoginModel = require("../models/loginModel");
 const { hashPassword, comparePassword } = require("../utils/password");
 const { generarToken } = require("../utils/jwt");
 const { isEmail, isNonEmptyString, sanitizeString } = require("../utils/validators");
+const { verifyGoogleIdToken } = require("../services/googleAuth");
 
-const ROLES = { ADMIN: 0, USER: 1 };
+const ROLES = { ADMIN: 0, TOURIST: 1, BUSINESS: 2 };
+const ROLES_PUBLICOS = [ROLES.TOURIST, ROLES.BUSINESS];
+const PROVEEDORES_VALIDOS = ["local", "google"];
 
 function mapRolId(rol_id) {
-  if (rol_id === 0 || rol_id === "0") return "ADMIN";
-  return "USER";
+  const r = Number(rol_id);
+  if (r === 0) return "ADMIN";
+  if (r === 2) return "BUSINESS";
+  return "TOURIST";
+}
+
+function getClientIp(req) {
+  const xff = req.headers["x-forwarded-for"];
+  if (xff) return xff.split(",")[0].trim();
+  return req.socket?.remoteAddress || null;
+}
+
+function getUserAgent(req) {
+  return req.headers["user-agent"] || null;
+}
+
+/**
+ * Parsea y valida el rol solicitado para registro publico.
+ * Solo permite TOURIST (1) o BUSINESS (2).
+ * Cualquier intento de ADMIN (0) es ignorado/forzado a default.
+ */
+function resolvePublicRol(rol) {
+  if (rol === "BUSINESS" || Number(rol) === ROLES.BUSINESS) return ROLES.BUSINESS;
+  return ROLES.TOURIST;
+}
+
+function buildSessionResponse(usuario, token, rolNombre) {
+  return {
+    token,
+    usuario: {
+      id: usuario.id,
+      nombre: usuario.nombre,
+      email: usuario.email,
+      rol: rolNombre,
+      avatar_url: usuario.avatar_url || null,
+      proveedor: usuario.proveedor || "local",
+    },
+  };
+}
+
+async function iniciarSesion(usuario, req) {
+  const rolNombre = mapRolId(usuario.rol_id);
+  const token = generarToken(usuario.id, rolNombre);
+  await UsuarioModel.setToken(usuario.id, token);
+  await LoginModel.registrar(usuario.id, true, getClientIp(req), getUserAgent(req));
+  return { token, usuario, rolNombre };
 }
 
 exports.register = async (req, res) => {
   try {
-    let { nombre, email, password } = req.body;
+    let { nombre, email, password, rol } = req.body;
 
     if (!nombre || !email || !password) {
       return res.status(400).json({ success: false, message: "Todos los campos son obligatorios" });
@@ -38,15 +85,24 @@ exports.register = async (req, res) => {
       return res.status(409).json({ success: false, message: "El email ya está registrado" });
     }
 
+    // El backend es la autoridad sobre el rol: nunca confiar en el cliente.
+    // Solo TOURIST o BUSINESS son valido para registro publico.
+    const rolFinal = resolvePublicRol(rol);
+
     const hashed = await hashPassword(password);
-    const usuario = await UsuarioModel.create(nombre, email, hashed, ROLES.USER);
+    const usuario = await UsuarioModel.create(nombre, email, hashed, rolFinal, {
+      proveedor: "local",
+    });
 
     return res.status(201).json({
       success: true,
       message: "Usuario registrado correctamente",
-      data: { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol: "USER" },
+      data: { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol: mapRolId(usuario.rol_id) },
     });
   } catch (error) {
+    if (error && error.code === "23505") {
+      return res.status(409).json({ success: false, message: "El email ya está registrado" });
+    }
     console.error("Error en register:", error);
     return res.status(500).json({ success: false, message: "Error en el servidor" });
   }
@@ -68,9 +124,17 @@ exports.login = async (req, res) => {
       return res.status(401).json({ success: false, message: "Credenciales incorrectas" });
     }
 
+    // Cuenta creada solo por Google sin password: no se puede autenticar por password.
+    if (usuario.proveedor === "google" && !usuario.password) {
+      return res.status(401).json({
+        success: false,
+        message: "Esta cuenta usa Google. Inicia sesión con 'Continuar con Google'.",
+      });
+    }
+
     const coincide = await comparePassword(password, usuario.password);
     if (!coincide) {
-      await LoginModel.registrar(usuario.id, false);
+      await LoginModel.registrar(usuario.id, false, getClientIp(req), getUserAgent(req));
       return res.status(401).json({ success: false, message: "Credenciales incorrectas" });
     }
 
@@ -82,23 +146,100 @@ exports.login = async (req, res) => {
       return res.status(401).json({ success: false, message: "Usuario sin rol asignado" });
     }
 
-    const rolNombre = mapRolId(usuario.rol_id);
-    const token = generarToken(usuario.id, rolNombre);
-
-    await UsuarioModel.setToken(usuario.id, token);
-    await LoginModel.registrar(usuario.id, true);
+    const { token, rolNombre } = await iniciarSesion(usuario, req);
 
     return res.status(200).json({
       success: true,
       message: "Login exitoso",
-      data: {
-        token,
-        usuario: { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol: rolNombre },
-      },
+      data: buildSessionResponse(usuario, token, rolNombre),
     });
   } catch (error) {
     console.error("Error en login:", error);
     return res.status(500).json({ success: false, message: "Error en el servidor" });
+  }
+};
+
+/**
+ * POST /auth/google
+ * Recibe { idToken, rol }.
+ * El idToken se verifica contra Google (firma/audiencia/exp).
+ * El rol solo se usa en cuentas NUEVAS y se restringe a TOURIST/BUSINESS.
+ * Para cuentas existentes, el rol SIEMPRE se conserva desde la BD.
+ */
+exports.google = async (req, res) => {
+  let verified = null;
+  try {
+    const { idToken, rol } = req.body || {};
+    if (!idToken) {
+      return res.status(400).json({ success: false, message: "Token de Google requerido" });
+    }
+
+    verified = await verifyGoogleIdToken(idToken);
+    if (!verified) {
+      await LoginModel.registrar(null, false, getClientIp(req), getUserAgent(req));
+      return res.status(401).json({ success: false, message: "Credenciales de Google inválidas" });
+    }
+
+    const { googleId, email, nombre, avatarUrl } = verified;
+
+    let usuario = await UsuarioModel.findByGoogleId(googleId);
+
+    if (usuario) {
+      // Usuario ya vinculado a este google_id: conserva su rol y datos.
+      // (flujo de cuenta existente)
+    } else {
+      // No vinculado por google_id: buscar por email para vincular (evitar duplicados).
+      const porEmail = await UsuarioModel.findByEmail(email);
+
+      if (porEmail) {
+        // Vincular la cuenta existente (tradicional o google) a este google_id.
+        // Se conserva el ROL y todos los datos del usuario existente.
+        await UsuarioModel.update(porEmail.id, {
+          google_id: googleId,
+          proveedor: "google",
+          avatar_url: avatarUrl || porEmail.avatar_url || null,
+        });
+        usuario = {
+          ...porEmail,
+          google_id: googleId,
+          proveedor: "google",
+          avatar_url: avatarUrl || porEmail.avatar_url || null,
+        };
+      } else {
+        // Crear usuario nuevo. Rol restringido a TOURIST (default) o BUSINESS.
+        const rolFinal = resolvePublicRol(rol);
+        usuario = await UsuarioModel.create(nombre || email.split("@")[0], email, null, rolFinal, {
+          proveedor: "google",
+          google_id: googleId,
+          avatar_url: avatarUrl || null,
+        });
+      }
+    }
+
+    if (usuario.token_activo) {
+      return res.status(403).json({ success: false, message: "Ya hay una sesión activa" });
+    }
+    if (usuario.rol_id === null || usuario.rol_id === undefined) {
+      return res.status(401).json({ success: false, message: "Usuario sin rol asignado" });
+    }
+
+    const { token, rolNombre } = await iniciarSesion(usuario, req);
+
+    return res.status(200).json({
+      success: true,
+      message: "Login con Google exitoso",
+      data: buildSessionResponse(usuario, token, rolNombre),
+    });
+  } catch (error) {
+    await LoginModel.registrar(null, false, getClientIp(req), getUserAgent(req));
+    if (error && error.message === "GOOGLE_CLIENT_ID no configurado") {
+      return res.status(503).json({
+        success: false,
+        message: "El inicio de sesión con Google no está configurado",
+      });
+    }
+    console.error("Error en google:", error);
+    return res.status(500).json({ success: false, message: "Error al iniciar sesión con Google" });
   }
 };
 
@@ -120,7 +261,14 @@ exports.me = async (req, res) => {
     }
     return res.json({
       success: true,
-      data: { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol: req.usuario.rol },
+      data: {
+        id: usuario.id,
+        nombre: usuario.nombre,
+        email: usuario.email,
+        rol: req.usuario.rol,
+        avatar_url: usuario.avatar_url || null,
+        proveedor: usuario.proveedor || "local",
+      },
     });
   } catch (error) {
     console.error("Error en me:", error);

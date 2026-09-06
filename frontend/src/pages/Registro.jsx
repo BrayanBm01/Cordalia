@@ -5,8 +5,9 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { User, Mail, Lock, Eye, EyeOff, Loader2, MapPin } from 'lucide-react'
+import { User, Mail, Lock, Eye, EyeOff, Loader2, MapPin, Compass, Store } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import GoogleButton from '../components/GoogleButton'
 
 const registerSchema = z
   .object({
@@ -22,7 +23,23 @@ const registerSchema = z
     path: ['confirmPassword'],
   })
 
+const TIPOS = [
+  {
+    id: 'TOURIST',
+    title: 'Turista',
+    subtitle: 'Quiero descubrir destinos y experiencias.',
+    icon: Compass,
+  },
+  {
+    id: 'BUSINESS',
+    title: 'Negocio',
+    subtitle: 'Tengo un negocio y quiero aparecer en Explora Turismo.',
+    icon: Store,
+  },
+]
+
 export default function Registro() {
+  const [tipo, setTipo] = useState('TOURIST')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -40,7 +57,7 @@ export default function Registro() {
   const onSubmit = async (data) => {
     setIsSubmitting(true)
     try {
-      await registerUser(data.nombre, data.email, data.password)
+      await registerUser(data.nombre, data.email, data.password, tipo)
       toast.success('Cuenta creada correctamente', {
         description: 'Ahora puedes iniciar sesión con tus credenciales.',
       })
@@ -50,6 +67,11 @@ export default function Registro() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  function handleGoogleSuccess() {
+    toast.success('Cuenta creada correctamente')
+    navigate('/')
   }
 
   return (
@@ -99,9 +121,33 @@ export default function Registro() {
           <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold text-dark-900 mb-2">
             Crear cuenta
           </h1>
-          <p className="text-dark-500 mb-8">
-            Completa los datos para registrarte
-          </p>
+          <p className="text-dark-500 mb-8">¿Qué tipo de cuenta quieres crear?</p>
+
+          {/* Tipo de cuenta */}
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            {TIPOS.map((t) => {
+              const Icon = t.icon
+              const selected = tipo === t.id
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setTipo(t.id)}
+                  className={`p-4 rounded-xl border-2 text-left transition-all cursor-pointer ${
+                    selected
+                      ? 'border-primary-500 bg-primary-50'
+                      : 'border-dark-200 bg-white hover:border-primary-300'
+                  }`}
+                >
+                  <Icon className={`w-6 h-6 mb-2 ${selected ? 'text-primary-600' : 'text-dark-400'}`} />
+                  <p className={`font-semibold text-sm ${selected ? 'text-primary-700' : 'text-dark-800'}`}>
+                    {t.title}
+                  </p>
+                  <p className="text-xs text-dark-500 mt-1">{t.subtitle}</p>
+                </button>
+              )
+            })}
+          </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <div>
@@ -228,6 +274,14 @@ export default function Registro() {
               )}
             </button>
           </form>
+
+          <div className="flex items-center gap-4 my-6">
+            <div className="flex-1 h-px bg-dark-200" />
+            <span className="text-sm text-dark-400">o</span>
+            <div className="flex-1 h-px bg-dark-200" />
+          </div>
+
+          <GoogleButton rol={tipo} onSuccess={handleGoogleSuccess} />
 
           <p className="mt-8 text-center text-dark-500">
             ¿Ya tienes una cuenta?{' '}

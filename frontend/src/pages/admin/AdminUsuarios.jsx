@@ -15,19 +15,20 @@ const userSchema = z.object({
   nombre: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
   email: z.string().email('Email inválido'),
   password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres').optional().or(z.literal('')),
-  rol: z.enum(['ADMIN', 'USER'], { message: 'Selecciona un rol válido' }),
+  rol: z.enum(['ADMIN', 'TOURIST', 'BUSINESS'], { message: 'Selecciona un rol válido' }),
 })
 
 const createUserSchema = z.object({
   nombre: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
   email: z.string().email('Email inválido'),
   password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
-  rol: z.enum(['ADMIN', 'USER'], { message: 'Selecciona un rol válido' }),
+  rol: z.enum(['ADMIN', 'TOURIST', 'BUSINESS'], { message: 'Selecciona un rol válido' }),
 })
 
 const rolBadge = {
   ADMIN: 'bg-primary-100 text-primary-700',
-  USER: 'bg-ocean-100 text-ocean-700',
+  TOURIST: 'bg-ocean-100 text-ocean-700',
+  BUSINESS: 'bg-amber-100 text-amber-700',
 }
 
 export default function AdminUsuarios() {
@@ -61,7 +62,7 @@ export default function AdminUsuarios() {
 
   function openCreate() {
     setEditingUser(null)
-    reset({ nombre: '', email: '', password: '', rol: 'USER' })
+    reset({ nombre: '', email: '', password: '', rol: 'TOURIST' })
     setModalOpen(true)
   }
 
@@ -299,7 +300,8 @@ export default function AdminUsuarios() {
                     {...register('rol')}
                     className="w-full px-3 py-2 rounded-lg border border-dark-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors bg-white"
                   >
-                    <option value="USER">Usuario</option>
+                    <option value="TOURIST">Turista</option>
+                    <option value="BUSINESS">Negocio</option>
                     <option value="ADMIN">Administrador</option>
                   </select>
                   {errors.rol && <p className="text-red-500 text-xs mt-1">{errors.rol.message}</p>}

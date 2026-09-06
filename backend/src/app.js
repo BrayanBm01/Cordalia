@@ -1,26 +1,49 @@
 const express = require("express");
 const cors = require("cors");
-const path = require("path");
+const helmet = require("helmet");
 require("dotenv").config();
 
 const app = express();
+
+// Seguridad: headers
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        "img-src": ["'self'", "data:", "https:", "https://*.googleusercontent.com"],
+        "frame-src": ["'self'", "https://accounts.google.com"],
+        "script-src": ["'self'", "https://accounts.google.com", "https://*.gstatic.com"],
+        "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        "font-src": ["'self'", "https://fonts.gstatic.com"],
+        "connect-src": ["'self'", "https://*.googleapis.com"],
+        "frame-ancestors": ["'self'"],
+      },
+    },
+  })
+);
 
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:3000",
   process.env.FRONTEND_URL,
+  process.env.BACKEND_URL,
 ].filter(Boolean);
 
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(null, true);
-    }
-  },
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Permite peticiones sin origen (curl, postman, health checks) y origenes permitidos.
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Origen no permitido por CORS"));
+      }
+    },
+    credentials: true,
+  })
+);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

@@ -7,6 +7,7 @@ import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { Mail, Lock, Eye, EyeOff, Loader2, MapPin } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import GoogleButton from '../components/GoogleButton'
 
 const loginSchema = z.object({
   email: z.string().min(1, 'El email es requerido').email('Ingresa un email válido'),
@@ -169,6 +170,14 @@ export default function Login() {
               )}
             </button>
           </form>
+
+          <div className="flex items-center gap-4 my-6">
+            <div className="flex-1 h-px bg-dark-200" />
+            <span className="text-sm text-dark-400">o</span>
+            <div className="flex-1 h-px bg-dark-200" />
+          </div>
+
+          <GoogleButton label="Continuar con Google" />
 
           <p className="mt-8 text-center text-dark-500">
             ¿No tienes una cuenta?{' '}

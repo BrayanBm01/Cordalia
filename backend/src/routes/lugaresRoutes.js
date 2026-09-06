@@ -5,6 +5,7 @@ const requireAuth = require("../middlewares/authMiddleware");
 const requireAdmin = require("../middlewares/adminMiddleware");
 
 router.get("/", requireAuth, lugaresController.getAll);
+router.get("/slug/:slug", requireAuth, lugaresController.getBySlug);
 router.get("/:id", requireAuth, lugaresController.getById);
 
 router.post("/", requireAuth, requireAdmin, lugaresController.create);

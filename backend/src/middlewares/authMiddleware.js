@@ -35,7 +35,7 @@ async function requireAuth(req, res, next) {
       return res.status(401).json({ success: false, message: "Usuario sin rol asignado" });
     }
 
-    const rol = fullUser.rol_id === 0 ? "ADMIN" : "USER";
+    const rol = Number(fullUser.rol_id) === 0 ? "ADMIN" : Number(fullUser.rol_id) === 2 ? "BUSINESS" : "TOURIST";
     req.usuario = { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol };
     next();
   } catch (error) {

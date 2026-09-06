@@ -42,11 +42,14 @@ export const api = {
 
 export const authAPI = {
   login: (email, password) => api.post('/auth/login', { email, password }),
-  register: (nombre, email, password) => api.post('/auth/register', { nombre, email, password }),
+  register: (nombre, email, password, rol) => api.post('/auth/register', { nombre, email, password, rol }),
+  google: (idToken, rol) => api.post('/auth/google', { idToken, rol }),
   logout: () => api.post('/auth/logout'),
   me: () => api.get('/auth/me'),
   updateProfile: (id, data) => api.put(`/auth/me`, data),
 }
+
+export const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
 export const lugaresAPI = {
   getAll: (search) => api.get(`/lugares${search ? `?search=${encodeURIComponent(search)}` : ''}`),

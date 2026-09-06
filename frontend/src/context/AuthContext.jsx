@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect } from 'react'
 import { authAPI } from '../services/api'
 
 const AuthContext = createContext(null)
@@ -10,29 +10,31 @@ export function AuthProvider({ children }) {
   })
   const [loading, setLoading] = useState(true)
 
-  const checkAuth = useCallback(async () => {
-    const token = localStorage.getItem('token')
-    if (!token) {
-      setUser(null)
-      setLoading(false)
-      return
-    }
-    try {
-      const res = await authAPI.me()
-      setUser(res.data)
-      localStorage.setItem('user', JSON.stringify(res.data))
-    } catch {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      setUser(null)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
+  // Restauracion de sesion al montar, con proteccion contra condiciones de carrera.
   useEffect(() => {
-    checkAuth()
-  }, [checkAuth])
+    let active = true
+    ;(async () => {
+      const token = localStorage.getItem('token')
+      if (!token) {
+        if (active) setLoading(false)
+        return
+      }
+      try {
+        const res = await authAPI.me()
+        if (!active) return
+        setUser(res.data)
+        localStorage.setItem('user', JSON.stringify(res.data))
+      } catch {
+        if (!active) return
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+        setUser(null)
+      } finally {
+        if (active) setLoading(false)
+      }
+    })()
+    return () => { active = false }
+  }, [])
 
   const login = async (email, password) => {
     const res = await authAPI.login(email, password)
@@ -42,8 +44,16 @@ export function AuthProvider({ children }) {
     return res
   }
 
-  const register = async (nombre, email, password) => {
-    return await authAPI.register(nombre, email, password)
+  const googleLogin = async (idToken, rol) => {
+    const res = await authAPI.google(idToken, rol)
+    localStorage.setItem('token', res.data.token)
+    localStorage.setItem('user', JSON.stringify(res.data.usuario))
+    setUser(res.data.usuario)
+    return res
+  }
+
+  const register = async (nombre, email, password, rol) => {
+    return await authAPI.register(nombre, email, password, rol)
   }
 
   const logout = async () => {
@@ -66,7 +76,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser, checkAuth }}>
+    <AuthContext.Provider value={{ user, loading, login, googleLogin, register, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   )

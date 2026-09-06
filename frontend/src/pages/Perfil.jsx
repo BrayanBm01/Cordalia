@@ -84,7 +84,7 @@ export default function Perfil() {
 
               <div className="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-100">
                 <Shield className="w-3 h-3" />
-                {user?.rol === 'ADMIN' ? 'Administrador' : 'Usuario'}
+                {user?.rol === 'ADMIN' ? 'Administrador' : user?.rol === 'BUSINESS' ? 'Negocio' : 'Turista'}
               </div>
 
               <div className="mt-6 pt-5 border-t border-dark-100 space-y-3 text-sm text-left">

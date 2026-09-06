@@ -53,7 +53,9 @@ exports.create = async (req, res) => {
       return res.status(409).json({ success: false, message: "El email ya está registrado" });
     }
 
-    const rolFinal = rol_id == 0 ? 0 : 1;
+    const rolesValidos = [0, 1, 2];
+    const rolNum = Number(rol_id);
+    const rolFinal = rolesValidos.includes(rolNum) ? rolNum : 1;
     const hashed = await hashPassword(password);
     const usuario = await UsuarioModel.create(nombre, email, hashed, rolFinal);
 
@@ -103,7 +105,8 @@ exports.update = async (req, res) => {
     }
 
     if (rol_id !== undefined && req.usuario.rol === "ADMIN") {
-      fields.rol_id = rol_id == 0 ? 0 : 1;
+      const rolNum = Number(rol_id);
+      fields.rol_id = [0, 1, 2].includes(rolNum) ? rolNum : 1;
     }
 
     if (Object.keys(fields).length === 0) {
