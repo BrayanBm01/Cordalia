@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Outlet, Link, NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { Mountain, Menu, X, ChevronDown, User, Shield, LogOut } from 'lucide-react'
+import { Mountain, Menu, X, ChevronDown, User, Shield, Store, Heart, LogOut } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 const navLinkClass = ({ isActive }) =>
@@ -64,6 +64,9 @@ function Navbar() {
             <NavLink to="/lugares" className={navLinkClass}>
               Destinos
             </NavLink>
+            <NavLink to="/negocios" className={navLinkClass}>
+              Negocios
+            </NavLink>
             {location.pathname === '/' ? (
               <a
                 href="#experiencias"
@@ -121,6 +124,24 @@ function Navbar() {
                       <User className="w-4 h-4" />
                       Mi perfil
                     </Link>
+                    <Link
+                      to="/favoritos"
+                      onClick={() => setDropdownOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-dark-700 hover:bg-dark-50 transition-colors"
+                    >
+                      <Heart className="w-4 h-4" />
+                      Mis favoritos
+                    </Link>
+                    {user.rol === 'BUSINESS' && (
+                      <Link
+                        to="/mis-negocios"
+                        onClick={() => setDropdownOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-dark-700 hover:bg-dark-50 transition-colors"
+                      >
+                        <Store className="w-4 h-4" />
+                        Mis negocios
+                      </Link>
+                    )}
                     {user.rol === 'ADMIN' && (
                       <Link
                         to="/admin"
@@ -196,6 +217,17 @@ function Navbar() {
             >
               Destinos
             </NavLink>
+            <NavLink
+              to="/negocios"
+              onClick={() => setMobileOpen(false)}
+              className={({ isActive }) =>
+                `block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  isActive ? 'bg-primary-50 text-primary-700' : 'text-dark-700 hover:bg-dark-50'
+                }`
+              }
+            >
+              Negocios
+            </NavLink>
             {location.pathname === '/' ? (
               <a
                 href="#experiencias"
@@ -247,6 +279,24 @@ function Navbar() {
                     <User className="w-4 h-4" />
                     Mi perfil
                   </Link>
+                  <Link
+                    to="/favoritos"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-dark-700 hover:bg-dark-50 transition-colors"
+                  >
+                    <Heart className="w-4 h-4" />
+                    Mis favoritos
+                  </Link>
+                  {user.rol === 'BUSINESS' && (
+                    <Link
+                      to="/mis-negocios"
+                      onClick={() => setMobileOpen(false)}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-dark-700 hover:bg-dark-50 transition-colors"
+                    >
+                      <Store className="w-4 h-4" />
+                      Mis negocios
+                    </Link>
+                  )}
                   {user.rol === 'ADMIN' && (
                     <Link
                       to="/admin"
@@ -327,6 +377,11 @@ function Footer() {
                 </Link>
               </li>
               <li>
+                <Link to="/negocios" className="text-sm text-dark-400 hover:text-primary-400 transition-colors">
+                  Negocios
+                </Link>
+              </li>
+              <li>
                 <Link to="/lugares" className="text-sm text-dark-400 hover:text-primary-400 transition-colors">
                   Explorar
                 </Link>
@@ -346,6 +401,13 @@ function Footer() {
                       Mi perfil
                     </Link>
                   </li>
+                  {user.rol === 'BUSINESS' && (
+                    <li>
+                      <Link to="/mis-negocios" className="text-sm text-dark-400 hover:text-primary-400 transition-colors">
+                        Mis negocios
+                      </Link>
+                    </li>
+                  )}
                   {user.rol === 'ADMIN' && (
                     <li>
                       <Link to="/admin" className="text-sm text-dark-400 hover:text-primary-400 transition-colors">

@@ -3,6 +3,7 @@ import { AuthProvider } from './context/AuthContext'
 import PublicLayout from './layouts/PublicLayout'
 import AuthLayout from './layouts/AuthLayout'
 import AdminLayout from './layouts/AdminLayout'
+import BusinessLayout from './layouts/BusinessLayout'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminRoute from './components/AdminRoute'
 import Home from './pages/Home'
@@ -16,6 +17,14 @@ import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminUsuarios from './pages/admin/AdminUsuarios'
 import AdminDestinos from './pages/admin/AdminDestinos'
 import AdminHistorial from './pages/admin/AdminHistorial'
+import AdminNegocios from './pages/admin/AdminNegocios'
+import AdminResenas from './pages/admin/AdminResenas'
+import NegociosPublicos from './pages/negocios/NegociosPublicos'
+import MisNegocios from './pages/negocios/MisNegocios'
+import ResumenNegocios from './pages/negocios/ResumenNegocios'
+import NegocioForm from './pages/negocios/NegocioForm'
+import NegocioDetalle from './pages/negocios/NegocioDetalle'
+import MisFavoritos from './pages/MisFavoritos'
 
 export default function App() {
   return (
@@ -25,8 +34,13 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/lugares" element={<Lugares />} />
           <Route path="/lugares/:id" element={<LugarDetalle />} />
+          <Route path="/negocios" element={<NegociosPublicos />} />
+          <Route path="/negocios/:id" element={<NegocioDetalle />} />
           <Route path="/perfil" element={
             <ProtectedRoute><Perfil /></ProtectedRoute>
+          } />
+          <Route path="/favoritos" element={
+            <ProtectedRoute><MisFavoritos /></ProtectedRoute>
           } />
         </Route>
 
@@ -35,11 +49,21 @@ export default function App() {
           <Route path="/registro" element={<Registro />} />
         </Route>
 
+        <Route element={<ProtectedRoute roles={['BUSINESS', 'ADMIN']}><BusinessLayout /></ProtectedRoute>}>
+          <Route path="/mis-negocios/resumen" element={<ResumenNegocios />} />
+          <Route path="/mis-negocios" element={<MisNegocios />} />
+          <Route path="/mis-negocios/nuevo" element={<NegocioForm />} />
+          <Route path="/mis-negocios/:id" element={<NegocioDetalle manage />} />
+          <Route path="/mis-negocios/:id/editar" element={<NegocioForm />} />
+        </Route>
+
         <Route element={<AdminRoute />}>
           <Route element={<AdminLayout />}>
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/usuarios" element={<AdminUsuarios />} />
             <Route path="/admin/lugares" element={<AdminDestinos />} />
+            <Route path="/admin/negocios" element={<AdminNegocios />} />
+            <Route path="/admin/resenas" element={<AdminResenas />} />
             <Route path="/admin/historial" element={<AdminHistorial />} />
           </Route>
         </Route>

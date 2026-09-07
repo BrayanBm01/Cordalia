@@ -49,42 +49,44 @@ export default function AdminHistorial() {
       ) : (
         <div className="bg-white rounded-xl border border-dark-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-dark-100 bg-dark-50/60">
-                  <th className="text-left px-5 py-3 font-medium text-dark-500">Usuario</th>
-                  <th className="text-left px-5 py-3 font-medium text-dark-500">Email</th>
-                  <th className="text-left px-5 py-3 font-medium text-dark-500">Estado</th>
-                  <th className="text-left px-5 py-3 font-medium text-dark-500">Fecha</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-dark-100">
-                {historial.map((entry, i) => (
-                  <tr key={entry.id || i} className="hover:bg-dark-50/40 transition-colors">
-                    <td className="px-5 py-3.5 font-medium text-dark-800">
-                      {entry.usuario || entry.nombre || '—'}
-                    </td>
-                    <td className="px-5 py-3.5 text-dark-600">
-                      {entry.email || '—'}
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                        entry.exito
-                          ? 'bg-primary-100 text-primary-700'
-                          : 'bg-red-100 text-red-700'
-                      }`}>
-                        {entry.exito ? 'Exitoso' : 'Fallido'}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5 text-dark-500">
-                      {entry.fecha
-                        ? format(new Date(entry.fecha), "dd/MM/yyyy HH:mm", { locale: es })
-                        : '—'}
-                    </td>
+            <div className="max-h-[480px] overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 z-10">
+                  <tr className="border-b border-dark-100 bg-dark-50">
+                    <th className="text-left px-5 py-3 font-medium text-dark-500">Usuario</th>
+                    <th className="text-left px-5 py-3 font-medium text-dark-500">Email</th>
+                    <th className="text-left px-5 py-3 font-medium text-dark-500">Estado</th>
+                    <th className="text-left px-5 py-3 font-medium text-dark-500">Fecha</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-dark-100">
+                  {historial.map((entry, i) => (
+                    <tr key={entry.id || i} className="hover:bg-dark-50/40 transition-colors">
+                      <td className="px-5 py-3.5 font-medium text-dark-800">
+                        {entry.usuario || entry.nombre || '—'}
+                      </td>
+                      <td className="px-5 py-3.5 text-dark-600">
+                        {entry.email || '—'}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                          entry.exito
+                            ? 'bg-primary-100 text-primary-700'
+                            : 'bg-red-100 text-red-700'
+                        }`}>
+                          {entry.exito ? 'Exitoso' : 'Fallido'}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 text-dark-500">
+                        {entry.fecha
+                          ? format(new Date(entry.fecha), "dd/MM/yyyy HH:mm", { locale: es })
+                          : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

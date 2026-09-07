@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
+import { Outlet, NavLink, Link, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
   Users,
   MapPin,
+  Store,
   History,
+  MessageSquare,
   LogOut,
+  Globe,
   Menu,
   X,
   ChevronLeft,
@@ -22,6 +25,8 @@ const sidebarLinks = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
   { to: '/admin/usuarios', icon: Users, label: 'Usuarios' },
   { to: '/admin/lugares', icon: MapPin, label: 'Destinos' },
+  { to: '/admin/negocios', icon: Store, label: 'Negocios' },
+  { to: '/admin/resenas', icon: MessageSquare, label: 'Reseñas' },
   { to: '/admin/historial', icon: History, label: 'Historial' },
 ]
 
@@ -82,13 +87,22 @@ function Sidebar({ collapsed, onToggle }) {
 
         <div className="border-t border-dark-800 my-3" />
 
+        <Link
+          to="/"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-400 hover:text-white hover:bg-dark-700/50 transition-all duration-200"
+          title={collapsed ? 'Volver al sitio' : undefined}
+        >
+          <Globe className="w-5 h-5 flex-shrink-0" />
+          {!collapsed && <span>Volver al sitio</span>}
+        </Link>
+
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-400 hover:text-red-400 hover:bg-dark-700/50 transition-all duration-200 w-full"
-          title={collapsed ? 'Cerrar sesion' : undefined}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all duration-200 w-full"
+          title={collapsed ? 'Cerrar sesión' : undefined}
         >
           <LogOut className="w-5 h-5 flex-shrink-0" />
-          {!collapsed && <span>Cerrar sesion</span>}
+          {!collapsed && <span>Cerrar sesión</span>}
         </button>
       </nav>
 
@@ -175,12 +189,21 @@ function MobileDrawer({ open, onClose }) {
 
           <div className="border-t border-dark-800 my-3" />
 
+          <Link
+            to="/"
+            onClick={onClose}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-400 hover:text-white hover:bg-dark-700/50 transition-all duration-200 w-full"
+          >
+            <Globe className="w-5 h-5 flex-shrink-0" />
+            <span>Volver al sitio</span>
+          </Link>
+
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-400 hover:text-red-400 hover:bg-dark-700/50 transition-all duration-200 w-full"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all duration-200 w-full"
           >
             <LogOut className="w-5 h-5 flex-shrink-0" />
-            <span>Cerrar sesion</span>
+            <span>Cerrar sesión</span>
           </button>
         </nav>
 
@@ -251,6 +274,8 @@ const pageTitles = {
   '/admin': 'Dashboard',
   '/admin/usuarios': 'Gestion de Usuarios',
   '/admin/lugares': 'Gestion de Destinos',
+  '/admin/negocios': 'Gestion de Negocios',
+  '/admin/resenas': 'Gestion de Reseñas',
   '/admin/historial': 'Historial de Sesiones',
 }
 

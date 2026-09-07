@@ -4,10 +4,11 @@ import { motion } from 'framer-motion'
 import {
   ArrowLeft, MapPin, Clock, DollarSign, Calendar,
   Plane, Utensils, Camera, Star, Compass, Info,
-  Bed, Tag, ChevronRight, ImageOff,
+  Bed, Tag, ChevronRight, ImageOff, Store,
 } from 'lucide-react'
 import { lugaresAPI } from '../services/api'
 import destinationDetails from '../data/destinos'
+import FavoritoButton from '../components/FavoritoButton'
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
@@ -189,12 +190,60 @@ function RelatedCard({ lugar }) {
   )
 }
 
+function BusinessCard({ business }) {
+  const [imgError, setImgError] = useState(false)
+  const portada = business.portada_url
+
+  return (
+    <Link
+      to={`/negocios/${business.id}`}
+      className="group bg-white rounded-xl border border-dark-100 overflow-hidden hover:shadow-lg transition-all duration-300"
+    >
+      <div className="aspect-[16/10] bg-dark-100 overflow-hidden relative">
+        {portada && !imgError ? (
+          <img
+            src={portada}
+            alt={business.nombre}
+            onError={() => setImgError(true)}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <ImageOff className="w-8 h-8 text-dark-300" />
+          </div>
+        )}
+        {business.categoria && (
+          <span className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-white/90 text-xs font-semibold text-primary-700 shadow-sm">
+            {business.categoria}
+          </span>
+        )}
+      </div>
+      <div className="p-4">
+        <h4
+          className="font-semibold text-dark-900 group-hover:text-primary-700 transition-colors"
+          style={{ fontFamily: 'var(--font-display)' }}
+        >
+          {business.nombre}
+        </h4>
+        {business.direccion && (
+          <div className="flex items-center gap-1 mt-1 text-dark-500 text-sm">
+            <MapPin className="w-3 h-3 shrink-0" />
+            <span>{business.direccion}</span>
+          </div>
+        )}
+      </div>
+    </Link>
+  )
+}
+
 export default function LugarDetalle() {
   const { id } = useParams()
   const [lugar, setLugar] = useState(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [relatedLugares, setRelatedLugares] = useState([])
+  const [negocios, setNegocios] = useState([])
+  const [negociosLoading, setNegociosLoading] = useState(true)
   const details = destinationDetails[id]
 
   useEffect(() => {
@@ -215,6 +264,23 @@ export default function LugarDetalle() {
       }
     }
     fetchLugar()
+  }, [id])
+
+  useEffect(() => {
+    let active = true
+    setNegociosLoading(true)
+    async function fetchNegocios() {
+      try {
+        const res = await lugaresAPI.businesses(id)
+        if (active) setNegocios(Array.isArray(res.data) ? res.data : [])
+      } catch {
+        if (active) setNegocios([])
+      } finally {
+        if (active) setNegociosLoading(false)
+      }
+    }
+    fetchNegocios()
+    return () => { active = false }
   }, [id])
 
   useEffect(() => {
@@ -319,12 +385,15 @@ export default function LugarDetalle() {
               </div>
             )}
 
-            <h1
-              className="text-3xl md:text-5xl lg:text-6xl font-bold text-white mb-3"
-              style={{ fontFamily: 'var(--font-display)' }}
-            >
-              {lugar.nombre}
-            </h1>
+            <div className="flex items-center gap-4 flex-wrap">
+              <h1
+                className="text-3xl md:text-5xl lg:text-6xl font-bold text-white mb-3"
+                style={{ fontFamily: 'var(--font-display)' }}
+              >
+                {lugar.nombre}
+              </h1>
+              <FavoritoButton tipo="destino" id={lugar.id} withLabel className="mb-3 shadow-lg" />
+            </div>
 
             {details?.tagline && (
               <p className="text-lg md:text-xl text-white/70 italic">{details.tagline}</p>
@@ -393,6 +462,39 @@ export default function LugarDetalle() {
             <p className="text-dark-600 leading-relaxed text-base md:text-lg">{lugar.descripcion}</p>
           </motion.section>
         )}
+
+        <section>
+          <SectionHeading icon={Store} title="Negocios en este destino" />
+          {negociosLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="aspect-[16/10] bg-dark-100 rounded-xl animate-pulse" />
+              ))}
+            </div>
+          ) : negocios.length === 0 ? (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="bg-white rounded-2xl border border-dark-100 p-10 text-center"
+            >
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary-50 flex items-center justify-center">
+                <Store className="w-7 h-7 text-primary-500" />
+              </div>
+              <h3 className="text-lg font-semibold text-dark-800 mb-1" style={{ fontFamily: 'var(--font-display)' }}>
+                Este destino todavía no tiene negocios registrados.
+              </h3>
+              <p className="text-sm text-dark-500 max-w-md mx-auto">
+                Cuando un negocio sea aprobado y asociado a este destino, aparecerá aquí.
+              </p>
+            </motion.div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {negocios.map((b) => (
+                <BusinessCard key={b.id} business={b} />
+              ))}
+            </div>
+          )}
+        </section>
 
         {details?.activities?.length > 0 && (
           <section>

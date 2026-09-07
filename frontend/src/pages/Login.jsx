@@ -53,7 +53,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="h-screen overflow-hidden flex">
       {/* Left side - decorative */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-ocean-900 via-primary-900 to-ocean-950 items-center justify-center">
         <div className="absolute inset-0">
@@ -80,14 +80,9 @@ export default function Login() {
       </div>
 
       {/* Right side - form */}
-      <div className="flex-1 flex items-center justify-center px-6 py-12">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-          className="w-full max-w-md"
-        >
-          <div className="lg:hidden flex items-center gap-2 mb-8">
+      <div className="flex-1 min-h-0 flex flex-col">
+        <div className="flex-none px-6 pt-6 sm:pt-8">
+          <div className="lg:hidden flex items-center gap-2 mb-6">
             <div className="w-10 h-10 rounded-xl bg-primary-500 flex items-center justify-center">
               <MapPin className="w-6 h-6 text-white" />
             </div>
@@ -99,9 +94,18 @@ export default function Login() {
           <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold text-dark-900 mb-2">
             Iniciar sesión
           </h1>
-          <p className="text-dark-500 mb-8">
+          <p className="text-dark-500 mb-4">
             Ingresa tus credenciales para acceder a tu cuenta
           </p>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 pt-2 pb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            className="w-full max-w-md mx-auto"
+          >
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <div>
@@ -188,7 +192,8 @@ export default function Login() {
               Crear cuenta
             </Link>
           </p>
-        </motion.div>
+          </motion.div>
+        </div>
       </div>
     </div>
   )
