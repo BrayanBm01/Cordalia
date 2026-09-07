@@ -11,6 +11,12 @@ h.test("REGR: el ADMIN puede iniciar sesión y acceder al panel", async () => {
   const stats = await h.api("/api/admin/stats", { token: r.token });
   h.assertStatus(stats.status, 200, "stats admin");
   h.assert(typeof stats.json?.data?.totalUsuarios === "number", "totalUsuarios numérico");
+  h.assert(typeof stats.json?.data?.totalDestinos === "number", "totalDestinos numérico");
+  h.assert(typeof stats.json?.data?.totalNegocios === "number", "totalNegocios numérico");
+  h.assert(Array.isArray(stats.json?.data?.negociosPorEstado), "negociosPorEstado array");
+  h.assert(Array.isArray(stats.json?.data?.usuariosPorRol), "usuariosPorRol array");
+  h.assert(Array.isArray(stats.json?.data?.resenasPorValoracion), "resenasPorValoracion array");
+  h.assert(Array.isArray(stats.json?.data?.negociosPorCategoria), "negociosPorCategoria array");
 
   const usuarios = await h.api("/api/usuarios", { token: r.token });
   h.assertStatus(usuarios.status, 200, "listar usuarios admin");

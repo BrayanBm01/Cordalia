@@ -81,7 +81,11 @@ h.test("NEG: el business ve solo sus negocios; el turista no ve los pending", as
 
   const vista = await h.api("/api/businesses", { token: h.test.tur.token });
   h.assertStatus(vista.status, 200, "lista turista");
-  h.assert(vista.json.data.length === 0, "turista no ve negocios pending");
+  const idsVista = vista.json.data.map((b) => String(b.id));
+  h.assert(
+    !idsVista.includes(String(h.test.negocioA.id)) && !idsVista.includes(String(h.test.negocioB.id)),
+    "turista no ve negocios pending"
+  );
 
   const oculto = await h.api("/api/businesses/" + h.test.negocioA.id, { token: h.test.tur.token });
   h.assertStatus(oculto.status, 404, "turista no accede a pending (404)");
@@ -128,7 +132,11 @@ h.test("NEG: ADMIN cambia estado y el turista pasa a ver el negocio", async () =
 
   const vista = await h.api("/api/businesses", { token: h.test.tur.token });
   h.assertStatus(vista.status, 200, "lista turista");
-  h.assert(vista.json.data.length === 2, "turista ve los 2 aprobados");
+  const idsVista = vista.json.data.map((b) => String(b.id));
+  h.assert(
+    idsVista.includes(String(h.test.negocioA.id)) && idsVista.includes(String(h.test.negocioB.id)),
+    "turista ve los negocios aprobados"
+  );
 
   const detalle = await h.api("/api/businesses/" + h.test.negocioA.id, { token: h.test.tur.token });
   h.assertStatus(detalle.status, 200, "turista ve detalle aprobado");

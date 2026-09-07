@@ -1,8 +1,10 @@
 const rateLimit = require("express-rate-limit");
 
+const authMax = Number(process.env.AUTH_RATE_LIMIT_MAX || 30);
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 30,
+  max: authMax,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
