@@ -1,10 +1,13 @@
 const pool = require("../config/db");
 
+const PERFIL_COLUMNS =
+  "apellido, telefono, ciudad, pais, bio, intereses_turisticos, preferencias_viaje";
+
 const UsuarioModel = {
   async findByEmail(email) {
     const { rows } = await pool.query(
       `SELECT id, nombre, email, password, rol_id, token_activo,
-              avatar_url, proveedor, google_id, created_at, updated_at
+              avatar_url, proveedor, google_id, ${PERFIL_COLUMNS}, created_at, updated_at
        FROM usuarios WHERE email = $1`,
       [email]
     );
@@ -14,7 +17,7 @@ const UsuarioModel = {
   async findById(id) {
     const { rows } = await pool.query(
       `SELECT id, nombre, email, rol_id, avatar_url,
-              proveedor, google_id, created_at, updated_at
+              proveedor, google_id, ${PERFIL_COLUMNS}, created_at, updated_at
        FROM usuarios WHERE id = $1`,
       [id]
     );
@@ -24,7 +27,7 @@ const UsuarioModel = {
   async findByGoogleId(googleId) {
     const { rows } = await pool.query(
       `SELECT id, nombre, email, password, rol_id, token_activo,
-              avatar_url, proveedor, google_id, created_at, updated_at
+              avatar_url, proveedor, google_id, ${PERFIL_COLUMNS}, created_at, updated_at
        FROM usuarios WHERE google_id = $1 AND google_id IS NOT NULL`,
       [googleId]
     );
@@ -41,7 +44,7 @@ const UsuarioModel = {
     const { rows } = await pool.query(
       `INSERT INTO usuarios (nombre, email, password, rol_id, proveedor, google_id, avatar_url)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, nombre, email, rol_id, avatar_url, proveedor, google_id, created_at, updated_at`,
+       RETURNING id, nombre, email, rol_id, avatar_url, proveedor, google_id, ${PERFIL_COLUMNS}, created_at, updated_at`,
       [nombre, email, password, rol_id, proveedor, google_id, avatar_url]
     );
     return rows[0];
@@ -53,6 +56,8 @@ const UsuarioModel = {
 
     const allowed = [
       "nombre", "email", "password", "rol_id", "avatar_url",
+      "apellido", "telefono", "ciudad", "pais", "bio",
+      "intereses_turisticos", "preferencias_viaje",
       "proveedor", "google_id", "updated_at"
     ];
     const safeKeys = keys.filter((k) => allowed.includes(k));
@@ -70,7 +75,7 @@ const UsuarioModel = {
 
     const { rows } = await pool.query(
       `UPDATE usuarios SET ${setClauses.join(", ")} WHERE id=$${values.length}
-       RETURNING id, nombre, email, rol_id, avatar_url, proveedor, created_at, updated_at`,
+       RETURNING id, nombre, email, rol_id, avatar_url, proveedor, ${PERFIL_COLUMNS}, created_at, updated_at`,
       values
     );
     return rows[0] || null;
@@ -86,7 +91,7 @@ const UsuarioModel = {
 
   async findAll() {
     const { rows } = await pool.query(
-      `SELECT id, nombre, email, rol_id, avatar_url, proveedor, created_at, updated_at
+      `SELECT id, nombre, email, rol_id, avatar_url, proveedor, ${PERFIL_COLUMNS}, created_at, updated_at
        FROM usuarios ORDER BY id ASC`
     );
     return rows;
@@ -94,7 +99,7 @@ const UsuarioModel = {
 
   async findAllWithSessionStatus() {
     const { rows } = await pool.query(
-      `SELECT id, nombre, email, rol_id, avatar_url, proveedor,
+      `SELECT id, nombre, email, rol_id, avatar_url, proveedor, ${PERFIL_COLUMNS},
               (token_activo IS NOT NULL) AS sesion_activa,
               created_at, updated_at
        FROM usuarios ORDER BY id ASC`

@@ -4,14 +4,17 @@ import { motion } from 'framer-motion'
 import {
   ArrowLeft, Pencil, ImageOff, MapPin, Phone, Globe, Mail, Star,
   Building2, Clock, Share2, Plus, Trash2, Loader2, Image as ImageIcon,
-  CheckCircle2, Map as MapIcon,
+  CheckCircle2, Map as MapIcon, Ticket, ArrowRight, ImageOff as PlanImgOff,
 } from 'lucide-react'
-import { businessesAPI, lugaresAPI } from '../../services/api'
+import { businessesAPI, lugaresAPI, businessPlanesAPI } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 import { ESTADO_LABEL, ESTADO_BADGE, DIAS_LABEL, formatRango } from './businessUtils'
+import { formatMoney } from './businessUtils'
+import { TIPO_PLAN_LABEL, formatDuracion, planPrecios } from './planUtils'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import FavoritoButton from '../../components/FavoritoButton'
 import ResenasSection from './ResenasSection'
+import PlanesNegocio from './PlanesNegocio'
 import { toast } from 'sonner'
 
 const inputClass =
@@ -206,6 +209,68 @@ function ManageSocialForm({ businessId, onAdded }) {
   )
 }
 
+function PublicPlanesSection({ businessId }) {
+  const [planes, setPlanes] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+    businessPlanesAPI
+      .list(businessId)
+      .then((r) => setPlanes(Array.isArray(r.data) ? r.data : []))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [businessId])
+
+  if (loading || planes.length === 0) return null
+
+  return (
+    <Section title="Planes y experiencias">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {planes.map((plan) => {
+          const portada = plan.plan_imagenes?.find((i) => i.is_primary) || plan.plan_imagenes?.[0]
+          const { efectivo, anterior } = planPrecios(plan)
+          return (
+            <Link
+              key={plan.id}
+              to={`/planes/${plan.id}`}
+              className="group flex gap-4 rounded-xl border border-dark-100 p-3 hover:shadow-md hover:border-primary-200 transition-all"
+            >
+              <div className="w-28 h-24 shrink-0 rounded-lg overflow-hidden bg-dark-100">
+                {portada ? (
+                  <img src={portada.url} alt={plan.nombre} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-dark-300">
+                    <PlanImgOff className="w-7 h-7" />
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0 flex flex-col">
+                <p className="text-xs font-semibold uppercase tracking-wide text-primary-600">
+                  {TIPO_PLAN_LABEL[plan.tipo_plan] || plan.tipo_plan}
+                </p>
+                <h4 className="font-semibold text-dark-900 truncate group-hover:text-primary-700 transition-colors">
+                  {plan.nombre}
+                </h4>
+                <p className="text-xs text-dark-500">{formatDuracion(plan.duracion_dias, plan.duracion_noches)}</p>
+                <div className="mt-auto flex items-center justify-between gap-2">
+                  <span className="text-sm font-bold text-dark-900">
+                    {anterior && <span className="text-xs text-dark-400 line-through mr-1">{formatMoney(anterior)}</span>}
+                    {efectivo ? formatMoney(efectivo) : 'Consultar'}
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-xs text-primary-600 group-hover:translate-x-0.5 transition-transform">
+                    Ver <ArrowRight className="w-3 h-3" />
+                  </span>
+                </div>
+              </div>
+            </Link>
+          )
+        })}
+      </div>
+    </Section>
+  )
+}
+
 export default function NegocioDetalle({ manage = false }) {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -325,6 +390,7 @@ export default function NegocioDetalle({ manage = false }) {
           { id: 'horarios', label: 'Horarios', icon: Clock },
           { id: 'redes', label: 'Redes', icon: Share2 },
           { id: 'destino', label: 'Destino', icon: MapIcon },
+          { id: 'planes', label: 'Planes y promociones', icon: Ticket },
         ]
       : []),
   ]
@@ -411,8 +477,13 @@ export default function NegocioDetalle({ manage = false }) {
             {activeTab === 'resumen' && (
               <>
                 <PublicInfo business={business} horarios={horarios} redes={redes} servicios={servicios} imagenes={imagenes} />
+                <PublicPlanesSection businessId={business.id} />
                 <ResenasSection businessId={business.id} businessOwnerId={business.owner_id || user?.id} />
               </>
+            )}
+
+            {activeTab === 'planes' && (
+              <PlanesNegocio businessId={business.id} />
             )}
 
             {activeTab === 'imagenes' && (
@@ -534,6 +605,7 @@ export default function NegocioDetalle({ manage = false }) {
         ) : (
           <>
             <PublicInfo business={business} horarios={horarios} redes={redes} servicios={servicios} imagenes={imagenes} destinos={destinos} />
+            <PublicPlanesSection businessId={business.id} />
             <div className="mt-6">
               <ResenasSection businessId={business.id} businessOwnerId={business.owner_id || user?.id} />
             </div>

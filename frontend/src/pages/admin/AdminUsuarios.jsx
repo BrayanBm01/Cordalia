@@ -9,6 +9,7 @@ import { useAuth } from '../../context/AuthContext'
 import ConfirmModal from '../../components/ConfirmModal'
 import EmptyState from '../../components/EmptyState'
 import LoadingSpinner from '../../components/LoadingSpinner'
+import SearchInput from '../../components/SearchInput'
 import { toast } from 'sonner'
 
 const userSchema = z.object({
@@ -35,6 +36,7 @@ export default function AdminUsuarios() {
   const { user: currentUser } = useAuth()
   const [usuarios, setUsuarios] = useState([])
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -125,6 +127,13 @@ export default function AdminUsuarios() {
 
   if (loading) return <LoadingSpinner />
 
+  const term = search.trim().toLowerCase()
+  const filtrados = term
+    ? usuarios.filter((u) =>
+        [u.nombre, u.email, u.rol].some((v) => String(v || '').toLowerCase().includes(term))
+      )
+    : usuarios
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -132,7 +141,7 @@ export default function AdminUsuarios() {
       transition={{ duration: 0.3 }}
       className="space-y-6"
     >
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-dark-900">Usuarios</h1>
           <p className="text-dark-500 mt-1">Gestión de usuarios del sistema</p>
@@ -146,28 +155,51 @@ export default function AdminUsuarios() {
         </button>
       </div>
 
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder="Buscar por nombre, email o rol..."
+          className="w-full sm:max-w-sm"
+        />
+        {search && (
+          <p className="text-sm text-dark-500">
+            {filtrados.length} de {usuarios.length} usuarios
+          </p>
+        )}
+      </div>
+
       {usuarios.length === 0 ? (
         <EmptyState
           title="No hay usuarios"
           description="Aún no se han registrado usuarios en el sistema."
           icon={UsersIcon}
         />
+      ) : filtrados.length === 0 ? (
+        <div className="bg-white rounded-xl border border-dark-200">
+          <EmptyState
+            title="Sin resultados"
+            description={`No se encontraron usuarios con "${search}".`}
+            icon={UsersIcon}
+          />
+        </div>
       ) : (
         <div className="bg-white rounded-xl border border-dark-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-dark-100 bg-dark-50/60">
-                  <th className="text-left px-5 py-3 font-medium text-dark-500">ID</th>
-                  <th className="text-left px-5 py-3 font-medium text-dark-500">Nombre</th>
-                  <th className="text-left px-5 py-3 font-medium text-dark-500">Email</th>
-                  <th className="text-left px-5 py-3 font-medium text-dark-500">Rol</th>
-                  <th className="text-left px-5 py-3 font-medium text-dark-500">Sesión</th>
-                  <th className="text-right px-5 py-3 font-medium text-dark-500">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-dark-100">
-                {usuarios.map((u) => {
+            <div className="max-h-[480px] overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 z-10">
+                  <tr className="border-b border-dark-100 bg-dark-50">
+                    <th className="text-left px-5 py-3 font-medium text-dark-500">ID</th>
+                    <th className="text-left px-5 py-3 font-medium text-dark-500">Nombre</th>
+                    <th className="text-left px-5 py-3 font-medium text-dark-500">Email</th>
+                    <th className="text-left px-5 py-3 font-medium text-dark-500">Rol</th>
+                    <th className="text-left px-5 py-3 font-medium text-dark-500">Sesión</th>
+                    <th className="text-right px-5 py-3 font-medium text-dark-500">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-dark-100">
+                  {filtrados.map((u) => {
                   const isCurrentUser = currentUser && u.id === currentUser.id
                   return (
                     <tr key={u.id} className="hover:bg-dark-50/40 transition-colors">
@@ -228,7 +260,8 @@ export default function AdminUsuarios() {
                   )
                 })}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
         </div>
       )}

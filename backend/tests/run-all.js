@@ -4,4 +4,6 @@ require("./02-negocios.test");
 require("./03-destinos.test");
 require("./04-favoritos.test");
 require("./05-reviews.test");
+require("./06-planes.test");
+require("./07-perfil.test");
 require("./helpers").main();

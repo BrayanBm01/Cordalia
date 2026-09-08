@@ -48,7 +48,7 @@ function Sidebar({ collapsed, onToggle }) {
 
   return (
     <aside
-      className={`hidden lg:flex flex-col bg-dark-900 transition-all duration-300 ${
+      className={`hidden lg:flex flex-col bg-dark-900 transition-all duration-300 h-screen sticky top-0 flex-shrink-0 overflow-y-auto ${
         collapsed ? 'w-[72px]' : 'w-64'
       }`}
     >
@@ -109,8 +109,12 @@ function Sidebar({ collapsed, onToggle }) {
       {!collapsed && user && (
         <div className="px-3 pb-4">
           <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-dark-800/50">
-            <div className="w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center text-sm font-semibold flex-shrink-0">
-              {user.nombre?.charAt(0).toUpperCase()}
+            <div className="w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center text-sm font-semibold flex-shrink-0 overflow-hidden">
+              {user.avatar_url ? (
+                <img src={user.avatar_url} alt={user.nombre} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none' }} />
+              ) : (
+                user.nombre?.charAt(0).toUpperCase()
+              )}
             </div>
             <div className="min-w-0">
               <p className="text-sm font-medium text-white truncate">{user.nombre}</p>
@@ -210,8 +214,12 @@ function MobileDrawer({ open, onClose }) {
         {user && (
           <div className="absolute bottom-0 left-0 right-0 px-3 pb-4">
             <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-dark-800/50">
-              <div className="w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center text-sm font-semibold flex-shrink-0">
-                {user.nombre?.charAt(0).toUpperCase()}
+              <div className="w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center text-sm font-semibold flex-shrink-0 overflow-hidden">
+                {user.avatar_url ? (
+                  <img src={user.avatar_url} alt={user.nombre} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none' }} />
+                ) : (
+                  user.nombre?.charAt(0).toUpperCase()
+                )}
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-medium text-white truncate">{user.nombre}</p>
@@ -335,15 +343,15 @@ export default function AdminLayout() {
   }, [notifications])
 
   return (
-    <div className="min-h-screen bg-dark-50 flex">
+    <div className="h-screen bg-dark-50 flex overflow-hidden">
       <Sidebar
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
       <MobileDrawer open={mobileOpen} onClose={() => setMobileOpen(false)} />
 
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-lg border-b border-dark-100 h-16 flex items-center px-4 sm:px-6 lg:px-8 gap-4">
+      <div className="flex-1 flex flex-col min-w-0 h-screen">
+        <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-lg border-b border-dark-100 h-16 flex items-center px-4 sm:px-6 lg:px-8 gap-4 flex-shrink-0">
           <button
             onClick={() => setMobileOpen(true)}
             className="lg:hidden p-2 -ml-2 rounded-lg text-dark-600 hover:bg-dark-50 transition-colors"
@@ -425,7 +433,7 @@ export default function AdminLayout() {
           </div>
         </header>
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           <Outlet />
         </main>
       </div>

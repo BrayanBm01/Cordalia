@@ -15,6 +15,11 @@ const {
 // de requireAuth para que un visitante anónimo pueda consultarlo.
 router.get("/:id/destinos", optionalAuth, loadVisibleBusiness, businessController.getDestinos);
 
+// Planes turísticos y promociones: lectura pública visible (solo activos de
+// negocios aprobados). La escritura se protege dentro de cada submódulo.
+router.use("/:id/planes", require("./planRoutes").businessRouter);
+router.use("/:id/promociones", require("./promotionRoutes").businessRouter);
+
 router.use(requireAuth);
 
 router.get("/categories", businessController.getCategories);

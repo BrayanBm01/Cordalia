@@ -6,6 +6,7 @@ import { businessesAPI, lugaresAPI } from '../../services/api'
 import { ESTADO_LABEL, ESTADO_BADGE } from '../negocios/businessUtils'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import EmptyState from '../../components/EmptyState'
+import SearchInput from '../../components/SearchInput'
 import { toast } from 'sonner'
 
 const ACCIONES = [
@@ -18,6 +19,7 @@ export default function AdminNegocios() {
   const [negocios, setNegocios] = useState([])
   const [lugares, setLugares] = useState([])
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
 
   async function fetchNegocios() {
     try {
@@ -57,6 +59,15 @@ export default function AdminNegocios() {
 
   if (loading) return <LoadingSpinner />
 
+  const term = search.trim().toLowerCase()
+  const filtrados = term
+    ? negocios.filter((n) =>
+        [n.nombre, n.categoria, n.owner_nombre, n.destino].some((v) =>
+          String(v || '').toLowerCase().includes(term)
+        )
+      )
+    : negocios
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -69,6 +80,13 @@ export default function AdminNegocios() {
         <p className="text-dark-500 mt-1">Aproba, rechaza o gestiona los negocios de la plataforma.</p>
       </div>
 
+      <SearchInput
+        value={search}
+        onChange={setSearch}
+        placeholder="Buscar por negocio, categoría, dueño o destino..."
+        className="w-full sm:max-w-sm"
+      />
+
       {negocios.length === 0 ? (
         <div className="bg-white rounded-xl border border-dark-200">
           <EmptyState
@@ -77,23 +95,32 @@ export default function AdminNegocios() {
             description="Los negocios creados por los usuarios aparecerán aquí para su aprobación."
           />
         </div>
+      ) : filtrados.length === 0 ? (
+        <div className="bg-white rounded-xl border border-dark-200">
+          <EmptyState
+            icon={Store}
+            title="Sin resultados"
+            description={`No se encontraron negocios con "${search}".`}
+          />
+        </div>
       ) : (
         <div className="bg-white rounded-xl border border-dark-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-dark-100 bg-dark-50/60">
-                  <th className="text-left px-5 py-3 font-medium text-dark-500">ID</th>
-                  <th className="text-left px-5 py-3 font-medium text-dark-500">Negocio</th>
-                  <th className="text-left px-5 py-3 font-medium text-dark-500">Categoría</th>
-                  <th className="text-left px-5 py-3 font-medium text-dark-500">Dueño</th>
-                  <th className="text-left px-5 py-3 font-medium text-dark-500">Destino</th>
-                  <th className="text-left px-5 py-3 font-medium text-dark-500">Estado</th>
-                  <th className="text-right px-5 py-3 font-medium text-dark-500">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-dark-100">
-                {negocios.map((n) => (
+            <div className="max-h-[480px] overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 z-10">
+                  <tr className="border-b border-dark-100 bg-dark-50">
+                    <th className="text-left px-5 py-3 font-medium text-dark-500">ID</th>
+                    <th className="text-left px-5 py-3 font-medium text-dark-500">Negocio</th>
+                    <th className="text-left px-5 py-3 font-medium text-dark-500">Categoría</th>
+                    <th className="text-left px-5 py-3 font-medium text-dark-500">Dueño</th>
+                    <th className="text-left px-5 py-3 font-medium text-dark-500">Destino</th>
+                    <th className="text-left px-5 py-3 font-medium text-dark-500">Estado</th>
+                    <th className="text-right px-5 py-3 font-medium text-dark-500">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-dark-100">
+                  {filtrados.map((n) => (
                   <tr key={n.id} className="hover:bg-dark-50/40 transition-colors">
                     <td className="px-5 py-3.5 text-dark-500 font-mono text-xs">{n.id}</td>
                     <td className="px-5 py-3.5">
@@ -155,7 +182,8 @@ export default function AdminNegocios() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
         </div>
       )}

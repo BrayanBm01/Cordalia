@@ -45,13 +45,17 @@ app.use(
   })
 );
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// El avatar de perfil se guarda como data-URL base64 (hasta ~2 MB de imagen,
+// que como JSON ocupa hasta ~2.7 MB). Elevamos el limite del body para
+// permitir ese caso manteniendo un margen seguro para el resto de endpoints.
+app.use(express.json({ limit: "4mb" }));
+app.use(express.urlencoded({ extended: true, limit: "4mb" }));
 
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/usuarios", require("./routes/usuarioRoutes"));
 app.use("/api/lugares", require("./routes/lugaresRoutes"));
 app.use("/api/businesses", require("./routes/businessRoutes"));
+app.use("/api/planes", require("./routes/planRoutes").publicRouter);
 app.use("/api/favoritos", require("./routes/favoritoRoutes"));
 app.use("/api/reviews", require("./routes/reviewRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));

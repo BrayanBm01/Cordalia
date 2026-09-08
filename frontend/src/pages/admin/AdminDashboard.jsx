@@ -2,26 +2,40 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Legend, Cell, PieChart, Pie,
+  Legend, Cell,
 } from 'recharts'
 import {
   Users, MapPin, Store, MessageSquare, Heart, Clock, CheckCircle, XCircle,
-  Activity, History,
+  Activity, History, Ticket, Sparkles, BadgePercent, Zap, Ban, CalendarX,
+  CalendarClock, PauseCircle,
 } from 'lucide-react'
 import { adminAPI } from '../../services/api'
 import LoadingSpinner from '../../components/LoadingSpinner'
+import PieChartCard from '../../components/PieChartCard'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
 const statCards = [
-  { key: 'totalUsuarios', label: 'Total Usuarios', icon: Users, iconColor: 'text-ocean-600', iconBg: 'bg-ocean-100' },
-  { key: 'totalDestinos', label: 'Total Destinos', icon: MapPin, iconColor: 'text-primary-600', iconBg: 'bg-primary-100' },
-  { key: 'totalNegocios', label: 'Total Negocios', icon: Store, iconColor: 'text-sand-600', iconBg: 'bg-sand-100' },
-  { key: 'negociosPendientes', label: 'Negocios Pendientes', icon: Clock, iconColor: 'text-sand-700', iconBg: 'bg-sand-50' },
-  { key: 'totalResenas', label: 'Total Reseñas', icon: MessageSquare, iconColor: 'text-ocean-600', iconBg: 'bg-ocean-100' },
-  { key: 'totalFavoritos', label: 'Total Favoritos', icon: Heart, iconColor: 'text-red-500', iconBg: 'bg-red-50' },
-  { key: 'loginsExitosos', label: 'Logins Exitosos', icon: CheckCircle, iconColor: 'text-primary-600', iconBg: 'bg-primary-100' },
-  { key: 'loginsFallidos', label: 'Logins Fallidos', icon: XCircle, iconColor: 'text-red-500', iconBg: 'bg-red-100' },
+  // General
+  { group: 'General', key: 'totalUsuarios', label: 'Total Usuarios', icon: Users, iconColor: 'text-ocean-600', iconBg: 'bg-ocean-100' },
+  { group: 'General', key: 'totalDestinos', label: 'Total Destinos', icon: MapPin, iconColor: 'text-primary-600', iconBg: 'bg-primary-100' },
+  { group: 'General', key: 'totalNegocios', label: 'Total Negocios', icon: Store, iconColor: 'text-sand-600', iconBg: 'bg-sand-100' },
+  { group: 'General', key: 'negociosPendientes', label: 'Negocios Pendientes', icon: Clock, iconColor: 'text-sand-700', iconBg: 'bg-sand-50' },
+  { group: 'General', key: 'totalResenas', label: 'Total Reseñas', icon: MessageSquare, iconColor: 'text-ocean-600', iconBg: 'bg-ocean-100' },
+  { group: 'General', key: 'totalFavoritos', label: 'Total Favoritos', icon: Heart, iconColor: 'text-red-500', iconBg: 'bg-red-50' },
+  // Planes
+  { group: 'Planes', key: 'totalPlanes', label: 'Total Planes', icon: Ticket, iconColor: 'text-primary-600', iconBg: 'bg-primary-100' },
+  { group: 'Planes', key: 'planesActivos', label: 'Planes Activos', icon: Sparkles, iconColor: 'text-emerald-600', iconBg: 'bg-emerald-100' },
+  { group: 'Planes', key: 'planesInactivos', label: 'Planes Inactivos', icon: Ban, iconColor: 'text-slate-600', iconBg: 'bg-slate-100' },
+  // Promociones
+  { group: 'Promociones', key: 'totalPromos', label: 'Total Promociones', icon: BadgePercent, iconColor: 'text-amber-600', iconBg: 'bg-amber-100' },
+  { group: 'Promociones', key: 'promosVigentes', label: 'Promo Vigentes', icon: Zap, iconColor: 'text-emerald-600', iconBg: 'bg-emerald-100' },
+  { group: 'Promociones', key: 'promosProximas', label: 'Promo Próximas', icon: CalendarClock, iconColor: 'text-ocean-600', iconBg: 'bg-ocean-100' },
+  { group: 'Promociones', key: 'promosVencidas', label: 'Promo Vencidas', icon: CalendarX, iconColor: 'text-red-500', iconBg: 'bg-red-50' },
+  { group: 'Promociones', key: 'promosInactivas', label: 'Promo Inactivas', icon: PauseCircle, iconColor: 'text-slate-600', iconBg: 'bg-slate-100' },
+  // Sesiones
+  { group: 'Sesiones', key: 'loginsExitosos', label: 'Logins Exitosos', icon: CheckCircle, iconColor: 'text-primary-600', iconBg: 'bg-primary-100' },
+  { group: 'Sesiones', key: 'loginsFallidos', label: 'Logins Fallidos', icon: XCircle, iconColor: 'text-red-500', iconBg: 'bg-red-100' },
 ]
 
 const ESTADO_LABEL = {
@@ -31,6 +45,14 @@ const ESTADO_LABEL = {
   rejected: 'Rechazado',
   suspended: 'Suspendido',
   inactive: 'Inactivo',
+  activo: 'Activo',
+  inactivo: 'Inactivo',
+}
+
+const TIPO_PLAN_LABEL = {
+  plan: 'Planes',
+  paquete: 'Paquetes',
+  experiencia: 'Experiencias',
 }
 
 const ROL_LABEL = {
@@ -140,6 +162,31 @@ export default function AdminDashboard() {
     { name: 'Negocios', cantidad: stats?.favoritosNegocios || 0 },
   ].filter((r) => r.cantidad > 0)
 
+  const planesPorTipo = (stats?.planesPorTipo || []).map((r) => ({
+    name: TIPO_PLAN_LABEL[r.tipo_plan] || r.tipo_plan,
+    cantidad: r.cantidad,
+  }))
+
+  const planesPorEstado = (stats?.planesPorEstado || []).map((r) => ({
+    name: ESTADO_LABEL[r.estado] || r.estado,
+    cantidad: r.cantidad,
+  }))
+
+  const planesPorDuracion = (stats?.planesPorDuracion || []).map((r) => ({
+    name: r.duracion,
+    cantidad: r.cantidad,
+  }))
+
+  const planesPorDestino = (stats?.planesPorDestino || []).map((r) => ({
+    name: r.destino,
+    cantidad: r.cantidad,
+  }))
+
+  const promosPorVigencia = (stats?.promosPorVigencia || []).map((r) => ({
+    name: r.name,
+    cantidad: r.cantidad,
+  }))
+
   const loginData = [
     { name: 'Exitosos', cantidad: stats?.loginsExitosos || 0 },
     { name: 'Fallidos', cantidad: stats?.loginsFallidos || 0 },
@@ -159,27 +206,36 @@ export default function AdminDashboard() {
         <p className="text-dark-500 mt-1">Resumen general del sistema con datos reales</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {statCards.map((card, i) => {
-          const Icon = card.icon
-          return (
-            <motion.div
-              key={card.key}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: i * 0.05 }}
-              className="bg-white rounded-xl border border-dark-200 p-5 flex items-center gap-4 hover:shadow-md transition-shadow"
-            >
-              <div className={`w-12 h-12 rounded-lg ${card.iconBg} flex items-center justify-center flex-shrink-0`}>
-                <Icon className={`w-6 h-6 ${card.iconColor}`} />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-dark-900">{stats?.[card.key] ?? 0}</p>
-                <p className="text-sm text-dark-500">{card.label}</p>
-              </div>
-            </motion.div>
-          )
-        })}
+      <div className="space-y-8">
+        {Array.from(new Set(statCards.map((c) => c.group))).map((group) => (
+          <div key={group}>
+            <h2 className="text-sm font-semibold text-dark-400 uppercase tracking-wide mb-3">
+              {group}
+            </h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+              {statCards.filter((c) => c.group === group).map((card, i) => {
+                const Icon = card.icon
+                return (
+                  <motion.div
+                    key={card.key}
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: i * 0.04 }}
+                    className="bg-white rounded-xl border border-dark-200 p-4 sm:p-5 flex items-center gap-3 sm:gap-4 hover:shadow-md transition-shadow min-w-0"
+                  >
+                    <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-lg ${card.iconBg} flex items-center justify-center flex-shrink-0`}>
+                      <Icon className={`w-5 h-5 sm:w-6 sm:h-6 ${card.iconColor}`} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xl sm:text-2xl font-bold text-dark-900 truncate">{stats?.[card.key] ?? 0}</p>
+                      <p className="text-xs sm:text-sm text-dark-500 truncate">{card.label}</p>
+                    </div>
+                  </motion.div>
+                )
+              })}
+            </div>
+          </div>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -217,47 +273,11 @@ export default function AdminDashboard() {
         </ChartCard>
 
         <ChartCard icon={Users} title="Usuarios por Rol" hint={usuariosPorRol.length === 0 ? 'No hay usuarios registrados' : undefined}>
-          <ResponsiveContainer width="100%" height={260}>
-            <PieChart>
-              <Pie
-                data={usuariosPorRol}
-                dataKey="cantidad"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                outerRadius={90}
-                label
-              >
-                {usuariosPorRol.map((_, index) => (
-                  <Cell key={index} fill={PALETTE[index % PALETTE.length]} />
-                ))}
-              </Pie>
-              <Tooltip {...tooltipStyle()} />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
+          <PieChartCard data={usuariosPorRol} />
         </ChartCard>
 
         <ChartCard icon={Heart} title="Favoritos por Tipo" hint={favoritosPorTipo.length === 0 ? 'No hay favoritos aún' : undefined}>
-          <ResponsiveContainer width="100%" height={260}>
-            <PieChart>
-              <Pie
-                data={favoritosPorTipo}
-                dataKey="cantidad"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                outerRadius={90}
-                label
-              >
-                {favoritosPorTipo.map((_, index) => (
-                  <Cell key={index} fill={index === 0 ? '#10b981' : '#ef4444'} />
-                ))}
-              </Pie>
-              <Tooltip {...tooltipStyle()} />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
+          <PieChartCard data={favoritosPorTipo} palette={['#10b981', '#ef4444']} />
         </ChartCard>
 
         <ChartCard icon={MessageSquare} title="Reseñas por Valoración" hint={resenasPorValoracion.length === 0 ? 'No hay reseñas aún' : undefined}>
@@ -320,6 +340,81 @@ export default function AdminDashboard() {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+        </ChartCard>
+
+        <ChartCard icon={Ticket} title="Planes por Tipo" hint={planesPorTipo.length === 0 ? 'No hay planes registrados' : undefined}>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={planesPorTipo} barCategoryGap="35%">
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="name" tick={{ fontSize: 13, fill: '#64748b' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 13, fill: '#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} />
+              <Tooltip {...tooltipStyle()} cursor={{ fill: '#f1f5f9' }} />
+              <Bar dataKey="cantidad" name="Planes" radius={[6, 6, 0, 0]}>
+                {planesPorTipo.map((_, index) => (
+                  <Cell key={index} fill={PALETTE[index % PALETTE.length]} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        <ChartCard icon={Sparkles} title="Planes por Estado" hint={planesPorEstado.length === 0 ? 'No hay planes registrados' : undefined}>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={planesPorEstado} barCategoryGap="35%">
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="name" tick={{ fontSize: 13, fill: '#64748b' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 13, fill: '#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} />
+              <Tooltip {...tooltipStyle()} cursor={{ fill: '#f1f5f9' }} />
+              <Bar dataKey="cantidad" name="Planes" radius={[6, 6, 0, 0]}>
+                {planesPorEstado.map((_, index) => (
+                  <Cell key={index} fill={index === 0 ? '#10b981' : '#94a3b8'} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        <ChartCard icon={Clock} title="Planes por Duración" hint={planesPorDuracion.length === 0 ? 'No hay planes registrados' : undefined}>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={planesPorDuracion} barCategoryGap="35%">
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="name" tick={{ fontSize: 13, fill: '#64748b' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 13, fill: '#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} />
+              <Tooltip {...tooltipStyle()} cursor={{ fill: '#f1f5f9' }} />
+              <Bar dataKey="cantidad" name="Planes" radius={[6, 6, 0, 0]}>
+                {planesPorDuracion.map((_, index) => (
+                  <Cell key={index} fill={PALETTE[index % PALETTE.length]} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        <ChartCard icon={MapPin} title="Planes por Destino" hint={planesPorDestino.length === 0 ? 'No hay planes con destino' : undefined}>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={planesPorDestino} layout="vertical" margin={{ left: 8, right: 16 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis type="number" tick={{ fontSize: 13, fill: '#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} />
+              <YAxis
+                type="category"
+                dataKey="name"
+                tick={{ fontSize: 12, fill: '#64748b' }}
+                axisLine={false}
+                tickLine={false}
+                width={110}
+              />
+              <Tooltip {...tooltipStyle()} cursor={{ fill: '#f1f5f9' }} />
+              <Bar dataKey="cantidad" name="Planes" radius={[0, 6, 6, 0]}>
+                {planesPorDestino.map((_, index) => (
+                  <Cell key={index} fill={PALETTE[index % PALETTE.length]} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        <ChartCard icon={BadgePercent} title="Promociones por Vigencia" hint={promosPorVigencia.length === 0 ? 'No hay promociones aún' : undefined}>
+          <PieChartCard data={promosPorVigencia} palette={['#10b981', '#3b9af6', '#ef4444', '#94a3b8']} />
         </ChartCard>
       </div>
 

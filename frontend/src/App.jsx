@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
+import ScrollToTop from './components/ScrollToTop'
 import PublicLayout from './layouts/PublicLayout'
 import AuthLayout from './layouts/AuthLayout'
 import AdminLayout from './layouts/AdminLayout'
@@ -25,10 +26,13 @@ import ResumenNegocios from './pages/negocios/ResumenNegocios'
 import NegocioForm from './pages/negocios/NegocioForm'
 import NegocioDetalle from './pages/negocios/NegocioDetalle'
 import MisFavoritos from './pages/MisFavoritos'
+import PlanesPublicos from './pages/planes/PlanesPublicos'
+import PlanDetalle from './pages/planes/PlanDetalle'
 
 export default function App() {
   return (
     <AuthProvider>
+      <ScrollToTop />
       <Routes>
         <Route element={<PublicLayout />}>
           <Route path="/" element={<Home />} />
@@ -36,6 +40,8 @@ export default function App() {
           <Route path="/lugares/:id" element={<LugarDetalle />} />
           <Route path="/negocios" element={<NegociosPublicos />} />
           <Route path="/negocios/:id" element={<NegocioDetalle />} />
+          <Route path="/planes" element={<PlanesPublicos />} />
+          <Route path="/planes/:id" element={<PlanDetalle />} />
           <Route path="/perfil" element={
             <ProtectedRoute><Perfil /></ProtectedRoute>
           } />

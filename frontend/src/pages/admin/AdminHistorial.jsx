@@ -6,11 +6,13 @@ import { History } from 'lucide-react'
 import { adminAPI } from '../../services/api'
 import EmptyState from '../../components/EmptyState'
 import LoadingSpinner from '../../components/LoadingSpinner'
+import SearchInput from '../../components/SearchInput'
 import { toast } from 'sonner'
 
 export default function AdminHistorial() {
   const [historial, setHistorial] = useState([])
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     async function fetchHistorial() {
@@ -28,6 +30,15 @@ export default function AdminHistorial() {
 
   if (loading) return <LoadingSpinner />
 
+  const term = search.trim().toLowerCase()
+  const filtrados = term
+    ? historial.filter((h) =>
+        [h.usuario, h.nombre, h.email, h.exito ? 'exitoso' : 'fallido', h.fecha].some((v) =>
+          String(v || '').toLowerCase().includes(term)
+        )
+      )
+    : historial
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -40,10 +51,23 @@ export default function AdminHistorial() {
         <p className="text-dark-500 mt-1">Registro de intentos de acceso al sistema</p>
       </div>
 
+      <SearchInput
+        value={search}
+        onChange={setSearch}
+        placeholder="Buscar por usuario, email, estado o fecha..."
+        className="w-full sm:max-w-sm"
+      />
+
       {historial.length === 0 ? (
         <EmptyState
           title="Sin registros"
           description="Aún no hay intentos de login registrados."
+          icon={History}
+        />
+      ) : filtrados.length === 0 ? (
+        <EmptyState
+          title="Sin resultados"
+          description={`No se encontraron registros con "${search}".`}
           icon={History}
         />
       ) : (
@@ -60,7 +84,7 @@ export default function AdminHistorial() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-dark-100">
-                  {historial.map((entry, i) => (
+                  {filtrados.map((entry, i) => (
                     <tr key={entry.id || i} className="hover:bg-dark-50/40 transition-colors">
                       <td className="px-5 py-3.5 font-medium text-dark-800">
                         {entry.usuario || entry.nombre || '—'}

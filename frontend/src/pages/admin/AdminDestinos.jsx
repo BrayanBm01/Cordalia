@@ -152,16 +152,17 @@ export default function AdminDestinos() {
       ) : (
         <div className="bg-white rounded-xl border border-dark-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-dark-100 bg-dark-50/60">
-                  <th className="text-left px-5 py-3 font-medium text-dark-500">ID</th>
-                  <th className="text-left px-5 py-3 font-medium text-dark-500">Nombre</th>
-                  <th className="text-left px-5 py-3 font-medium text-dark-500">Ubicación</th>
-                  <th className="text-left px-5 py-3 font-medium text-dark-500">Descripción</th>
-                  <th className="text-right px-5 py-3 font-medium text-dark-500">Acciones</th>
-                </tr>
-              </thead>
+            <div className="max-h-[480px] overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 z-10">
+                  <tr className="border-b border-dark-100 bg-dark-50">
+                    <th className="text-left px-5 py-3 font-medium text-dark-500">ID</th>
+                    <th className="text-left px-5 py-3 font-medium text-dark-500">Nombre</th>
+                    <th className="text-left px-5 py-3 font-medium text-dark-500">Ubicación</th>
+                    <th className="text-left px-5 py-3 font-medium text-dark-500">Descripción</th>
+                    <th className="text-right px-5 py-3 font-medium text-dark-500">Acciones</th>
+                  </tr>
+                </thead>
               <tbody className="divide-y divide-dark-100">
                 {destinos.map((destino) => (
                   <tr key={destino.id} className="hover:bg-dark-50/40 transition-colors">
@@ -192,7 +193,8 @@ export default function AdminDestinos() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
         </div>
       )}

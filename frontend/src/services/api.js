@@ -137,3 +137,45 @@ export const reviewsAPI = {
   moderar: (reviewId, estado) => api.put(`/reviews/${reviewId}/moderar`, { estado }),
   all: () => api.get('/reviews'),
 }
+
+function buildQuery(params = {}) {
+  const qs = new URLSearchParams()
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') return
+    if (Array.isArray(value)) {
+      value.forEach((v) => qs.append(key, v))
+    } else {
+      qs.append(key, value)
+    }
+  })
+  const qsStr = qs.toString()
+  return qsStr ? `?${qsStr}` : ''
+}
+
+// Planes turísticos y promociones (precios SOLO informativos, sin pagos)
+export const planesAPI = {
+  list: (params) => api.get(`/planes${buildQuery(params)}`),
+  getById: (id) => api.get(`/planes/${id}`),
+}
+
+export const businessPlanesAPI = {
+  list: (businessId) => api.get(`/businesses/${businessId}/planes`),
+  getById: (businessId, planId) => api.get(`/businesses/${businessId}/planes/${planId}`),
+  create: (businessId, data) => api.post(`/businesses/${businessId}/planes`, data),
+  update: (businessId, planId, data) => api.put(`/businesses/${businessId}/planes/${planId}`, data),
+  remove: (businessId, planId) => api.delete(`/businesses/${businessId}/planes/${planId}`),
+  setEstado: (businessId, planId, estado) => api.put(`/businesses/${businessId}/planes/${planId}/estado`, { estado }),
+  imagenes: {
+    add: (businessId, planId, data) => api.post(`/businesses/${businessId}/planes/${planId}/imagenes`, data),
+    setPrimary: (businessId, planId, imageId) => api.put(`/businesses/${businessId}/planes/${planId}/imagenes/${imageId}/principal`),
+    remove: (businessId, planId, imageId) => api.delete(`/businesses/${businessId}/planes/${planId}/imagenes/${imageId}`),
+  },
+}
+
+export const promocionesAPI = {
+  list: (businessId) => api.get(`/businesses/${businessId}/promociones`),
+  create: (businessId, data) => api.post(`/businesses/${businessId}/promociones`, data),
+  update: (businessId, promoId, data) => api.put(`/businesses/${businessId}/promociones/${promoId}`, data),
+  remove: (businessId, promoId) => api.delete(`/businesses/${businessId}/promociones/${promoId}`),
+  setEstado: (businessId, promoId, estado) => api.put(`/businesses/${businessId}/promociones/${promoId}/estado`, { estado }),
+}

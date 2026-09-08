@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Outlet, Link, NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { Mountain, Menu, X, ChevronDown, User, Shield, Store, Heart, LogOut } from 'lucide-react'
+import { Mountain, Menu, X, ChevronDown, User, Shield, Store, Heart, LogOut, Ticket, Code2, ExternalLink } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 const navLinkClass = ({ isActive }) =>
@@ -67,6 +67,9 @@ function Navbar() {
             <NavLink to="/negocios" className={navLinkClass}>
               Negocios
             </NavLink>
+            <NavLink to="/planes" className={navLinkClass}>
+              Planes
+            </NavLink>
             {location.pathname === '/' ? (
               <a
                 href="#experiencias"
@@ -95,8 +98,12 @@ function Navbar() {
                   onClick={() => setDropdownOpen(!dropdownOpen)}
                   className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-dark-50 transition-colors"
                 >
-                  <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-sm font-semibold">
-                    {user.nombre?.charAt(0).toUpperCase()}
+                  <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-sm font-semibold overflow-hidden">
+                    {user.avatar_url ? (
+                      <img src={user.avatar_url} alt={user.nombre} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none' }} />
+                    ) : (
+                      user.nombre?.charAt(0).toUpperCase()
+                    )}
                   </div>
                   <span className="text-sm font-medium text-dark-700 max-w-[120px] truncate">
                     {user.nombre}
@@ -228,6 +235,17 @@ function Navbar() {
             >
               Negocios
             </NavLink>
+            <NavLink
+              to="/planes"
+              onClick={() => setMobileOpen(false)}
+              className={({ isActive }) =>
+                `block px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  isActive ? 'bg-primary-50 text-primary-700' : 'text-dark-700 hover:bg-dark-50'
+                }`
+              }
+            >
+              Planes
+            </NavLink>
             {location.pathname === '/' ? (
               <a
                 href="#experiencias"
@@ -261,8 +279,12 @@ function Navbar() {
               {user ? (
                 <div className="space-y-2">
                   <div className="flex items-center gap-3 px-3 py-2">
-                    <div className="w-9 h-9 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-sm font-semibold">
-                      {user.nombre?.charAt(0).toUpperCase()}
+                    <div className="w-9 h-9 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-sm font-semibold overflow-hidden">
+                      {user.avatar_url ? (
+                        <img src={user.avatar_url} alt={user.nombre} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none' }} />
+                      ) : (
+                        user.nombre?.charAt(0).toUpperCase()
+                      )}
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-dark-900 truncate">
@@ -382,6 +404,12 @@ function Footer() {
                 </Link>
               </li>
               <li>
+                <Link to="/planes" className="text-sm text-dark-400 hover:text-primary-400 transition-colors inline-flex items-center gap-1.5">
+                  <Ticket className="w-3.5 h-3.5" />
+                  Planes y experiencias
+                </Link>
+              </li>
+              <li>
                 <Link to="/lugares" className="text-sm text-dark-400 hover:text-primary-400 transition-colors">
                   Explorar
                 </Link>
@@ -435,25 +463,20 @@ function Footer() {
 
           <div>
             <h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-4">
-              Información
+              Desarrollador
             </h3>
-            <ul className="space-y-3">
-              <li>
-                <Link to="/" className="text-sm text-dark-400 hover:text-primary-400 transition-colors">
-                  Inicio
-                </Link>
-              </li>
-              <li>
-                <Link to="/lugares" className="text-sm text-dark-400 hover:text-primary-400 transition-colors">
-                  Destinos
-                </Link>
-              </li>
-              <li>
-                <Link to="/lugares" className="text-sm text-dark-400 hover:text-primary-400 transition-colors">
-                  Explorar destinos
-                </Link>
-              </li>
-            </ul>
+            <p className="text-sm text-dark-400 mb-3">Hecho con dedicación para el turismo colombiano.</p>
+            <a
+              href="https://github.com/BrayanBm01"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-dark-800/60 border border-dark-700 text-sm font-medium text-dark-200 hover:text-white hover:border-primary-500 hover:bg-dark-700/50 transition-colors"
+              title="Ver perfil de Brayan Borja en GitHub"
+            >
+              <Code2 className="w-4 h-4" />
+              Brayan Borja
+              <ExternalLink className="w-3.5 h-3.5 text-dark-400" />
+            </a>
           </div>
         </div>
 
@@ -461,9 +484,12 @@ function Footer() {
           <p className="text-sm text-dark-500">
             &copy; {new Date().getFullYear()} Explora Turismo. Todos los derechos reservados.
           </p>
-          <p className="text-sm text-dark-500">
-            Hecho con amor en Colombia
-          </p>
+          <div className="flex flex-col sm:flex-row items-center gap-3 text-sm text-dark-500">
+            <p className="inline-flex items-center gap-1.5">
+              <Heart className="w-3.5 h-3.5 text-primary-500" />
+              Hecho con amor en Colombia
+            </p>
+          </div>
         </div>
       </div>
     </footer>

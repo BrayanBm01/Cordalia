@@ -5,6 +5,7 @@ import { MessageSquare, Star, EyeOff, Eye, Trash2 } from 'lucide-react'
 import { reviewsAPI } from '../../services/api'
 import EmptyState from '../../components/EmptyState'
 import LoadingSpinner from '../../components/LoadingSpinner'
+import SearchInput from '../../components/SearchInput'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -42,6 +43,7 @@ export default function AdminResenas() {
   const [resenas, setResenas] = useState([])
   const [loading, setLoading] = useState(true)
   const [filtro, setFiltro] = useState('todas')
+  const [search, setSearch] = useState('')
   const [busy, setBusy] = useState(null)
 
   async function fetchResenas() {
@@ -87,7 +89,15 @@ export default function AdminResenas() {
 
   if (loading) return <LoadingSpinner />
 
-  const filtradas = filtro === 'todas' ? resenas : resenas.filter((r) => r.estado === filtro)
+  const porEstado = filtro === 'todas' ? resenas : resenas.filter((r) => r.estado === filtro)
+  const term = search.trim().toLowerCase()
+  const filtradas = term
+    ? porEstado.filter((r) =>
+        [r.autor_nombre, r.negocio_nombre, r.comment, r.estado].some((v) =>
+          String(v || '').toLowerCase().includes(term)
+        )
+      )
+    : porEstado
 
   return (
     <motion.div
@@ -118,29 +128,43 @@ export default function AdminResenas() {
         ))}
       </div>
 
+      <SearchInput
+        value={search}
+        onChange={setSearch}
+        placeholder="Buscar por autor, negocio, comentario o estado..."
+        className="w-full sm:max-w-sm"
+      />
+
       {filtradas.length === 0 ? (
         <div className="bg-white rounded-xl border border-dark-200">
           <EmptyState
             icon={MessageSquare}
-            title="Sin reseñas"
-            description={filtro === 'todas' ? 'Aún no hay reseñas en la plataforma.' : 'No hay reseñas en este estado.'}
+            title={search ? 'Sin resultados' : 'Sin reseñas'}
+            description={
+              search
+                ? `No se encontraron reseñas con "${search}".`
+                : filtro === 'todas'
+                  ? 'Aún no hay reseñas en la plataforma.'
+                  : 'No hay reseñas en este estado.'
+            }
           />
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-dark-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-dark-100 bg-dark-50/60">
-                  <th className="text-left px-5 py-3 font-medium text-dark-500">Autor</th>
-                  <th className="text-left px-5 py-3 font-medium text-dark-500">Negocio</th>
-                  <th className="text-left px-5 py-3 font-medium text-dark-500">Puntuación</th>
-                  <th className="text-left px-5 py-3 font-medium text-dark-500">Comentario</th>
-                  <th className="text-left px-5 py-3 font-medium text-dark-500">Estado</th>
-                  <th className="text-left px-5 py-3 font-medium text-dark-500">Fecha</th>
-                  <th className="text-right px-5 py-3 font-medium text-dark-500">Acciones</th>
-                </tr>
-              </thead>
+            <div className="max-h-[480px] overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 z-10">
+                  <tr className="border-b border-dark-100 bg-dark-50">
+                    <th className="text-left px-5 py-3 font-medium text-dark-500">Autor</th>
+                    <th className="text-left px-5 py-3 font-medium text-dark-500">Negocio</th>
+                    <th className="text-left px-5 py-3 font-medium text-dark-500">Puntuación</th>
+                    <th className="text-left px-5 py-3 font-medium text-dark-500">Comentario</th>
+                    <th className="text-left px-5 py-3 font-medium text-dark-500">Estado</th>
+                    <th className="text-left px-5 py-3 font-medium text-dark-500">Fecha</th>
+                    <th className="text-right px-5 py-3 font-medium text-dark-500">Acciones</th>
+                  </tr>
+                </thead>
               <tbody className="divide-y divide-dark-100">
                 {filtradas.map((r) => (
                   <tr key={r.id} className="hover:bg-dark-50/40 transition-colors">
@@ -205,7 +229,8 @@ export default function AdminResenas() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
         </div>
       )}

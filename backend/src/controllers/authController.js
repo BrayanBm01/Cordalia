@@ -9,11 +9,59 @@ const ROLES = { ADMIN: 0, TOURIST: 1, BUSINESS: 2 };
 const ROLES_PUBLICOS = [ROLES.TOURIST, ROLES.BUSINESS];
 const PROVEEDORES_VALIDOS = ["local", "google"];
 
+const AVATAR_MAX_BYTES = 1024 * 1024 * 2; // 2 MB (coincide con el limite del frontend)
+const IMAGENES_PERMITIDAS = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+
+/**
+ * Valida un avatar enviado como data-URL base64 (p. ej.
+ * "data:image/png;base64,..."). Devuelve un mensaje de error descriptivo
+ * o null si es valido. Sobre datos demasiado grandes o formato corrupto,
+ * el error es de VALIDACION (400), nunca un 500.
+ */
+function validarAvatarDataUrl(dataUrl) {
+  const match = /^data:([^;,]+);base64,(.+)$/i.exec(dataUrl);
+  if (!match) {
+    return "Avatar inválido: formato no reconocido";
+  }
+  const mime = match[1].toLowerCase();
+  if (!IMAGENES_PERMITIDAS.includes(mime)) {
+    return `Avatar inválido: solo se permiten imágenes (${IMAGENES_PERMITIDAS.join(", ")})`;
+  }
+  const contenido = match[2];
+  if (!contenido) {
+    return "Avatar inválido: datos de imagen vacíos";
+  }
+  // Estimamos el tamano binario real a partir de la base64.
+  const approxBytes = Math.floor((contenido.length * 3) / 4) - (contenido.endsWith("==") ? 2 : contenido.endsWith("=") ? 1 : 0);
+  if (approxBytes > AVATAR_MAX_BYTES) {
+    return "Avatar demasiado grande: máximo 2 MB";
+  }
+  return null;
+}
+
 function mapRolId(rol_id) {
   const r = Number(rol_id);
   if (r === 0) return "ADMIN";
   if (r === 2) return "BUSINESS";
   return "TOURIST";
+}
+
+function mapPublicUser(usuario, rol) {
+  return {
+    id: usuario.id,
+    nombre: usuario.nombre,
+    apellido: usuario.apellido || null,
+    email: usuario.email,
+    rol,
+    avatar_url: usuario.avatar_url || null,
+    proveedor: usuario.proveedor || "local",
+    telefono: usuario.telefono || null,
+    ciudad: usuario.ciudad || null,
+    pais: usuario.pais || null,
+    bio: usuario.bio || null,
+    intereses_turisticos: usuario.intereses_turisticos || null,
+    preferencias_viaje: usuario.preferencias_viaje || null,
+  };
 }
 
 function getClientIp(req) {
@@ -39,14 +87,7 @@ function resolvePublicRol(rol) {
 function buildSessionResponse(usuario, token, rolNombre) {
   return {
     token,
-    usuario: {
-      id: usuario.id,
-      nombre: usuario.nombre,
-      email: usuario.email,
-      rol: rolNombre,
-      avatar_url: usuario.avatar_url || null,
-      proveedor: usuario.proveedor || "local",
-    },
+    usuario: mapPublicUser(usuario, rolNombre),
   };
 }
 
@@ -261,14 +302,7 @@ exports.me = async (req, res) => {
     }
     return res.json({
       success: true,
-      data: {
-        id: usuario.id,
-        nombre: usuario.nombre,
-        email: usuario.email,
-        rol: req.usuario.rol,
-        avatar_url: usuario.avatar_url || null,
-        proveedor: usuario.proveedor || "local",
-      },
+      data: mapPublicUser(usuario, req.usuario.rol),
     });
   } catch (error) {
     console.error("Error en me:", error);
@@ -310,6 +344,47 @@ exports.updateProfile = async (req, res) => {
       fields.password = await hashPassword(sanitizeString(password));
     }
 
+    // Campos opcionales de perfil. Un string vacio limpia el campo.
+    const opcionales = [
+      { key: "apellido", max: 100, label: "Apellido" },
+      { key: "telefono", max: 30, label: "Teléfono" },
+      { key: "ciudad", max: 100, label: "Ciudad" },
+      { key: "pais", max: 100, label: "País" },
+      { key: "bio", max: 1000, label: "Biografía" },
+      { key: "intereses_turisticos", max: 500, label: "Intereses turísticos" },
+      { key: "preferencias_viaje", max: 500, label: "Preferencias de viaje" },
+    ];
+
+    for (const campo of opcionales) {
+      if (req.body[campo.key] === undefined) continue;
+      const valor = sanitizeString(String(req.body[campo.key] ?? ""));
+      if (valor.length > campo.max) {
+        return res.status(400).json({
+          success: false,
+          message: `${campo.label} debe tener máximo ${campo.max} caracteres`,
+        });
+      }
+      fields[campo.key] = valor || null;
+    }
+
+    if (req.body.avatar_url !== undefined) {
+      const avatar = sanitizeString(String(req.body.avatar_url ?? ""));
+      if (avatar) {
+        const esUrl = /^https?:\/\//i.test(avatar);
+        const esDataUrl = /^data:image\//i.test(avatar);
+        if (!esUrl && !esDataUrl) {
+          return res.status(400).json({ success: false, message: "Avatar inválido: debe ser una URL" });
+        }
+        if (esDataUrl) {
+          const errorAvatar = validarAvatarDataUrl(avatar);
+          if (errorAvatar) {
+            return res.status(400).json({ success: false, message: errorAvatar });
+          }
+        }
+      }
+      fields.avatar_url = avatar || null;
+    }
+
     if (Object.keys(fields).length === 0) {
       return res.status(400).json({ success: false, message: "No hay datos para actualizar" });
     }
@@ -319,7 +394,7 @@ exports.updateProfile = async (req, res) => {
       return res.status(404).json({ success: false, message: "Usuario no encontrado" });
     }
 
-    return res.json({ success: true, message: "Perfil actualizado", data: updated });
+    return res.json({ success: true, message: "Perfil actualizado", data: mapPublicUser(updated, req.usuario.rol) });
   } catch (error) {
     console.error("Error en updateProfile:", error);
     return res.status(500).json({ success: false, message: "Error al actualizar" });

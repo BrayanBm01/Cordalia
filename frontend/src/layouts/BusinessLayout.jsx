@@ -96,8 +96,12 @@ function SidebarContent({ onNavigate }) {
       {user && (
         <div className="px-3 pb-4">
           <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-dark-800/50">
-            <div className="w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center text-sm font-semibold flex-shrink-0">
-              {user.nombre?.charAt(0).toUpperCase()}
+            <div className="w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center text-sm font-semibold flex-shrink-0 overflow-hidden">
+              {user.avatar_url ? (
+                <img src={user.avatar_url} alt={user.nombre} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none' }} />
+              ) : (
+                user.nombre?.charAt(0).toUpperCase()
+              )}
             </div>
             <div className="min-w-0">
               <p className="text-sm font-medium text-white truncate">{user.nombre}</p>

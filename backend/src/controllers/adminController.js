@@ -86,6 +86,83 @@ exports.stats = async (req, res) => {
       await pool.query("SELECT COUNT(*)::int as count FROM business_categories")
     ).rows[0].count;
 
+    // ---- Planes turisticos y promociones (FASE 7 / POST-FASE 7) ----
+    const planesPorEstado = (
+      await pool.query(
+        "SELECT estado, COUNT(*)::int AS cantidad FROM tour_plans GROUP BY estado ORDER BY estado"
+      )
+    ).rows;
+    const totalPlanes = planesPorEstado.reduce((s, r) => s + r.cantidad, 0);
+    const planesActivos =
+      planesPorEstado.find((r) => r.estado === "activo")?.cantidad || 0;
+    const planesInactivos =
+      planesPorEstado.find((r) => r.estado === "inactivo")?.cantidad || 0;
+
+    const planesPorTipo = (
+      await pool.query(
+        "SELECT tipo_plan, COUNT(*)::int AS cantidad FROM tour_plans GROUP BY tipo_plan ORDER BY tipo_plan"
+      )
+    ).rows;
+
+    const planesPorDuracion = (
+      await pool.query(
+        `SELECT CASE
+                  WHEN duracion_dias = 1 THEN '1 día'
+                  WHEN duracion_dias BETWEEN 2 AND 3 THEN '2-3 días'
+                  ELSE '4+ días'
+                END AS duracion,
+                COUNT(*)::int AS cantidad
+         FROM tour_plans
+         GROUP BY 1
+         ORDER BY duracion`
+      )
+    ).rows;
+
+    const planesPorDestino = (
+      await pool.query(
+        `SELECT COALESCE(NULLIF(tp.destino, ''), l.nombre, 'Sin destino') AS destino,
+                COUNT(*)::int AS cantidad
+         FROM tour_plans tp
+         LEFT JOIN lugares l ON l.id = tp.destination_id
+         GROUP BY 1
+         ORDER BY cantidad DESC, destino ASC`
+      )
+    ).rows;
+
+    const promociones = (
+      await pool.query(
+        `SELECT id, nombre, estado, fecha_inicio, fecha_fin
+         FROM promotions`
+      )
+    ).rows;
+
+    const hoy = new Date().toISOString().slice(0, 10);
+    let promosVigentes = 0;
+    let promosProximas = 0;
+    let promosVencidas = 0;
+    let promosInactivas = 0;
+    for (const p of promociones) {
+      const inicio = p.fecha_inicio ? new Date(p.fecha_inicio).toISOString().slice(0, 10) : "";
+      const fin = p.fecha_fin ? new Date(p.fecha_fin).toISOString().slice(0, 10) : "";
+      if (p.estado !== "activo") {
+        promosInactivas += 1;
+      } else if (inicio > hoy) {
+        promosProximas += 1;
+      } else if (fin < hoy) {
+        promosVencidas += 1;
+      } else {
+        promosVigentes += 1;
+      }
+    }
+    const totalPromos = promociones.length;
+
+    const promosPorVigencia = [
+      { name: "Vigentes", cantidad: promosVigentes },
+      { name: "Próximas", cantidad: promosProximas },
+      { name: "Vencidas", cantidad: promosVencidas },
+      { name: "Inactivas", cantidad: promosInactivas },
+    ].filter((r) => r.cantidad > 0);
+
     return res.json({
       success: true,
       data: {
@@ -106,11 +183,24 @@ exports.stats = async (req, res) => {
         totalTuristas,
         totalBusiness,
         totalCategorias,
+        totalPlanes,
+        planesActivos,
+        planesInactivos,
+        totalPromos,
+        promosVigentes,
+        promosProximas,
+        promosVencidas,
+        promosInactivas,
+        promosPorVigencia,
         negociosPorEstado,
         negociosPorDestino,
         negociosPorCategoria,
         usuariosPorRol,
         resenasPorValoracion,
+        planesPorTipo,
+        planesPorEstado,
+        planesPorDuracion,
+        planesPorDestino,
       },
     });
   } catch (error) {
