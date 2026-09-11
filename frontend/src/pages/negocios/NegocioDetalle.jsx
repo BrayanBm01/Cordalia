@@ -15,6 +15,7 @@ import LoadingSpinner from '../../components/LoadingSpinner'
 import FavoritoButton from '../../components/FavoritoButton'
 import ResenasSection from './ResenasSection'
 import PlanesNegocio from './PlanesNegocio'
+import ImageUploader from '../../components/ImageUploader'
 import { toast } from 'sonner'
 
 const inputClass =
@@ -56,8 +57,8 @@ function ManageImageForm({ businessId, onAdded }) {
 
   return (
     <form onSubmit={add} className="space-y-3 p-4 bg-dark-50 rounded-xl">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="URL de la imagen (https://)" className={inputClass} />
+      <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3">
+        <ImageUploader value={url} onChange={setUrl} placeholder="URL (https://) o selecciona del dispositivo" />
         <input value={alt} onChange={(e) => setAlt(e.target.value)} placeholder="Texto alternativo" className={inputClass} />
         <label className="flex items-center gap-2 text-sm text-dark-700">
           <input type="checkbox" checked={isPrimary} onChange={(e) => setIsPrimary(e.target.checked)} />

@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
+import AppErrorBoundary from './components/AppErrorBoundary'
 import ScrollToTop from './components/ScrollToTop'
 import PublicLayout from './layouts/PublicLayout'
 import AuthLayout from './layouts/AuthLayout'
@@ -33,8 +34,9 @@ export default function App() {
   return (
     <AuthProvider>
       <ScrollToTop />
-      <Routes>
-        <Route element={<PublicLayout />}>
+      <AppErrorBoundary>
+        <Routes>
+          <Route element={<PublicLayout />}>
           <Route path="/" element={<Home />} />
           <Route path="/lugares" element={<Lugares />} />
           <Route path="/lugares/:id" element={<LugarDetalle />} />
@@ -75,7 +77,8 @@ export default function App() {
         </Route>
 
         <Route path="*" element={<NotFound />} />
-      </Routes>
+        </Routes>
+      </AppErrorBoundary>
     </AuthProvider>
   )
 }

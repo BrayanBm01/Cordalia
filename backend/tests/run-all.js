@@ -6,4 +6,7 @@ require("./04-favoritos.test");
 require("./05-reviews.test");
 require("./06-planes.test");
 require("./07-perfil.test");
+require("./08-grupales.test");
+require("./09-datos-cordoba.test");
+require("./10-precio.test");
 require("./helpers").main();

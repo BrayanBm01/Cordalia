@@ -112,8 +112,15 @@ h.test("NEG: ownership: B no puede editar/borrar negocios de A; turista no puede
   });
   h.assertStatus(promocionar.status, 403, "business no cambia estado");
 
+  // El listado es lectura pública: sin token se ven únicamente negocios aprobados.
   const sinToken = await h.api("/api/businesses");
-  h.assertStatus(sinToken.status, 401, "sin token 401");
+  h.assertStatus(sinToken.status, 200, "lista pública sin token 200");
+  h.assert(Array.isArray(sinToken.json?.data), "data array sin token");
+  const idsPublicos = sinToken.json.data.map((b) => String(b.id));
+  h.assert(
+    !idsPublicos.includes(String(h.test.negocioA.id)) && !idsPublicos.includes(String(h.test.negocioB.id)),
+    "sin token no se ven negocios pendientes"
+  );
 });
 
 h.test("NEG: ADMIN cambia estado y el turista pasa a ver el negocio", async () => {

@@ -87,16 +87,17 @@ const PromotionModel = {
   async create(data) {
     const { business_id, plan_id, service_id, nombre, descripcion, tipo_descuento,
             valor_descuento, precio_anterior, precio_promocional, imagen_url,
-            fecha_inicio, fecha_fin } = data;
+            fecha_inicio, fecha_fin, estado } = data;
     const { rows } = await pool.query(
       `INSERT INTO promotions
         (business_id, plan_id, service_id, nombre, descripcion, tipo_descuento,
          valor_descuento, precio_anterior, precio_promocional, imagen_url,
-         fecha_inicio, fecha_fin)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+         fecha_inicio, fecha_fin, estado)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
        RETURNING ${RETURN_COLUMNS}`,
       [business_id, plan_id || null, service_id || null, nombre, descripcion, tipo_descuento,
-       valor_descuento, precio_anterior, precio_promocional, imagen_url, fecha_inicio, fecha_fin]
+       valor_descuento, precio_anterior, precio_promocional, imagen_url, fecha_inicio, fecha_fin,
+       estado || "activo"]
     );
     return withRelated(rows[0]);
   },

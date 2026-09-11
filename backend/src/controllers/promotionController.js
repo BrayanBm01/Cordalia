@@ -6,6 +6,8 @@ const { isNonEmptyString, sanitizeString } = require("../utils/validators");
 const ESTADOS = ["activo", "inactivo"];
 const TIPOS_DESCUENTO = ["porcentaje", "valor"];
 const URL_RE = /^https?:\/\/.+/i;
+const IMAGEN_MAX_BYTES = 1500 * 1024; // 1.5 MB por imagen
+const IMAGENES_PERMITIDAS = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
 const NOMBRE_MAX = 150;
 const DESCRIPCION_MAX = 2000;
@@ -27,6 +29,20 @@ function isValidDateString(val) {
   return !Number.isNaN(d.getTime());
 }
 
+function validarImagenDataUrl(dataUrl) {
+  const match = /^data:([^;,]+);base64,(.+)$/i.exec(dataUrl);
+  if (!match) return "Imagen inválida: formato no reconocido";
+  const mime = match[1].toLowerCase();
+  if (!IMAGENES_PERMITIDAS.includes(mime)) {
+    return `Imagen inválida: solo se permiten ${IMAGENES_PERMITIDAS.join(", ")}`;
+  }
+  const contenido = match[2];
+  if (!contenido) return "Imagen inválida: datos de imagen vacíos";
+  const approxBytes = Math.floor((contenido.length * 3) / 4) - (contenido.endsWith("==") ? 2 : contenido.endsWith("=") ? 1 : 0);
+  if (approxBytes > IMAGEN_MAX_BYTES) return "Imagen demasiado grande: máximo 1.5 MB";
+  return null;
+}
+
 function serverError(res, error, context) {
   console.error(`Error ${context}:`, error);
   return res.status(500).json({ success: false, message: "Error interno del servidor" });
@@ -43,10 +59,20 @@ function isOwnerView(req, business) {
 async function validarPromo(body, business, esCreacion = false) {
   let {
     plan_id, service_id, nombre, descripcion, tipo_descuento, valor_descuento,
-    precio_anterior, precio_promocional, imagen_url, fecha_inicio, fecha_fin,
+    precio_anterior, precio_promocional, imagen_url, fecha_inicio, fecha_fin, estado,
   } = body || {};
 
   const data = {};
+
+  if (estado !== undefined) {
+    const e = sanitizeString(estado).toLowerCase();
+    if (!ESTADOS.includes(e)) {
+      return { error: { status: 400, message: "Estado inválido" } };
+    }
+    data.estado = e;
+  } else if (esCreacion) {
+    data.estado = "activo";
+  }
 
   if (nombre !== undefined) {
     nombre = sanitizeString(nombre);
@@ -161,7 +187,10 @@ async function validarPromo(body, business, esCreacion = false) {
     const i = sanitizeString(imagen_url);
     data.imagen_url = i === "" ? null : i;
     if (data.imagen_url && !URL_RE.test(data.imagen_url)) {
-      return { error: { status: 400, message: "URL de la imagen inválida" } };
+      const errorImg = validarImagenDataUrl(data.imagen_url);
+      if (errorImg) {
+        return { error: { status: 400, message: errorImg } };
+      }
     }
   } else if (esCreacion) {
     data.imagen_url = null;

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Search, Ticket, MapPin, Clock, ArrowRight, ImageOff, Star, Users, Map } from 'lucide-react'
 import { planesAPI, lugaresAPI } from '../../services/api'
@@ -29,6 +29,7 @@ function SkeletonCard() {
 
 export function PlanCard({ plan, index }) {
   const [imgError, setImgError] = useState(false)
+  const navigate = useNavigate()
   const portada = plan.plan_imagenes?.find((i) => i.is_primary) || plan.plan_imagenes?.[0]
   const { efectivo, anterior, descuento } = planPrecios(plan)
 
@@ -83,10 +84,19 @@ export function PlanCard({ plan, index }) {
           <div className="flex items-center gap-3 mt-2 text-sm text-dark-500">
             <span className="inline-flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {formatDuracion(plan.duracion_dias, plan.duracion_noches)}</span>
             {plan.negocio_nombre && (
-              <Link to={`/negocios/${plan.business_id}`} className="inline-flex items-center gap-1 hover:text-primary-600" onClick={(e) => e.stopPropagation()}>
+              <span
+                role="link"
+                title={`Ir a ${plan.negocio_nombre}`}
+                className="inline-flex items-center gap-1 hover:text-primary-600 cursor-pointer"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  navigate(`/negocios/${plan.business_id}`)
+                }}
+              >
                 <Users className="w-3.5 h-3.5" />
                 <span className="truncate">{plan.negocio_nombre}</span>
-              </Link>
+              </span>
             )}
           </div>
 

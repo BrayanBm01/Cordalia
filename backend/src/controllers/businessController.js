@@ -7,6 +7,22 @@ const ESTADOS = ["draft", "pending", "approved", "rejected", "suspended", "inact
 const URL_RE = /^https?:\/\/.+/i;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
 const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+const IMAGEN_MAX_BYTES = 1500 * 1024; // 1.5 MB por imagen
+const IMAGENES_PERMITIDAS = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+
+function validarImagenDataUrl(dataUrl) {
+  const match = /^data:([^;,]+);base64,(.+)$/i.exec(dataUrl);
+  if (!match) return "Imagen inválida: formato no reconocido";
+  const mime = match[1].toLowerCase();
+  if (!IMAGENES_PERMITIDAS.includes(mime)) {
+    return `Imagen inválida: solo se permiten ${IMAGENES_PERMITIDAS.join(", ")}`;
+  }
+  const contenido = match[2];
+  if (!contenido) return "Imagen inválida: datos de imagen vacíos";
+  const approxBytes = Math.floor((contenido.length * 3) / 4) - (contenido.endsWith("==") ? 2 : contenido.endsWith("=") ? 1 : 0);
+  if (approxBytes > IMAGEN_MAX_BYTES) return "Imagen demasiado grande: máximo 1.5 MB";
+  return null;
+}
 
 function parseNumber(val) {
   if (val === undefined || val === null || val === "") return null;
@@ -91,8 +107,14 @@ function validarBusiness(body, esCreacion = false) {
   if (portada_url !== undefined) {
     const p = sanitizeString(portada_url);
     data.portada_url = p === "" ? null : p;
-    if (data.portada_url && !URL_RE.test(data.portada_url)) {
+    const esUrl = URL_RE.test(p);
+    const esDataUrl = /^data:image\//i.test(p);
+    if (data.portada_url && !esUrl && !esDataUrl) {
       return { error: { status: 400, message: "URL de la portada inválida" } };
+    }
+    if (esDataUrl) {
+      const errorImg = validarImagenDataUrl(p);
+      if (errorImg) return { error: { status: 400, message: errorImg } };
     }
   }
 
@@ -161,7 +183,9 @@ exports.getCategories = async (_req, res) => {
 // ---------- Negocios ----------
 exports.list = async (req, res) => {
   try {
-    const negocios = await BusinessModel.listByRol(req.usuario.rol, req.usuario.id);
+    const rol = req.usuario?.rol || "TOURIST";
+    const userId = req.usuario?.id || null;
+    const negocios = await BusinessModel.listByRol(rol, userId);
     return res.json({ success: true, data: negocios });
   } catch (error) {
     return serverError(res, error, "list negocios");
@@ -343,12 +367,19 @@ exports.listImages = async (req, res) => {
 exports.addImage = async (req, res) => {
   try {
     const { url, alt_text, is_primary, orden } = req.body || {};
-    if (!isNonEmptyString(url, 1, 2000) || !URL_RE.test(url)) {
+    const img = sanitizeString(url);
+    const esUrl = URL_RE.test(img);
+    const esDataUrl = /^data:image\//i.test(img);
+    if (!isNonEmptyString(img, 1, 3000000) || (!esUrl && !esDataUrl)) {
       return res.status(400).json({ success: false, message: "URL de la imagen inválida" });
+    }
+    if (esDataUrl) {
+      const errorImg = validarImagenDataUrl(img);
+      if (errorImg) return res.status(400).json({ success: false, message: errorImg });
     }
     const imagen = await BusinessModel.addImage(
       req.params.id,
-      url.trim(),
+      img.trim(),
       sanitizeString(alt_text).slice(0, 250) || null,
       Boolean(is_primary),
       Number.isInteger(Number(orden)) ? Number(orden) : 0
@@ -649,5 +680,280 @@ exports.deleteSocialLink = async (req, res) => {
     return res.json({ success: true, message: "Red social eliminada" });
   } catch (error) {
     return serverError(res, error, "deleteSocialLink");
+  }
+};
+
+// ---------- Vehículos (flota) ----------
+exports.listVehiculos = async (req, res) => {
+  try {
+    const vehiculos = await BusinessModel.listVehiculos(req.params.id);
+    return res.json({ success: true, data: vehiculos });
+  } catch (error) {
+    return serverError(res, error, "listVehiculos");
+  }
+};
+
+const TIPOS_VEHICULO = ["camioneta", "minivan", "bus", "buseta", "colectivo", "auto", "otro"];
+const ESTADOS_VEHICULO = ["disponible", "mantenimiento", "inactivo"];
+
+function normalizarTipoVehiculo(tipo) {
+  const t = String(tipo || "").trim().toLowerCase();
+  if (!t) return null;
+  if (TIPOS_VEHICULO.includes(t)) return t;
+  const mapa = {
+    camioneta: "camioneta", minivan: "minivan", van: "minivan",
+    bus: "bus", buseta: "buseta", urbano: "bus", colectivo: "colectivo",
+    carro: "auto", auto: "auto", otro: "otro",
+  };
+  return mapa[t] || null;
+}
+
+exports.addVehiculo = async (req, res) => {
+  try {
+    const { nombre, tipo, marca, modelo, anio, placa, capacidad, estado, descripcion, conductor_id } = req.body || {};
+    if (!isNonEmptyString(nombre, 2, 150)) {
+      return res.status(400).json({ success: false, message: "El nombre del vehículo debe tener entre 2 y 150 caracteres" });
+    }
+    const cap = Number(capacidad);
+    if (!Number.isInteger(cap) || cap < 1 || cap > 200) {
+      return res.status(400).json({ success: false, message: "La capacidad debe ser un entero entre 1 y 200" });
+    }
+    const placaNormalizada = sanitizeString(placa).toUpperCase().slice(0, 20) || null;
+    if (placaNormalizada && !/^[A-Z0-9]{2,}-?[A-Z0-9]{1,6}$/.test(placaNormalizada.replace(/\s+/g, ""))) {
+      return res.status(400).json({ success: false, message: "Placa inválida: usa letras y números (ej. ABC-123)" });
+    }
+    const tipoNorm = normalizarTipoVehiculo(tipo);
+    if (tipo !== undefined && tipo !== null && tipo !== "" && !tipoNorm) {
+      return res.status(400).json({ success: false, message: "Tipo de vehículo inválido (Camioneta, Minivan, Bus, ...)" });
+    }
+    const estadoNorm = estado === undefined || estado === null || estado === "" ? "disponible" : String(estado).toLowerCase();
+    if (!ESTADOS_VEHICULO.includes(estadoNorm)) {
+      return res.status(400).json({ success: false, message: "Estado inválido (disponible, mantenimiento, inactivo)" });
+    }
+    let anioNorm = null;
+    if (anio !== undefined && anio !== null && anio !== "") {
+      anioNorm = Number(anio);
+      if (!Number.isInteger(anioNorm) || anioNorm < 1960 || anioNorm > 2100) {
+        return res.status(400).json({ success: false, message: "El año debe ser un entero entre 1960 y 2100" });
+      }
+    }
+    let conductorNorm = null;
+    if (conductor_id !== undefined && conductor_id !== null && conductor_id !== "") {
+      conductorNorm = Number(conductor_id);
+      if (!Number.isInteger(conductorNorm) || conductorNorm <= 0) {
+        return res.status(400).json({ success: false, message: "Conductor inválido" });
+      }
+      const existe = await BusinessModel.findConductorById(req.params.id, conductorNorm);
+      if (!existe) return res.status(400).json({ success: false, message: "El conductor asignado no pertenece a este negocio" });
+    }
+    const vehiculo = await BusinessModel.addVehiculo(req.params.id, {
+      nombre: sanitizeString(nombre),
+      tipo: tipoNorm,
+      marca: sanitizeString(marca).slice(0, 100) || null,
+      modelo: sanitizeString(modelo).slice(0, 100) || null,
+      anio: anioNorm,
+      placa: placaNormalizada,
+      capacidad: cap,
+      estado: estadoNorm,
+      descripcion: sanitizeString(descripcion).slice(0, 1000) || null,
+      conductor_id: conductorNorm,
+    });
+    return res.status(201).json({ success: true, message: "Vehículo agregado", data: vehiculo });
+  } catch (error) {
+    if (error && error.code === "23505") {
+      return res.status(400).json({ success: false, message: "Ya existe un vehículo con esa placa en este negocio" });
+    }
+    return serverError(res, error, "addVehiculo");
+  }
+};
+
+exports.updateVehiculo = async (req, res) => {
+  try {
+    const { nombre, tipo, marca, modelo, anio, placa, capacidad, estado, descripcion, conductor_id } = req.body || {};
+    const fields = {};
+    if (nombre !== undefined) {
+      if (!isNonEmptyString(nombre, 2, 150)) {
+        return res.status(400).json({ success: false, message: "El nombre del vehículo debe tener entre 2 y 150 caracteres" });
+      }
+      fields.nombre = sanitizeString(nombre);
+    }
+    if (tipo !== undefined) {
+      const t = normalizarTipoVehiculo(tipo);
+      if (!t && String(tipo || "") !== "") {
+        return res.status(400).json({ success: false, message: "Tipo de vehículo inválido (Camioneta, Minivan, Bus, ...)" });
+      }
+      fields.tipo = String(tipo || "") === "" ? null : t;
+    }
+    if (marca !== undefined) fields.marca = sanitizeString(marca).slice(0, 100) || null;
+    if (modelo !== undefined) fields.modelo = sanitizeString(modelo).slice(0, 100) || null;
+    if (placa !== undefined) {
+      const p = sanitizeString(placa).toUpperCase().slice(0, 20) || null;
+      if (p && !/^[A-Z0-9]{2,}-?[A-Z0-9]{1,6}$/.test(p.replace(/\s+/g, ""))) {
+        return res.status(400).json({ success: false, message: "Placa inválida: usa letras y números (ej. ABC-123)" });
+      }
+      fields.placa = p;
+    }
+    if (capacidad !== undefined) {
+      const cap = Number(capacidad);
+      if (!Number.isInteger(cap) || cap < 1 || cap > 200) {
+        return res.status(400).json({ success: false, message: "La capacidad debe ser un entero entre 1 y 200" });
+      }
+      fields.capacidad = cap;
+    }
+    if (estado !== undefined) {
+      const e = String(estado).toLowerCase();
+      if (!ESTADOS_VEHICULO.includes(e)) {
+        return res.status(400).json({ success: false, message: "Estado inválido (disponible, mantenimiento, inactivo)" });
+      }
+      fields.estado = e;
+    }
+    if (anio !== undefined && anio !== null && anio !== "") {
+      const a = Number(anio);
+      if (!Number.isInteger(a) || a < 1960 || a > 2100) {
+        return res.status(400).json({ success: false, message: "El año debe ser un entero entre 1960 y 2100" });
+      }
+      fields.anio = a;
+    } else if (anio === null || anio === "") {
+      fields.anio = null;
+    }
+    if (conductor_id !== undefined) {
+      if (conductor_id === null || conductor_id === "") {
+        fields.conductor_id = null;
+      } else {
+        const c = Number(conductor_id);
+        if (!Number.isInteger(c) || c <= 0) {
+          return res.status(400).json({ success: false, message: "Conductor inválido" });
+        }
+        const existe = await BusinessModel.findConductorById(req.params.id, c);
+        if (!existe) return res.status(400).json({ success: false, message: "El conductor asignado no pertenece a este negocio" });
+        fields.conductor_id = c;
+      }
+    }
+    if (descripcion !== undefined) fields.descripcion = sanitizeString(descripcion).slice(0, 1000) || null;
+    if (Object.keys(fields).length === 0) {
+      return res.status(400).json({ success: false, message: "No hay datos para actualizar" });
+    }
+    const vehiculo = await BusinessModel.updateVehiculo(req.params.vehiculoId, req.params.id, fields);
+    if (!vehiculo) return res.status(404).json({ success: false, message: "Vehículo no encontrado" });
+    return res.json({ success: true, message: "Vehículo actualizado", data: vehiculo });
+  } catch (error) {
+    if (error && error.code === "23505") {
+      return res.status(400).json({ success: false, message: "Ya existe un vehículo con esa placa en este negocio" });
+    }
+    return serverError(res, error, "updateVehiculo");
+  }
+};
+
+exports.deleteVehiculo = async (req, res) => {
+  try {
+    const ok = await BusinessModel.deleteVehiculo(req.params.vehiculoId, req.params.id);
+    if (!ok) return res.status(404).json({ success: false, message: "Vehículo no encontrado" });
+    return res.json({ success: true, message: "Vehículo eliminado" });
+  } catch (error) {
+    return serverError(res, error, "deleteVehiculo");
+  }
+};
+
+// ---------- Conductores ----------
+exports.listConductores = async (req, res) => {
+  try {
+    const conductores = await BusinessModel.listConductores(req.params.id);
+    return res.json({ success: true, data: conductores });
+  } catch (error) {
+    return serverError(res, error, "listConductores");
+  }
+};
+
+exports.addConductor = async (req, res) => {
+  try {
+    const { nombre, email, telefono, licencia, licencia_categoria, licencia_vencimiento, experiencia, disponible } = req.body || {};
+    if (!isNonEmptyString(nombre, 2, 150)) {
+      return res.status(400).json({ success: false, message: "El nombre del conductor debe tener entre 2 y 150 caracteres" });
+    }
+    let emailNorm = null;
+    if (email !== undefined && email !== null && email !== "") {
+      emailNorm = sanitizeString(email).toLowerCase().slice(0, 150) || null;
+      if (emailNorm && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNorm)) {
+        return res.status(400).json({ success: false, message: "Correo electrónico inválido" });
+      }
+    }
+    let vencimiento = null;
+    if (licencia_vencimiento !== undefined && licencia_vencimiento !== null && licencia_vencimiento !== "") {
+      vencimiento = String(licencia_vencimiento);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(vencimiento) || Number.isNaN(new Date(vencimiento + "T00:00:00").getTime())) {
+        return res.status(400).json({ success: false, message: "La fecha de vencimiento de licencia debe tener formato YYYY-MM-DD" });
+      }
+    }
+    const conductor = await BusinessModel.addConductor(req.params.id, {
+      nombre: sanitizeString(nombre),
+      email: emailNorm,
+      telefono: sanitizeString(telefono).slice(0, 30) || null,
+      licencia: sanitizeString(licencia).slice(0, 50) || null,
+      licencia_categoria: sanitizeString(licencia_categoria).slice(0, 20) || null,
+      licencia_vencimiento: vencimiento,
+      experiencia: sanitizeString(experiencia).slice(0, 1000) || null,
+      disponible: disponible !== false,
+    });
+    return res.status(201).json({ success: true, message: "Conductor agregado", data: conductor });
+  } catch (error) {
+    return serverError(res, error, "addConductor");
+  }
+};
+
+exports.updateConductor = async (req, res) => {
+  try {
+    const { nombre, email, telefono, licencia, licencia_categoria, licencia_vencimiento, experiencia, disponible } = req.body || {};
+    const fields = {};
+    if (nombre !== undefined) {
+      if (!isNonEmptyString(nombre, 2, 150)) {
+        return res.status(400).json({ success: false, message: "El nombre del conductor debe tener entre 2 y 150 caracteres" });
+      }
+      fields.nombre = sanitizeString(nombre);
+    }
+    if (email !== undefined) {
+      if (email === null || email === "") {
+        fields.email = null;
+      } else {
+        const e = sanitizeString(email).toLowerCase().slice(0, 150);
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+          return res.status(400).json({ success: false, message: "Correo electrónico inválido" });
+        }
+        fields.email = e;
+      }
+    }
+    if (telefono !== undefined) fields.telefono = sanitizeString(telefono).slice(0, 30) || null;
+    if (licencia !== undefined) fields.licencia = sanitizeString(licencia).slice(0, 50) || null;
+    if (licencia_categoria !== undefined) fields.licencia_categoria = sanitizeString(licencia_categoria).slice(0, 20) || null;
+    if (licencia_vencimiento !== undefined) {
+      if (licencia_vencimiento === null || licencia_vencimiento === "") {
+        fields.licencia_vencimiento = null;
+      } else {
+        const v = String(licencia_vencimiento);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(v) || Number.isNaN(new Date(v + "T00:00:00").getTime())) {
+          return res.status(400).json({ success: false, message: "La fecha de vencimiento de licencia debe tener formato YYYY-MM-DD" });
+        }
+        fields.licencia_vencimiento = v;
+      }
+    }
+    if (experiencia !== undefined) fields.experiencia = sanitizeString(experiencia).slice(0, 1000) || null;
+    if (disponible !== undefined) fields.disponible = disponible !== false;
+    if (Object.keys(fields).length === 0) {
+      return res.status(400).json({ success: false, message: "No hay datos para actualizar" });
+    }
+    const conductor = await BusinessModel.updateConductor(req.params.conductorId, req.params.id, fields);
+    if (!conductor) return res.status(404).json({ success: false, message: "Conductor no encontrado" });
+    return res.json({ success: true, message: "Conductor actualizado", data: conductor });
+  } catch (error) {
+    return serverError(res, error, "updateConductor");
+  }
+};
+
+exports.deleteConductor = async (req, res) => {
+  try {
+    const ok = await BusinessModel.deleteConductor(req.params.conductorId, req.params.id);
+    if (!ok) return res.status(404).json({ success: false, message: "Conductor no encontrado" });
+    return res.json({ success: true, message: "Conductor eliminado" });
+  } catch (error) {
+    return serverError(res, error, "deleteConductor");
   }
 };

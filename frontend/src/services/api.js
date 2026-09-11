@@ -156,6 +156,12 @@ function buildQuery(params = {}) {
 export const planesAPI = {
   list: (params) => api.get(`/planes${buildQuery(params)}`),
   getById: (id) => api.get(`/planes/${id}`),
+  precio: (id, personas) => api.get(`/planes/${id}/precio?personas=${personas}`),
+  salidas: (id) => api.get(`/planes/${id}/salidas`),
+  transporteSugerir: (id, personas) => api.get(`/planes/${id}/transporte/sugerir?personas=${personas}`),
+  transporteSalida: (planId, salidaId) => api.get(`/planes/${planId}/salidas/${salidaId}/transporte`),
+  inscribir: (businessId, planId, salidaId, data) =>
+    api.post(`/businesses/${businessId}/planes/${planId}/salidas/${salidaId}/inscripciones`, data),
 }
 
 export const businessPlanesAPI = {
@@ -169,6 +175,54 @@ export const businessPlanesAPI = {
     add: (businessId, planId, data) => api.post(`/businesses/${businessId}/planes/${planId}/imagenes`, data),
     setPrimary: (businessId, planId, imageId) => api.put(`/businesses/${businessId}/planes/${planId}/imagenes/${imageId}/principal`),
     remove: (businessId, planId, imageId) => api.delete(`/businesses/${businessId}/planes/${planId}/imagenes/${imageId}`),
+  },
+  precio: (businessId, planId, personas) =>
+    api.get(`/businesses/${businessId}/planes/${planId}/precio?personas=${personas}`),
+  salidas: {
+    list: (businessId, planId) => api.get(`/businesses/${businessId}/planes/${planId}/salidas`),
+    create: (businessId, planId, data) => api.post(`/businesses/${businessId}/planes/${planId}/salidas`, data),
+    update: (businessId, planId, salidaId, data) => api.put(`/businesses/${businessId}/planes/${planId}/salidas/${salidaId}`, data),
+    remove: (businessId, planId, salidaId) => api.delete(`/businesses/${businessId}/planes/${planId}/salidas/${salidaId}`),
+    inscripciones: {
+      list: (businessId, planId, salidaId) => api.get(`/businesses/${businessId}/planes/${planId}/salidas/${salidaId}/inscripciones`),
+      create: (businessId, planId, salidaId, data) => api.post(`/businesses/${businessId}/planes/${planId}/salidas/${salidaId}/inscripciones`, data),
+      cancelar: (businessId, planId, salidaId, inscripcionId) =>
+        api.put(`/businesses/${businessId}/planes/${planId}/salidas/${salidaId}/inscripciones/${inscripcionId}/cancelar`),
+      resumen: (businessId, planId, salidaId) =>
+        api.get(`/businesses/${businessId}/planes/${planId}/salidas/${salidaId}/inscripciones/resumen`),
+    },
+    transporte: {
+      sugerir: (businessId, planId, salidaId) =>
+        api.get(`/businesses/${businessId}/planes/${planId}/salidas/${salidaId}/transporte/sugerir`),
+      asignados: (businessId, planId, salidaId) =>
+        api.get(`/businesses/${businessId}/planes/${planId}/salidas/${salidaId}/transporte`),
+      asignar: (businessId, planId, salidaId, data) =>
+        api.post(`/businesses/${businessId}/planes/${planId}/salidas/${salidaId}/transporte`, data),
+      quitar: (businessId, planId, salidaId, transporteId) =>
+        api.delete(`/businesses/${businessId}/planes/${planId}/salidas/${salidaId}/transporte/${transporteId}`),
+    },
+  },
+  transporte: {
+    list: (businessId, planId) => api.get(`/businesses/${businessId}/planes/${planId}/transporte`),
+    add: (businessId, planId, data) => api.post(`/businesses/${businessId}/planes/${planId}/transporte`, data),
+    remove: (businessId, planId, transporteId) => api.delete(`/businesses/${businessId}/planes/${planId}/transporte/${transporteId}`),
+    sugerir: (businessId, planId, personas) =>
+      api.get(`/businesses/${businessId}/planes/${planId}/transporte/sugerir?personas=${personas}`),
+  },
+}
+
+export const businessFlotaAPI = {
+  vehiculos: {
+    list: (businessId) => api.get(`/businesses/${businessId}/vehiculos`),
+    add: (businessId, data) => api.post(`/businesses/${businessId}/vehiculos`, data),
+    update: (businessId, vehiculoId, data) => api.put(`/businesses/${businessId}/vehiculos/${vehiculoId}`, data),
+    remove: (businessId, vehiculoId) => api.delete(`/businesses/${businessId}/vehiculos/${vehiculoId}`),
+  },
+  conductores: {
+    list: (businessId) => api.get(`/businesses/${businessId}/conductores`),
+    add: (businessId, data) => api.post(`/businesses/${businessId}/conductores`, data),
+    update: (businessId, conductorId, data) => api.put(`/businesses/${businessId}/conductores/${conductorId}`, data),
+    remove: (businessId, conductorId) => api.delete(`/businesses/${businessId}/conductores/${conductorId}`),
   },
 }
 

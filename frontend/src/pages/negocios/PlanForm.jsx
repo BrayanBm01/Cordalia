@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Plus, Trash2, Loader2, Clock, Save, X } from 'lucide-react'
 import { businessPlanesAPI, lugaresAPI } from '../../services/api'
 import { toast } from 'sonner'
+import MoneyInput from '../../components/MoneyInput'
 import { findIncluyeOption, TIPO_PLAN_LABEL, TIPO_PRECIO_LABEL } from './planUtils'
 
 const inputClass =
@@ -43,6 +44,16 @@ export default function PlanForm({ businessId, plan, onSaved, onCancel }) {
   const [precio, setPrecio] = useState(plan?.precio != null ? String(plan.precio) : '')
   const [precioAnterior, setPrecioAnterior] = useState(plan?.precio_anterior != null ? String(plan.precio_anterior) : '')
   const [tipoPrecio, setTipoPrecio] = useState(plan?.tipo_precio || 'por_persona')
+  const [capacidadReferencial, setCapacidadReferencial] = useState(plan?.capacidad_referencial != null ? String(plan.capacidad_referencial) : '')
+  const [rangos, setRangos] = useState(() =>
+    Array.isArray(plan?.descuentos_rango) && plan.descuentos_rango.length > 0
+      ? plan.descuentos_rango.map((r) => ({
+          min: r.min != null ? String(r.min) : '',
+          max: r.max != null ? String(r.max) : '',
+          descuento: r.descuento != null ? String(r.descuento) : '0',
+        }))
+      : [{ min: '', max: '', descuento: '0' }]
+  )
   const [incluidosSel, setIncluidosSel] = useState(
     Array.isArray(plan?.incluye)
       ? plan.incluye.filter((i) => findIncluyeOption(i)).map((i) => findIncluyeOption(i).key)
@@ -64,6 +75,10 @@ export default function PlanForm({ businessId, plan, onSaved, onCancel }) {
       .then((r) => setLugares(Array.isArray(r.data) ? r.data : []))
       .catch(() => {})
       .finally(() => setLoadingLugares(false))
+  }
+
+  function setRango(i, campo, valor) {
+    setRangos((prev) => prev.map((r, j) => (i === j ? { ...r, [campo]: valor } : r)))
   }
 
   function toggleIncluido(key) {
@@ -135,6 +150,14 @@ export default function PlanForm({ businessId, plan, onSaved, onCancel }) {
       precio_anterior: precioAnterior !== '' ? Number(precioAnterior) : null,
       tipo_precio: tipoPrecio,
       moneda: 'COP',
+      capacidad_referencial: capacidadReferencial !== '' ? Number(capacidadReferencial) : null,
+      descuentos_rango: rangos
+        .filter((r) => r.min !== '' && r.descuento !== '')
+        .map((r) => ({
+          min: Number(r.min),
+          max: r.max !== '' && Number(r.max) > 0 ? Number(r.max) : null,
+          descuento: Number(r.descuento),
+        })),
       incluye,
       itinerario: itinerarioClean,
     }
@@ -223,11 +246,11 @@ export default function PlanForm({ businessId, plan, onSaved, onCancel }) {
             </div>
             <div>
               <label className="block text-xs text-dark-500 mb-1">Precio (COP) *</label>
-              <input type="number" min={0} step={1000} value={precio} onChange={(e) => setPrecio(e.target.value)} className={inputClass} required />
+              <MoneyInput value={precio} onChange={(v) => setPrecio(v ?? '')} placeholder="Ej: 132000" className={inputClass} required />
             </div>
             <div>
               <label className="block text-xs text-dark-500 mb-1">Precio anterior</label>
-              <input type="number" min={0} step={1000} value={precioAnterior} onChange={(e) => setPrecioAnterior(e.target.value)} className={inputClass} />
+              <MoneyInput value={precioAnterior} onChange={(v) => setPrecioAnterior(v ?? '')} placeholder="Ej: 150000" className={inputClass} />
             </div>
           </div>
           <select value={tipoPrecio} onChange={(e) => setTipoPrecio(e.target.value)} className={`${inputClass} bg-white max-w-sm`} required>
@@ -238,6 +261,84 @@ export default function PlanForm({ businessId, plan, onSaved, onCancel }) {
           <p className="text-xs text-dark-500">
             El precio es informativo: los clientes te contactarán por WhatsApp para cotizar. No se realizan pagos por la plataforma.
           </p>
+        </div>
+
+        <div className="space-y-3">
+          <h4 className="text-sm font-semibold text-dark-700">Precios para grupos y paquetes grupales</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+            <div>
+              <label className="block text-xs text-dark-500 mb-1">Capacidad referencial (personas)</label>
+              <input
+                type="number"
+                min={1}
+                max={200}
+                value={capacidadReferencial}
+                onChange={(e) => setCapacidadReferencial(e.target.value)}
+                placeholder="Ej: 20"
+                className={inputClass}
+              />
+            </div>
+            <p className="text-xs text-dark-500 sm:col-span-2">
+              Cantidad máxima de personas que admitiría el paquete. Se usa para sugerir transporte grupal.
+            </p>
+          </div>
+          <div>
+            <label className="block text-xs text-dark-500 mb-1">Descuento por rango de personas (sobre el precio informativo)</label>
+            <div className="space-y-2">
+              {rangos.map((r, i) => (
+                <div key={i} className="flex flex-wrap items-center gap-2">
+                  <label className="text-xs text-dark-500">Desde</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={r.min}
+                    onChange={(e) => setRango(i, 'min', e.target.value)}
+                    placeholder="1"
+                    className={`${inputClass} max-w-[100px]`}
+                  />
+                  <label className="text-xs text-dark-500">hasta</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={r.max}
+                    onChange={(e) => setRango(i, 'max', e.target.value)}
+                    placeholder="Ilimitado"
+                    className={`${inputClass} max-w-[100px]`}
+                  />
+                  <label className="text-xs text-dark-500">descuento %</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={r.descuento}
+                    onChange={(e) => setRango(i, 'descuento', e.target.value)}
+                    placeholder="0"
+                    className={`${inputClass} max-w-[100px]`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setRangos((prev) => prev.filter((_, j) => j !== i))}
+                    disabled={rangos.length <= 1}
+                    className="p-2 rounded-lg text-dark-400 hover:text-red-600 transition-colors cursor-pointer disabled:opacity-30"
+                    title="Quitar rango"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => setRangos((prev) => [...prev, { min: '', max: '', descuento: '0' }])}
+                disabled={rangos.length >= 20}
+                className="inline-flex items-center gap-1.5 text-sm text-primary-600 hover:text-primary-700 font-medium cursor-pointer disabled:opacity-40"
+              >
+                <Plus className="w-4 h-4" /> Agregar rango
+              </button>
+            </div>
+            <p className="text-xs text-dark-400 mt-1">
+              Ejemplo: 1–4 → 0%, 5–9 → 10%, 10+ → 20%. El turista verá el precio total según el número de personas.
+            </p>
+          </div>
         </div>
 
         <div className="space-y-3">

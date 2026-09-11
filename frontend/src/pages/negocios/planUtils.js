@@ -75,6 +75,17 @@ export function formatFechas(fechaInicio, fechaFin) {
   return a || b
 }
 
+// Normaliza un día de itinerario que puede venir en el formato del editor
+// ({ dia, actividades:[{hora,descripcion}] }) o del seed/datos históricos
+// ({ dia, titulo, descripcion }).
+export function diaActividades(dia) {
+  if (Array.isArray(dia?.actividades)) return dia.actividades
+  const items = []
+  if (dia?.titulo) items.push({ hora: null, descripcion: dia.titulo })
+  if (dia?.descripcion) items.push({ hora: null, descripcion: dia.descripcion })
+  return items
+}
+
 export function presente(fechaInicio, fechaFin) {
   const hoy = new Date()
   hoy.setHours(0, 0, 0, 0)
@@ -90,27 +101,27 @@ export function planPrecios(plan) {
   const base = Number(plan?.precio) || 0
   let efectivo = base
   let anterior = plan?.precio_anterior != null ? Number(plan.precio_anterior) : null
+  let descuento = 0
 
   const promo = Array.isArray(plan?.promociones) ? plan.promociones[0] : null
   if (promo) {
     const valor = Number(promo.valor_descuento) || 0
+    if (anterior == null) anterior = base
     if (promo.tipo_descuento === 'porcentaje') {
-      const descuento = Math.min(valor, 100)
-      if (anterior == null) anterior = base
-      efectivo = Math.round(base * (1 - descuento / 100))
+      const pct = Math.max(0, Math.min(Math.round(valor), 100))
+      efectivo = Math.round(base * (1 - pct / 100))
+      descuento = pct
+    } else if (promo.precio_promocional != null) {
+      efectivo = Math.max(0, Math.round(Number(promo.precio_promocional) || 0))
     } else if (valor > 0) {
-      if (anterior == null) anterior = base
       efectivo = Math.max(0, Math.round(base - valor))
-    }
-    if (promo.precio_promocional != null) {
-      anterior = base
-      efectivo = Number(promo.precio_promocional)
     }
   }
 
   if (anterior != null && anterior <= efectivo) anterior = null
-  const descuento =
-    anterior != null && anterior > efectivo ? Math.round((1 - efectivo / anterior) * 100) : 0
+  if (descuento === 0 && promo && anterior != null && anterior > efectivo) {
+    descuento = Math.round((1 - efectivo / anterior) * 100)
+  }
   return { efectivo, anterior, descuento }
 }
 

@@ -3,12 +3,14 @@ const pool = require("../config/db");
 const BASE_COLUMNS = `p.id, p.business_id, p.nombre, p.slug, p.descripcion, p.destination_id,
        p.destino, p.duracion_dias, p.duracion_noches, p.precio, p.tipo_precio,
        p.precio_anterior, p.tipo_plan, p.incluye, p.itinerario, p.moneda,
+       p.descuentos_rango, p.capacidad_referencial,
        p.estado, p.created_at, p.updated_at`;
 
 // Misma lista sin el prefijo de alias, para cláusulas RETURNING (no hay alias p).
 const RETURN_COLUMNS = `id, business_id, nombre, slug, descripcion, destination_id,
        destino, duracion_dias, duracion_noches, precio, tipo_precio,
        precio_anterior, tipo_plan, incluye, itinerario, moneda,
+       descuentos_rango, capacidad_referencial,
        estado, created_at, updated_at`;
 
 const BelongsToQuery = `
@@ -203,16 +205,19 @@ const PlanModel = {
 
   async create(data) {
     const { business_id, nombre, slug, descripcion, destination_id, destino, duracion_dias,
-            duracion_noches, precio, tipo_precio, precio_anterior, tipo_plan, incluye, itinerario, moneda } = data;
+            duracion_noches, precio, tipo_precio, precio_anterior, tipo_plan, incluye,
+            itinerario, moneda, descuentos_rango, capacidad_referencial } = data;
     const { rows } = await pool.query(
       `INSERT INTO tour_plans
         (business_id, nombre, slug, descripcion, destination_id, destino, duracion_dias,
-         duracion_noches, precio, tipo_precio, precio_anterior, tipo_plan, incluye, itinerario, moneda)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+         duracion_noches, precio, tipo_precio, precio_anterior, tipo_plan, incluye,
+         itinerario, moneda, descuentos_rango, capacidad_referencial)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
        RETURNING ${RETURN_COLUMNS}`,
       [business_id, nombre, slug, descripcion, destination_id, destino, duracion_dias,
        duracion_noches, precio, tipo_precio, precio_anterior, tipo_plan, JSON.stringify(incluye),
-       JSON.stringify(itinerario), moneda]
+       JSON.stringify(itinerario), moneda, JSON.stringify(descuentos_rango || []),
+       capacidad_referencial ?? null]
     );
     return withImages(rows[0]);
   },
@@ -222,7 +227,7 @@ const PlanModel = {
     if (keys.length === 0) return null;
     const setClauses = keys.map((k, i) => `${k}=$${i + 1}`);
     const val = keys.map((k) => {
-      if (k === "incluye" || k === "itinerario") return JSON.stringify(fields[k]);
+      if (k === "incluye" || k === "itinerario" || k === "descuentos_rango") return JSON.stringify(fields[k]);
       return fields[k];
     });
     val.push(id);
@@ -248,6 +253,568 @@ const PlanModel = {
     const { rowCount } = await pool.query(
       "DELETE FROM tour_plans WHERE id = $1 AND business_id = $2",
       [id, businessId]
+    );
+    return rowCount > 0;
+  },
+
+  // ---------- Precio por personas (un solo descuento efectivo) ----------
+  /**
+   * Calcula el precio para N personas aplicando UN solo descuento efectivo
+   * sobre el SUBTOTAL ORIGINAL (nunca sobre un precio ya descontado):
+   *
+   *   1) Si existe promoción ACTIVA (estado='activo' y dentro de
+   *      fecha_inicio/fecha_fin) se aplica SOLO la promoción.
+   *   2) Si no hay promoción, se aplica el descuento por rango de personas.
+   *   3) Nunca se combinan ambos descuentos.
+   *
+   *   subtotal_original = precio_original_persona * personas
+   *   descuento         = subtotal_original * %/100
+   *   total_original    = subtotal_original
+   *   total             = subtotal_original - descuento
+   *   precio_persona    = redondeo(total / personas)
+   *
+   * Devuelve la información diferenciada:
+   *   - tipo_descuento       : 'promocion' | 'rango' | 'ninguno'
+   *   - descuento_porcentaje : % efectivo aplicado (igual a descuento_total)
+   *   - precio_original_persona / precio_persona / subtotal_original / total
+   */
+   async calcularPrecio(planId, personas, visible = false) {
+     let plan = await this.findById(planId, visible);
+     if (!plan) return null;
+     const planes = await this.attachActivePromotions([plan]);
+     plan = planes[0];
+
+     const n = Math.max(1, Number(personas) || 1);
+     const rangos = Array.isArray(plan.descuentos_rango) ? plan.descuentos_rango : [];
+     const precioOriginalPersona = Math.round(Number(plan.precio) || 0);
+     const promo = plan.promociones && plan.promociones[0] ? plan.promociones[0] : null;
+
+     const clampPct = (v) => Math.max(0, Math.min(Number(v) || 0, 100));
+
+     // ---- 1) Determinar el ÚNICO descuento que se aplica ----
+     let tipoDescuento = "ninguno";
+     let descuentoPorcentaje = 0; // % efectivo de referencia (display/snapshot)
+     let precioPorPersona = precioOriginalPersona;
+     let rangoAplicado = null;
+     let pctPromo = 0;
+
+     if (promo) {
+       // La promoción activa tiene prioridad sobre el rango por personas.
+       tipoDescuento = "promocion";
+       const valor = Number(promo.valor_descuento) || 0;
+       if (promo.tipo_descuento === "porcentaje") {
+         // Promo porcentual: el porcentaje configura el precio (el precio fijo,
+         // si quedó desactualizado, no debe sobreescribir el cálculo).
+         pctPromo = clampPct(valor);
+         precioPorPersona = Math.round(precioOriginalPersona * (1 - pctPromo / 100));
+       } else if (promo.precio_promocional != null) {
+         // Promo de precio fijo: reemplaza el precio base por persona.
+         precioPorPersona = Math.max(0, Math.round(Number(promo.precio_promocional) || 0));
+       } else if (valor > 0) {
+         // Promo de valor fijo en COP.
+         precioPorPersona = Math.max(0, precioOriginalPersona - Math.round(valor));
+       }
+     } else {
+       const ordenados = [...rangos].sort((a, b) => (Number(a.min) || 0) - (Number(b.min) || 0));
+       for (const r of ordenados) {
+         const min = Number(r.min) || 0;
+         const max = Number(r.max) || Infinity;
+         if (n >= min && (max === Infinity || n <= max)) {
+           rangoAplicado = r;
+           break;
+         }
+       }
+       if (rangoAplicado) {
+         const pctRango = clampPct(rangoAplicado.descuento);
+         if (pctRango > 0) tipoDescuento = "rango";
+         descuentoPorcentaje = pctRango;
+         precioPorPersona = Math.round(precioOriginalPersona * (1 - pctRango / 100));
+       }
+     }
+
+     // % efectivo para mostrar (en promo de precio fijo se calcula vs el original).
+     if (promo && tipoDescuento === "promocion") {
+       descuentoPorcentaje = pctPromo > 0
+         ? pctPromo
+         : precioOriginalPersona > 0
+           ? Math.round((1 - precioPorPersona / precioOriginalPersona) * 100)
+           : 0;
+     }
+
+     const subtotalOriginal = precioOriginalPersona * n;
+     const descuentoMonto = Math.round((subtotalOriginal * descuentoPorcentaje) / 100);
+     const total = Math.max(0, precioPorPersona * n);
+     const precioPersona = Math.round(total / n);
+
+     return {
+       plan_id: plan.id,
+       tipo_plan: plan.tipo_plan,
+       tipo_precio: plan.tipo_precio,
+       personas: n,
+       moneda: plan.moneda || "COP",
+       tipo_descuento: tipoDescuento,
+       precio_original_persona: precioOriginalPersona,
+       precio_base_persona: precioPorPersona,
+       precio_persona: precioPersona,
+       descuento_promocion: promo && pctPromo > 0 ? pctPromo : null,
+       descuento_porcentaje: descuentoPorcentaje,
+       descuento_total: descuentoPorcentaje,
+       subtotal_original: subtotalOriginal,
+       descuento_monto: descuentoMonto,
+       rango_aplicado: rangoAplicado,
+       total,
+       total_original: precioOriginalPersona * n,
+       ahorro_total: descuentoMonto,
+       promocion: promo || null,
+     };
+   },
+
+  // ---------- Sugerencia de transporte según personas ----------
+  async sugerirTransporte(planId, personas) {
+    const plan = await this.findById(planId);
+    if (!plan) return null;
+    const n = Number(personas) || 1;
+
+    const { rows: vehiculos } = await pool.query(
+      `SELECT id, business_id, nombre, tipo, placa, capacidad, descripcion
+       FROM vehiculos v
+       WHERE EXISTS (SELECT 1 FROM businesses b WHERE b.id = v.business_id AND b.id = $1)
+         AND COALESCE(v.estado, 'disponible') = 'disponible'
+       ORDER BY capacidad DESC, id ASC`,
+      [plan.business_id]
+    );
+
+    const transportes = await this.listTransportes(planId);
+
+    // Asigna vehículos por capacidad para cubrir a las personas.
+    const asignados = [];
+    let restante = n;
+    for (const v of vehiculos) {
+      if (restante <= 0) break;
+      const cap = Number(v.capacidad) || 0;
+      if (cap <= 0) continue;
+      const usados = Math.min(Math.ceil(restante / cap), 1);
+      asignados.push({ vehiculo: v, cantidad: usados });
+      restante -= usados * cap;
+    }
+    const unidades = asignados.reduce((s, a) => s + a.cantidad, 0);
+
+    // Sugerencia preferente basada en transportes configurados.
+    if (transportes.length > 0) {
+      const preferidos = transportes.slice(0, unidades > 0 ? unidades : 1).map((t) => ({
+        transporte_id: t.id,
+        vehiculo: {
+          id: t.vehiculo_id,
+          nombre: t.vehiculo_nombre,
+          tipo: t.vehiculo_tipo,
+          placa: t.vehiculo_placa,
+          capacidad: t.vehiculo_capacidad,
+        },
+        conductor: t.conductor_id
+          ? { id: t.conductor_id, nombre: t.conductor_nombre, telefono: t.conductor_telefono }
+          : null,
+        notas: t.notas,
+      }));
+      return {
+        personas: n,
+        total_vehiculos: Math.max(unidades, preferidos.length),
+        sugeridos: preferidos,
+      };
+    }
+
+    return {
+      personas: n,
+      total_vehiculos: unidades,
+      sugeridos: asignados.map((a) => ({
+        vehiculo: a.vehiculo,
+        cantidad: a.cantidad,
+      })),
+    };
+  },
+
+  // ---------- Salidas (fechas con cupo) ----------
+  async listSalidas(planId, visible = false) {
+    let where = "s.plan_id = $1";
+    const params = [planId];
+    if (visible) {
+      where += ` AND s.estado = 'activa' AND s.fecha >= CURRENT_DATE`;
+    }
+    const { rows } = await pool.query(
+      `SELECT s.id, s.plan_id, to_char(s.fecha, 'YYYY-MM-DD')::text AS fecha,
+              to_char(s.hora, 'HH24:MI')::text AS hora,
+              s.cupo_maximo, s.cupo_ocupado,
+              to_char(s.fecha_limite, 'YYYY-MM-DD')::text AS fecha_limite,
+              to_char(s.hora_limite, 'HH24:MI')::text AS hora_limite,
+              s.lugar_encuentro, s.estado, s.created_at, s.updated_at,
+              (s.cupo_maximo - s.cupo_ocupado) AS cupo_disponible
+       FROM tour_plan_salidas s
+       WHERE ${where}
+       ORDER BY s.fecha ASC, s.id ASC`,
+      params
+    );
+    return rows;
+  },
+
+  async findSalidaById(planId, salidaId) {
+    const { rows } = await pool.query(
+      `SELECT s.id, s.plan_id, to_char(s.fecha, 'YYYY-MM-DD')::text AS fecha,
+              to_char(s.hora, 'HH24:MI')::text AS hora,
+              s.cupo_maximo, s.cupo_ocupado,
+              to_char(s.fecha_limite, 'YYYY-MM-DD')::text AS fecha_limite,
+              to_char(s.hora_limite, 'HH24:MI')::text AS hora_limite,
+              s.lugar_encuentro, s.estado, s.created_at, s.updated_at,
+              (s.cupo_maximo - s.cupo_ocupado) AS cupo_disponible
+       FROM tour_plan_salidas s
+       WHERE s.plan_id = $1 AND s.id = $2
+       LIMIT 1`,
+      [planId, salidaId]
+    );
+    return rows[0] || null;
+  },
+
+  async createSalida(planId, data) {
+    const { rows } = await pool.query(
+      `INSERT INTO tour_plan_salidas (plan_id, fecha, hora, cupo_maximo, fecha_limite, hora_limite, lugar_encuentro)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, plan_id, to_char(fecha, 'YYYY-MM-DD')::text AS fecha,
+                 to_char(hora, 'HH24:MI')::text AS hora,
+                 cupo_maximo, cupo_ocupado,
+                 to_char(fecha_limite, 'YYYY-MM-DD')::text AS fecha_limite,
+                 to_char(hora_limite, 'HH24:MI')::text AS hora_limite,
+                 lugar_encuentro, estado, created_at, updated_at,
+                 (cupo_maximo - cupo_ocupado) AS cupo_disponible`,
+      [planId, data.fecha, data.hora || null, data.cupo_maximo, data.fecha_limite || null,
+       data.hora_limite || null, data.lugar_encuentro || null]
+    );
+    return rows[0];
+  },
+
+  async updateSalida(salidaId, planId, fields) {
+    const keys = Object.keys(fields);
+    if (keys.length === 0) return null;
+    const setClauses = keys.map((k, i) => `${k}=$${i + 1}`);
+    const values = keys.map((k) => fields[k]);
+    values.push(planId, salidaId);
+    const { rows } = await pool.query(
+      `UPDATE tour_plan_salidas SET ${setClauses.join(", ")}, updated_at = NOW()
+       WHERE plan_id=$${values.length - 1} AND id=$${values.length}
+       RETURNING id, plan_id, to_char(fecha, 'YYYY-MM-DD')::text AS fecha,
+                 to_char(hora, 'HH24:MI')::text AS hora,
+                 cupo_maximo, cupo_ocupado,
+                 to_char(fecha_limite, 'YYYY-MM-DD')::text AS fecha_limite,
+                 to_char(hora_limite, 'HH24:MI')::text AS hora_limite,
+                 lugar_encuentro, estado, created_at, updated_at,
+                 (cupo_maximo - cupo_ocupado) AS cupo_disponible`,
+      values
+    );
+    return rows[0] || null;
+  },
+
+  async deleteSalida(salidaId, planId) {
+    const { rowCount } = await pool.query(
+      "DELETE FROM tour_plan_salidas WHERE id = $1 AND plan_id = $2",
+      [salidaId, planId]
+    );
+    return rowCount > 0;
+  },
+
+  // ---------- Inscripciones ----------
+  async listInscripciones(salidaId, planId) {
+    const { rows } = await pool.query(
+      `SELECT i.id, i.salida_id, i.user_id, i.nombre, i.email, i.personas, i.mensaje,
+              i.precio_original_persona, i.precio_persona, i.descuento_porcentaje,
+              i.precio_total, i.tipo_descuento, i.estado, i.created_at
+       FROM inscripciones i
+       JOIN tour_plan_salidas s ON s.id = i.salida_id
+       WHERE i.salida_id = $1 AND s.plan_id = $2
+       ORDER BY i.created_at ASC`,
+      [salidaId, planId]
+    );
+    return rows;
+  },
+
+  // Resumen logístico de una salida (información SIN pago).
+  async resumenInscripciones(salidaId, planId) {
+    const { rows } = await pool.query(
+      `SELECT COALESCE(SUM(CASE WHEN i.estado = 'confirmada' THEN i.personas ELSE 0 END), 0)::int AS inscritos,
+              COALESCE(SUM(CASE WHEN i.estado = 'confirmada' THEN i.precio_total ELSE 0 END), 0)::bigint AS valor_total,
+              COUNT(*)::int AS total_solicitudes
+       FROM inscripciones i
+       JOIN tour_plan_salidas s ON s.id = i.salida_id
+       WHERE i.salida_id = $1 AND s.plan_id = $2`,
+      [salidaId, planId]
+    );
+    return rows[0];
+  },
+
+  async findInscripcionById(inscripcionId, salidaId, planId) {
+    const { rows } = await pool.query(
+      `SELECT i.id, i.salida_id, i.user_id, i.nombre, i.email, i.personas, i.mensaje,
+              i.precio_original_persona, i.precio_persona, i.descuento_porcentaje,
+              i.precio_total, i.tipo_descuento, i.estado, i.created_at
+       FROM inscripciones i
+       JOIN tour_plan_salidas s ON s.id = i.salida_id
+       WHERE i.id = $1 AND i.salida_id = $2 AND s.plan_id = $3
+       LIMIT 1`,
+      [inscripcionId, salidaId, planId]
+    );
+    return rows[0] || null;
+  },
+
+  async createInscripcion(salidaId, planId, data) {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      // Bloquear salida y validar cupo disponible.
+      const { rows: salidas } = await client.query(
+        `SELECT * FROM tour_plan_salidas
+         WHERE id = $1 AND plan_id = $2
+         FOR UPDATE`,
+        [salidaId, planId]
+      );
+      const salida = salidas[0];
+      if (!salida) throw { status: 404, message: "Salida no encontrada" };
+      if (salida.estado !== "activa") throw { status: 400, message: "La salida no está activa" };
+      const hoy = new Date();
+      const hoyLocal = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
+      const fmtFecha = (d) => {
+        if (d instanceof Date) {
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        }
+        return String(d || "").slice(0, 10);
+      };
+      if (fmtFecha(salida.fecha) < hoyLocal) {
+        throw { status: 400, message: "La salida ya ocurrió: inscripciones cerradas" };
+      }
+      if (salida.fecha_limite) {
+        const horaLim = salida.hora_limite ? String(salida.hora_limite).slice(0, 5) : "23:59";
+        const cutoff = new Date(`${fmtFecha(salida.fecha_limite)}T${horaLim}:00`);
+        if (cutoff < hoy) throw { status: 400, message: "Inscripciones cerradas (fecha límite superada)" };
+      }
+      const cupoDisponible = salida.cupo_maximo - salida.cupo_ocupado;
+      if (data.personas > cupoDisponible) {
+        throw { status: 400, message: `Cupo insuficiente: quedan ${cupoDisponible} de ${salida.cupo_maximo}` };
+      }
+
+      // Snapshot del precio calculado EN ESTE MOMENTO (la promoción puede
+      // cambiar después sin afectar inscripciones pasadas).
+      let precio = null;
+      try {
+        precio = await this.calcularPrecio(planId, data.personas, false);
+      } catch (_) {
+        precio = null;
+      }
+
+      const { rows } = await client.query(
+        `INSERT INTO inscripciones (salida_id, user_id, nombre, email, personas, mensaje,
+                precio_original_persona, precio_persona, descuento_porcentaje, precio_total, tipo_descuento)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         RETURNING id, salida_id, user_id, nombre, email, personas, mensaje,
+                   precio_original_persona, precio_persona, descuento_porcentaje,
+                   precio_total, tipo_descuento, estado, created_at`,
+        [salidaId, data.user_id || null, data.nombre || null, data.email || null,
+         data.personas, data.mensaje || null,
+         precio?.precio_original_persona ?? null,
+         precio?.precio_persona ?? null,
+         precio?.descuento_porcentaje ?? (precio?.descuento_total ?? 0),
+         precio?.total ?? null,
+         precio?.tipo_descuento ?? null]
+      );
+      await client.query(
+        `UPDATE tour_plan_salidas SET cupo_ocupado = cupo_ocupado + $1, updated_at = NOW()
+         WHERE id = $2`,
+        [data.personas, salidaId]
+      );
+      await client.query("COMMIT");
+      return rows[0];
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  },
+
+  async cancelarInscripcion(inscripcionId, salidaId, planId) {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const { rows: inscs } = await client.query(
+        `SELECT id, personas, estado FROM inscripciones
+         WHERE id = $1 AND salida_id = $2
+         FOR UPDATE`,
+        [inscripcionId, salidaId]
+      );
+      const insc = inscs[0];
+      // Verificar que la inscripción pertenece a un plan.
+      if (insc) {
+        const { rows: joins } = await client.query(
+          `SELECT 1 FROM tour_plan_salidas s
+           WHERE s.id = $1 AND s.plan_id = $2 LIMIT 1`,
+          [salidaId, planId]
+        );
+        if (joins.length === 0) throw { status: 404, message: "Inscripción no encontrada" };
+        if (insc.estado !== "confirmada") throw { status: 400, message: "La inscripción ya está cancelada" };
+        await client.query(
+          `UPDATE inscripciones SET estado = 'cancelada' WHERE id = $1`,
+          [inscripcionId]
+        );
+        await client.query(
+          `UPDATE tour_plan_salidas SET cupo_ocupado = GREATEST(cupo_ocupado - $1, 0), updated_at = NOW()
+           WHERE id = $2`,
+          [insc.personas, salidaId]
+        );
+      }
+      await client.query("COMMIT");
+      return true;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  },
+
+  // ---------- Transporte por plan ----------
+  async listTransportes(planId) {
+    const { rows } = await pool.query(
+      `SELECT t.id, t.plan_id, t.salida_id, t.vehiculo_id, t.conductor_id, t.orden, t.notas,
+              v.nombre AS vehiculo_nombre, v.tipo AS vehiculo_tipo,
+              v.placa AS vehiculo_placa, v.capacidad AS vehiculo_capacidad,
+              c.nombre AS conductor_nombre, c.telefono AS conductor_telefono
+       FROM transportes t
+       JOIN vehiculos v ON v.id = t.vehiculo_id
+       LEFT JOIN conductores c ON c.id = t.conductor_id
+       WHERE t.plan_id = $1
+       ORDER BY t.orden ASC, t.id ASC`,
+      [planId]
+    );
+    return rows;
+  },
+
+  // Asignaciones de transporte a una salida concreta.
+  async listTransportesSalida(salidaId, planId) {
+    const { rows } = await pool.query(
+      `SELECT t.id, t.plan_id, t.salida_id, t.vehiculo_id, t.conductor_id, t.orden, t.notas,
+              v.nombre AS vehiculo_nombre, v.tipo AS vehiculo_tipo,
+              v.placa AS vehiculo_placa, v.capacidad AS vehiculo_capacidad,
+              c.nombre AS conductor_nombre, c.telefono AS conductor_telefono
+       FROM transportes t
+       JOIN vehiculos v ON v.id = t.vehiculo_id
+       LEFT JOIN conductores c ON c.id = t.conductor_id
+       WHERE t.salida_id = $1 AND t.plan_id = $2
+       ORDER BY t.orden ASC, t.id ASC`,
+      [salidaId, planId]
+    );
+    return rows;
+  },
+
+  async addTransporte(planId, vehiculoId, conductorId, orden = 0, notas = null, salidaId = null) {
+    const { rows } = await pool.query(
+      `INSERT INTO transportes (plan_id, salida_id, vehiculo_id, conductor_id, orden, notas)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, plan_id, salida_id, vehiculo_id, conductor_id, orden, notas, created_at, updated_at`,
+      [planId, salidaId || null, vehiculoId, conductorId || null, orden, notas]
+    );
+    return rows[0];
+  },
+
+  async deleteTransporteSalida(transporteId, planId, salidaId) {
+    const { rowCount } = await pool.query(
+      "DELETE FROM transportes WHERE id = $1 AND plan_id = $2 AND salida_id = $3",
+      [transporteId, planId, salidaId]
+    );
+    return rowCount > 0;
+  },
+
+  // ---------- Recomendación de transporte para una salida ----------
+  // Usa el TOTAL de personas inscritas en la salida, elige el vehículo
+  // disponible con la capacidad mínima suficiente y un conductor libre.
+  // No asigna un vehículo/conductor ya ocupado en otra salida del mismo día.
+  async recomendarTransporteSalida(salidaId, planId, personas = null) {
+    const salida = await this.findSalidaById(planId, salidaId);
+    if (!salida) return null;
+    const plan = await this.findById(planId);
+    if (!plan) return null;
+
+    const n = personas != null ? Math.max(1, Number(personas) || 1) : (Number(salida.cupo_ocupado) || 0);
+    const businessId = plan.business_id;
+    const fecha = String(salida.fecha).slice(0, 10);
+
+    const { rows: vehiculos } = await pool.query(
+      `SELECT v.id, v.nombre, v.tipo, v.placa, v.capacidad, v.marca, v.modelo, v.anio,
+              v.estado, v.conductor_id
+       FROM vehiculos v
+       WHERE v.business_id = $1 AND COALESCE(v.estado, 'disponible') = 'disponible'
+       ORDER BY v.capacidad ASC, v.id ASC`,
+      [businessId]
+    );
+
+    // Vehículos/conductores ya usados en otra salida del mismo negocio
+    // programada para el mismo día (solapamiento de horario).
+    const { rows: usados } = await pool.query(
+      `SELECT DISTINCT t.vehiculo_id, t.conductor_id
+       FROM transportes t
+       JOIN tour_plan_salidas s ON s.id = t.salida_id
+       WHERE t.salida_id IS NOT NULL AND t.salida_id <> $1
+         AND s.fecha = $2
+         AND s.plan_id IN (SELECT p.id FROM tour_plans p WHERE p.business_id = $3)`,
+      [salidaId, fecha, businessId]
+    );
+    const vehiculosUsados = new Set(usados.map((u) => Number(u.vehiculo_id)));
+    const conductoresUsados = new Set(usados.filter((u) => u.conductor_id != null).map((u) => Number(u.conductor_id)));
+
+    const { rows: conductores } = await pool.query(
+      `SELECT id, nombre, telefono, licencia_categoria
+       FROM conductores
+       WHERE business_id = $1 AND disponible = true
+       ORDER BY nombre ASC, id ASC`,
+      [businessId]
+    );
+
+    let vehiculo = vehiculos.find((v) => Number(v.capacidad) >= n && !vehiculosUsados.has(Number(v.id))) || null;
+    let conductor = null;
+    if (vehiculo) {
+      if (vehiculo.conductor_id && !conductoresUsados.has(Number(vehiculo.conductor_id))) {
+        conductor = conductores.find((c) => Number(c.id) === Number(vehiculo.conductor_id)) || null;
+      }
+      if (!conductor) conductor = conductores.find((c) => !conductoresUsados.has(Number(c.id))) || null;
+    }
+
+    let mensaje = null;
+    if (!vehiculo) {
+      const hayVehiculos = vehiculos.some((v) => !vehiculosUsados.has(Number(v.id)));
+      mensaje = hayVehiculos
+        ? `No hay un vehículo disponible con capacidad para ${n} persona(s).`
+        : `No hay vehículos disponibles: la flota está en uso para otra salida ese día.`;
+    } else if (!conductor) {
+      mensaje = "Vehículo suficiente, pero sin conductor disponible.";
+    }
+
+    const asignados = await this.listTransportesSalida(salidaId, planId);
+    return {
+      salida_id: salidaId,
+      plan_id: planId,
+      fecha,
+      lugar_encuentro: salida.lugar_encuentro || null,
+      personas: n,
+      cupo_ocupado: Number(salida.cupo_ocupado) || 0,
+      cupo_maximo: Number(salida.cupo_maximo) || 0,
+      vehiculo: vehiculo
+        ? { id: vehiculo.id, nombre: vehiculo.nombre, tipo: vehiculo.tipo, placa: vehiculo.placa, capacidad: vehiculo.capacidad }
+        : null,
+      conductor: conductor
+        ? { id: conductor.id, nombre: conductor.nombre, telefono: conductor.telefono, licencia_categoria: conductor.licencia_categoria }
+        : null,
+      mensaje,
+      asignados,
+    };
+  },
+
+  async deleteTransporte(transporteId, planId) {
+    const { rowCount } = await pool.query(
+      "DELETE FROM transportes WHERE id = $1 AND plan_id = $2",
+      [transporteId, planId]
     );
     return rowCount > 0;
   },

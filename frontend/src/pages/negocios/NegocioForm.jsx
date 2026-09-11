@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { ArrowLeft, Save, Loader2 } from 'lucide-react'
 import { businessesAPI, lugaresAPI } from '../../services/api'
 import LoadingSpinner from '../../components/LoadingSpinner'
+import ImageUploader from '../../components/ImageUploader'
+import MoneyInput from '../../components/MoneyInput'
 import { toast } from 'sonner'
 
 const negocioSchema = z
@@ -26,7 +28,7 @@ const negocioSchema = z
       .or(z.literal('')),
     portada_url: z
       .string()
-      .refine((v) => v === '' || /^https?:\/\/.+/i.test(v), 'URL inválida (http/https)')
+      .refine((v) => v === '' || /^https?:\/\/.+/i.test(v) || /^data:image\//i.test(v), 'URL inválida (http/https o imagen base64)')
       .optional()
       .or(z.literal('')),
     moneda: z.string().max(3, '3 letras').optional().or(z.literal('')),
@@ -51,9 +53,12 @@ export default function NegocioForm() {
   const [submitting, setSubmitting] = useState(false)
 
   const {
+    control,
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm({ resolver: zodResolver(negocioSchema) })
 
@@ -207,8 +212,12 @@ export default function NegocioForm() {
               {errors.website && <p className="text-red-500 text-xs mt-1">{errors.website.message}</p>}
             </div>
             <div>
-              <label className="block text-sm font-medium text-dark-700 mb-1.5">URL de portada</label>
-              <input {...register('portada_url')} placeholder="https://..." className={inputClass} />
+              <label className="block text-sm font-medium text-dark-700 mb-1.5">Portada del negocio</label>
+              <ImageUploader
+                value={watch('portada_url') || ''}
+                onChange={(v) => setValue('portada_url', v, { shouldValidate: true })}
+                placeholder="URL de la portada (https://)"
+              />
               {errors.portada_url && <p className="text-red-500 text-xs mt-1">{errors.portada_url.message}</p>}
             </div>
             <div>
@@ -217,11 +226,33 @@ export default function NegocioForm() {
             </div>
             <div>
               <label className="block text-sm font-medium text-dark-700 mb-1.5">Precio mínimo</label>
-              <input {...register('precio_min')} type="number" min="0" placeholder="100000" className={inputClass} />
+              <Controller
+                control={control}
+                name="precio_min"
+                render={({ field }) => (
+                  <MoneyInput
+                    value={field.value}
+                    onChange={(v) => field.onChange(v ?? undefined)}
+                    placeholder="100000"
+                    className={inputClass}
+                  />
+                )}
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-dark-700 mb-1.5">Precio máximo</label>
-              <input {...register('precio_max')} type="number" min="0" placeholder="500000" className={inputClass} />
+              <Controller
+                control={control}
+                name="precio_max"
+                render={({ field }) => (
+                  <MoneyInput
+                    value={field.value}
+                    onChange={(v) => field.onChange(v ?? undefined)}
+                    placeholder="500000"
+                    className={inputClass}
+                  />
+                )}
+              />
               {errors.precio_max && <p className="text-red-500 text-xs mt-1">{errors.precio_max.message}</p>}
             </div>
           </div>

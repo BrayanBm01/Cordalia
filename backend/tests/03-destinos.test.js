@@ -15,8 +15,10 @@ h.test("DEST: login admin y consulta pública de destinos", async () => {
   const inexistente = await h.api("/api/lugares/999999/negocios");
   h.assertStatus(inexistente.status, 404, "destino inexistente 404");
 
+  // El listado de negocios es lectura pública (solo negocios aprobados).
   const sinToken = await h.api("/api/businesses");
-  h.assertStatus(sinToken.status, 401, "businesses sigue exigiendo auth");
+  h.assertStatus(sinToken.status, 200, "lista pública de negocios sin token");
+  h.assert(Array.isArray(sinToken.json?.data), "data array de negocios sin token");
 });
 
 h.test("DEST: crear negocio con/ sin destino y validaciones", async () => {

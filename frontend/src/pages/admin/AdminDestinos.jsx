@@ -1,20 +1,53 @@
 import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, Trash2, X, Search, MapPin } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, MapPin, Image as ImageIcon, Info } from 'lucide-react'
 import { lugaresAPI } from '../../services/api'
 import ConfirmModal from '../../components/ConfirmModal'
 import EmptyState from '../../components/EmptyState'
 import LoadingSpinner from '../../components/LoadingSpinner'
+import Modal from '../../components/Modal'
+import ImageUploader from '../../components/ImageUploader'
 import { toast } from 'sonner'
+
+const TIPOS_DESTINO = [
+  { value: 'ciudad', label: 'Ciudad' },
+  { value: 'playa', label: 'Playa' },
+  { value: 'cultura', label: 'Cultura' },
+  { value: 'naturaleza', label: 'Naturaleza' },
+  { value: 'montaña', label: 'Montaña' },
+  { value: 'humedal', label: 'Humedal' },
+  { value: 'ecoturismo', label: 'Ecoturismo' },
+  { value: 'pueblo_patrimonio', label: 'Pueblo patrimonial' },
+  { value: 'parque', label: 'Parque' },
+  { value: 'manglar', label: 'Manglar' },
+  { value: 'lago', label: 'Lago / ciénaga' },
+  { value: 'rio', label: 'Río' },
+  { value: 'lugar', label: 'Otro' },
+]
+
+const TIPO_LABELS = Object.fromEntries(TIPOS_DESTINO.map((t) => [t.value, t.label]))
+
+function sectionTitle(icon, text) {
+  return (
+    <p className="text-xs font-semibold uppercase tracking-wide text-dark-400 mb-2 flex items-center gap-1.5">
+      {icon} {text}
+    </p>
+  )
+}
 
 const destinoSchema = z.object({
   nombre: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
   descripcion: z.string().min(10, 'La descripción debe tener al menos 10 caracteres'),
   ubicacion: z.string().min(2, 'La ubicación es requerida'),
-  imagen: z.string().url('Debe ser una URL válida').optional().or(z.literal('')),
+  municipio: z.string().min(2, 'El municipio es requerido'),
+  tipo: z.string().min(1, 'Selecciona un tipo de destino'),
+  imagen: z.string().optional().or(z.literal('')).refine(
+    (v) => v === '' || /^https?:\/\/.+/i.test(v) || /^data:image\//i.test(v),
+    'URL inválida (http/https o imagen base64)'
+  ),
 })
 
 export default function AdminDestinos() {
@@ -26,7 +59,7 @@ export default function AdminDestinos() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [submitting, setSubmitting] = useState(false)
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm({
+  const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm({
     resolver: zodResolver(destinoSchema),
   })
 
@@ -54,7 +87,7 @@ export default function AdminDestinos() {
 
   function openCreate() {
     setEditingDestino(null)
-    reset({ nombre: '', descripcion: '', ubicacion: '', imagen: '' })
+    reset({ nombre: '', descripcion: '', ubicacion: '', municipio: '', tipo: 'ciudad', imagen: '' })
     setModalOpen(true)
   }
 
@@ -64,6 +97,8 @@ export default function AdminDestinos() {
       nombre: destino.nombre,
       descripcion: destino.descripcion,
       ubicacion: destino.ubicacion,
+      municipio: destino.municipio || '',
+      tipo: destino.tipo || 'ciudad',
       imagen: destino.imagen || '',
     })
     setModalOpen(true)
@@ -158,7 +193,8 @@ export default function AdminDestinos() {
                   <tr className="border-b border-dark-100 bg-dark-50">
                     <th className="text-left px-5 py-3 font-medium text-dark-500">ID</th>
                     <th className="text-left px-5 py-3 font-medium text-dark-500">Nombre</th>
-                    <th className="text-left px-5 py-3 font-medium text-dark-500">Ubicación</th>
+                    <th className="text-left px-5 py-3 font-medium text-dark-500">Tipo</th>
+                    <th className="text-left px-5 py-3 font-medium text-dark-500">Municipio</th>
                     <th className="text-left px-5 py-3 font-medium text-dark-500">Descripción</th>
                     <th className="text-right px-5 py-3 font-medium text-dark-500">Acciones</th>
                   </tr>
@@ -168,7 +204,15 @@ export default function AdminDestinos() {
                   <tr key={destino.id} className="hover:bg-dark-50/40 transition-colors">
                     <td className="px-5 py-3.5 text-dark-500 font-mono text-xs">{destino.id}</td>
                     <td className="px-5 py-3.5 font-medium text-dark-800">{destino.nombre}</td>
-                    <td className="px-5 py-3.5 text-dark-600">{destino.ubicacion}</td>
+                    <td className="px-5 py-3.5">
+                      <span className="inline-block px-2 py-0.5 rounded-full bg-primary-50 text-primary-700 text-xs font-medium capitalize">
+                        {destino.tipo ? TIPO_LABELS[destino.tipo] || destino.tipo : 'Lugar'}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-dark-600">
+                      {destino.municipio || '—'}
+                      <span className="text-dark-400 text-xs block">{destino.ubicacion}</span>
+                    </td>
                     <td className="px-5 py-3.5 text-dark-600 max-w-xs">
                       <span className="line-clamp-2">{destino.descripcion}</span>
                     </td>
@@ -199,96 +243,97 @@ export default function AdminDestinos() {
         </div>
       )}
 
-      <AnimatePresence>
-        {modalOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-dark-900/40 backdrop-blur-sm"
-            onClick={closeModal}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 8 }}
-              transition={{ duration: 0.2 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-xl shadow-xl w-full max-w-md border border-dark-200"
-            >
-              <div className="flex items-center justify-between px-6 py-4 border-b border-dark-100">
-                <h2 className="text-lg font-semibold text-dark-900">
-                  {editingDestino ? 'Editar destino' : 'Crear destino'}
-                </h2>
-                <button onClick={closeModal} className="p-1 rounded-lg text-dark-400 hover:text-dark-600 hover:bg-dark-100 transition-colors cursor-pointer">
-                  <X className="w-5 h-5" />
-                </button>
+      <Modal
+        open={modalOpen}
+        onClose={closeModal}
+        title={editingDestino ? 'Editar destino' : 'Crear destino'}
+        size="lg"
+      >
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          <div>
+            {sectionTitle(<MapPin className="w-3.5 h-3.5" />, 'Información general')}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-dark-700 mb-1">Nombre *</label>
+                <input
+                  {...register('nombre')}
+                  className="w-full px-3 py-2 rounded-lg border border-dark-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors"
+                  placeholder="Nombre del destino"
+                />
+                {errors.nombre && <p className="text-red-500 text-xs mt-1">{errors.nombre.message}</p>}
               </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-700 mb-1">Tipo de destino *</label>
+                <select
+                  {...register('tipo')}
+                  className="w-full px-3 py-2 rounded-lg border border-dark-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors capitalize"
+                >
+                  {TIPOS_DESTINO.map((t) => (
+                    <option key={t.value} value={t.value} className="capitalize">{t.label}</option>
+                  ))}
+                </select>
+                {errors.tipo && <p className="text-red-500 text-xs mt-1">{errors.tipo.message}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-700 mb-1">Municipio *</label>
+                <input
+                  {...register('municipio')}
+                  className="w-full px-3 py-2 rounded-lg border border-dark-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors"
+                  placeholder="ej. Montería"
+                />
+                {errors.municipio && <p className="text-red-500 text-xs mt-1">{errors.municipio.message}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-700 mb-1">Ubicación *</label>
+                <input
+                  {...register('ubicacion')}
+                  className="w-full px-3 py-2 rounded-lg border border-dark-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors"
+                  placeholder="Ciudad, Región"
+                />
+                {errors.ubicacion && <p className="text-red-500 text-xs mt-1">{errors.ubicacion.message}</p>}
+              </div>
+            </div>
+          </div>
 
-              <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-dark-700 mb-1">Nombre</label>
-                  <input
-                    {...register('nombre')}
-                    className="w-full px-3 py-2 rounded-lg border border-dark-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors"
-                    placeholder="Nombre del destino"
-                  />
-                  {errors.nombre && <p className="text-red-500 text-xs mt-1">{errors.nombre.message}</p>}
-                </div>
+          <div>
+            {sectionTitle(<Info className="w-3.5 h-3.5" />, 'Descripción')}
+            <textarea
+              {...register('descripcion')}
+              rows={3}
+              className="w-full px-3 py-2 rounded-lg border border-dark-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors resize-none"
+              placeholder="Describe el destino turístico..."
+            />
+            {errors.descripcion && <p className="text-red-500 text-xs mt-1">{errors.descripcion.message}</p>}
+          </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-dark-700 mb-1">Descripción</label>
-                  <textarea
-                    {...register('descripcion')}
-                    rows={3}
-                    className="w-full px-3 py-2 rounded-lg border border-dark-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors resize-none"
-                    placeholder="Describe el destino turístico..."
-                  />
-                  {errors.descripcion && <p className="text-red-500 text-xs mt-1">{errors.descripcion.message}</p>}
-                </div>
+          <div>
+            {sectionTitle(<ImageIcon className="w-3.5 h-3.5" />, 'Imagen del destino')}
+            <ImageUploader
+              value={watch('imagen') || ''}
+              onChange={(v) => setValue('imagen', v, { shouldValidate: true })}
+              placeholder="URL de la imagen (https://) o selecciona del dispositivo"
+            />
+            {errors.imagen && <p className="text-red-500 text-xs mt-1">{errors.imagen.message}</p>}
+          </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-dark-700 mb-1">Ubicación</label>
-                  <input
-                    {...register('ubicacion')}
-                    className="w-full px-3 py-2 rounded-lg border border-dark-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors"
-                    placeholder="Ciudad, Región"
-                  />
-                  {errors.ubicacion && <p className="text-red-500 text-xs mt-1">{errors.ubicacion.message}</p>}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-dark-700 mb-1">URL de imagen</label>
-                  <input
-                    {...register('imagen')}
-                    type="url"
-                    className="w-full px-3 py-2 rounded-lg border border-dark-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors"
-                    placeholder="https://ejemplo.com/imagen.jpg"
-                  />
-                  {errors.imagen && <p className="text-red-500 text-xs mt-1">{errors.imagen.message}</p>}
-                </div>
-
-                <div className="flex items-center justify-end gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={closeModal}
-                    className="px-4 py-2 rounded-lg text-sm font-medium text-dark-600 hover:bg-dark-100 transition-colors cursor-pointer"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="px-4 py-2 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 transition-colors disabled:opacity-50 cursor-pointer"
-                  >
-                    {submitting ? 'Guardando...' : editingDestino ? 'Actualizar' : 'Crear'}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          <div className="flex items-center justify-end gap-3 pt-2 border-t border-dark-100">
+            <button
+              type="button"
+              onClick={closeModal}
+              className="px-4 py-2 rounded-lg text-sm font-medium text-dark-600 hover:bg-dark-100 transition-colors cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              {submitting ? 'Guardando...' : editingDestino ? 'Actualizar' : 'Crear'}
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       <ConfirmModal
         isOpen={!!deleteTarget}

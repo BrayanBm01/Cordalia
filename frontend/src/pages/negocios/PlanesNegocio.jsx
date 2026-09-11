@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   Plus, Pencil, Trash2, Loader2, Image as ImageIcon, Star, ChevronDown, ChevronRight,
-  Power, Ticket, MapPin, Clock, X,
+  Power, Ticket, MapPin, Clock, Users, Tag, BadgePercent, CalendarDays,
 } from 'lucide-react'
 import { businessPlanesAPI, promocionesAPI } from '../../services/api'
 import { toast } from 'sonner'
@@ -10,14 +10,26 @@ import ConfirmModal from '../../components/ConfirmModal'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import EmptyState from '../../components/EmptyState'
 import PlanForm from './PlanForm'
+import SalidasPanel from './SalidasPanel'
+import TransportePanel from './TransportePanel'
+import ImageUploader from '../../components/ImageUploader'
+import MoneyInput from '../../components/MoneyInput'
 import { formatMoney } from './businessUtils'
 import {
   TIPO_PLAN_LABEL, TIPO_PLAN_BADGE, TIPO_PRECIO_LABEL,
-  PLAN_ESTADO_LABEL, PLAN_ESTADO_BADGE, formatDuracion, formatFechas, presente,
+  PLAN_ESTADO_LABEL, PLAN_ESTADO_BADGE, formatDuracion, formatFechas, presente, diaActividades,
 } from './planUtils'
 
 const inputClass =
   'w-full px-3 py-2 rounded-lg border border-dark-200 text-sm bg-white text-dark-900 placeholder:text-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors'
+
+function sectionTitle(icon, text) {
+  return (
+    <p className="text-xs font-semibold uppercase tracking-wide text-dark-400 mb-2 flex items-center gap-1.5">
+      {icon} {text}
+    </p>
+  )
+}
 
 function PromoForm({ businessId, planes, promo, onSaved, onCancel }) {
   const editing = Boolean(promo)
@@ -31,7 +43,15 @@ function PromoForm({ businessId, planes, promo, onSaved, onCancel }) {
   const [imagenUrl, setImagenUrl] = useState(promo?.imagen_url || '')
   const [fechaInicio, setFechaInicio] = useState(promo?.fecha_inicio || '')
   const [fechaFin, setFechaFin] = useState(promo?.fecha_fin || '')
+  const [estado, setEstado] = useState(promo?.estado || 'activo')
   const [saving, setSaving] = useState(false)
+  const esPorcentaje = tipoDescuento === 'porcentaje'
+
+  function cambiarTipo(e) {
+    const t = e.target.value
+    setTipoDescuento(t)
+    if (t === 'porcentaje') setPrecioPromocional('')
+  }
 
   async function submit(e) {
     e.preventDefault()
@@ -40,12 +60,13 @@ function PromoForm({ businessId, planes, promo, onSaved, onCancel }) {
       descripcion: descripcion.trim() || null,
       plan_id: planId ? Number(planId) : null,
       tipo_descuento: tipoDescuento,
-      valor_descuento: valorDescuento !== '' ? Number(valorDescuento) : null,
-      precio_anterior: precioAnterior !== '' ? Number(precioAnterior) : null,
-      precio_promocional: precioPromocional !== '' ? Number(precioPromocional) : null,
+      valor_descuento: valorDescuento != null && valorDescuento !== '' ? Number(valorDescuento) : null,
+      precio_anterior: precioAnterior != null && precioAnterior !== '' ? Number(precioAnterior) : null,
+      precio_promocional: esPorcentaje ? null : (precioPromocional != null && precioPromocional !== '' ? Number(precioPromocional) : null),
       imagen_url: imagenUrl.trim() || null,
       fecha_inicio: fechaInicio || null,
       fecha_fin: fechaFin || null,
+      estado,
     }
     setSaving(true)
     try {
@@ -61,19 +82,10 @@ function PromoForm({ businessId, planes, promo, onSaved, onCancel }) {
     }
   }
 
-  const hoy = new Date().toISOString().slice(0, 10)
-
   return (
-    <div>
-      <div className="mb-5 flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-dark-900" style={{ fontFamily: 'var(--font-display)' }}>
-          {editing ? 'Editar promoción' : 'Nueva promoción'}
-        </h3>
-        <button onClick={onCancel} className="p-1.5 rounded-lg text-dark-400 hover:text-dark-700 hover:bg-dark-100 transition-colors cursor-pointer">
-          <X className="w-5 h-5" />
-        </button>
-      </div>
-      <form onSubmit={submit} className="space-y-4">
+    <form onSubmit={submit} className="space-y-5">
+      <div>
+        {sectionTitle(<Tag className="w-3.5 h-3.5" />, 'Información general')}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre de la promoción *" className={inputClass} required />
           <select value={planId} onChange={(e) => setPlanId(e.target.value)} className={`${inputClass} bg-white`} required disabled={planes.length === 0}>
@@ -82,55 +94,80 @@ function PromoForm({ businessId, planes, promo, onSaved, onCancel }) {
               : planes.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
           </select>
         </div>
-        <textarea value={descripcion} onChange={(e) => setDescripcion(e.target.value)} rows={2} placeholder="Descripción (opcional)" className={inputClass} />
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <textarea value={descripcion} onChange={(e) => setDescripcion(e.target.value)} rows={2} placeholder="Descripción (opcional)" className={`${inputClass} mt-3`} />
+      </div>
+
+      <div>
+        {sectionTitle(<BadgePercent className="w-3.5 h-3.5" />, 'Descuento')}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-xs text-dark-500 mb-1">Tipo de descuento</label>
-            <select value={tipoDescuento} onChange={(e) => setTipoDescuento(e.target.value)} className={`${inputClass} bg-white`}>
+            <select value={tipoDescuento} onChange={cambiarTipo} className={`${inputClass} bg-white`}>
               <option value="porcentaje">Porcentaje (%)</option>
               <option value="valor">Valor fijo (COP)</option>
             </select>
           </div>
           <div>
-            <label className="block text-xs text-dark-500 mb-1">Valor del descuento *</label>
-            <input type="number" min={0} step={tipoDescuento === 'porcentaje' ? 1 : 1000} value={valorDescuento} onChange={(e) => setValorDescuento(e.target.value)} className={inputClass} required />
+            <label className="block text-xs text-dark-500 mb-1">{esPorcentaje ? 'Porcentaje de descuento *' : 'Valor del descuento (COP) *'}</label>
+            {esPorcentaje ? (
+              <input type="number" min={0} max={100} step={1} value={valorDescuento} onChange={(e) => setValorDescuento(e.target.value)} className={inputClass} required />
+            ) : (
+              <MoneyInput value={valorDescuento} onChange={setValorDescuento} className={inputClass} required placeholder="Ej: 20000" />
+            )}
           </div>
           <div>
-            <label className="block text-xs text-dark-500 mb-1">Imagen (URL)</label>
-            <input value={imagenUrl} onChange={(e) => setImagenUrl(e.target.value)} placeholder="https://..." className={inputClass} />
+            <label className="block text-xs text-dark-500 mb-1">Precio anterior (referencia)</label>
+            <MoneyInput value={precioAnterior} onChange={setPrecioAnterior} className={inputClass} placeholder="Ej: 150000" />
           </div>
+          {!esPorcentaje && (
+            <div>
+              <label className="block text-xs text-dark-500 mb-1">Precio promocional</label>
+              <MoneyInput value={precioPromocional} onChange={setPrecioPromocional} className={inputClass} placeholder="Ej: 130000" />
+            </div>
+          )}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs text-dark-500 mb-1">Precio anterior</label>
-            <input type="number" min={0} step={1000} value={precioAnterior} onChange={(e) => setPrecioAnterior(e.target.value)} className={inputClass} />
-          </div>
-          <div>
-            <label className="block text-xs text-dark-500 mb-1">Precio promocional</label>
-            <input type="number" min={0} step={1000} value={precioPromocional} onChange={(e) => setPrecioPromocional(e.target.value)} className={inputClass} />
-          </div>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      </div>
+
+      <div>
+        {sectionTitle(<ImageIcon className="w-3.5 h-3.5" />, 'Imagen de la promoción')}
+        <label className="block text-xs text-dark-500 mb-1">URL o seleccionar del dispositivo</label>
+        <ImageUploader value={imagenUrl} onChange={setImagenUrl} placeholder="https://..." />
+      </div>
+
+      <div>
+        {sectionTitle(<CalendarDays className="w-3.5 h-3.5" />, 'Vigencia y estado')}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className="block text-xs text-dark-500 mb-1">Vigencia desde</label>
-            <input type="date" min={hoy} value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} className={inputClass} />
+            <input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} className={inputClass} />
           </div>
           <div>
             <label className="block text-xs text-dark-500 mb-1">Vigencia hasta</label>
-            <input type="date" min={hoy} value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} className={inputClass} />
+            <input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} className={inputClass} />
+          </div>
+          <div>
+            <label className="block text-xs text-dark-500 mb-1">Estado</label>
+            <select value={estado} onChange={(e) => setEstado(e.target.value)} className={`${inputClass} bg-white`}>
+              <option value="activo">Activa</option>
+              <option value="inactivo">Inactiva</option>
+            </select>
           </div>
         </div>
-        <div className="flex items-center justify-end gap-3 pt-2 border-t border-dark-100">
-          <button type="button" onClick={onCancel} className="px-4 py-2 rounded-lg text-sm font-medium text-dark-600 hover:bg-dark-100 transition-colors cursor-pointer">
-            Cancelar
-          </button>
-          <button type="submit" disabled={saving || !nombre.trim() || !valorDescuento || !planId} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 transition-colors shadow-sm cursor-pointer">
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            {editing ? 'Guardar cambios' : 'Crear promoción'}
-          </button>
-        </div>
-      </form>
-    </div>
+        <p className="text-xs text-dark-400 mt-2 leading-relaxed">
+          Solo una promoción <strong>activa y vigente</strong> descuenta del precio por persona y tiene prioridad sobre el descuento por rango grupal. Si está inactiva o fuera de fechas, el precio usará el descuento por grupo (o ninguno).
+        </p>
+      </div>
+
+      <div className="flex items-center justify-end gap-3 pt-3 border-t border-dark-100">
+        <button type="button" onClick={onCancel} className="px-4 py-2 rounded-lg text-sm font-medium text-dark-600 hover:bg-dark-100 transition-colors cursor-pointer">
+          Cancelar
+        </button>
+        <button type="submit" disabled={saving || !nombre.trim() || !valorDescuento || !planId} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 transition-colors shadow-sm cursor-pointer">
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+          {editing ? 'Guardar cambios' : 'Crear promoción'}
+        </button>
+      </div>
+    </form>
   )
 }
 
@@ -143,6 +180,7 @@ export default function PlanesNegocio({ businessId }) {
   const [promoForm, setPromoForm] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [expanded, setExpanded] = useState(null)
+  const [grupalPlanId, setGrupalPlanId] = useState(null)
   const [img, setImg] = useState({ url: '', alt: '', is_primary: false, planId: null, saving: false })
 
   const load = useCallback(async () => {
@@ -253,6 +291,12 @@ export default function PlanesNegocio({ businessId }) {
         >
           <Star className="w-4 h-4" /> Promociones ({promos.length})
         </button>
+        <button
+          onClick={() => setTab('grupales')}
+          className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${tab === 'grupales' ? 'bg-primary-600 text-white' : 'text-dark-600 hover:bg-dark-100'}`}
+        >
+          <Users className="w-4 h-4" /> Grupales
+        </button>
       </div>
 
       {tab === 'planes' && (
@@ -348,30 +392,33 @@ export default function PlanesNegocio({ businessId }) {
                         </div>
                       ))}
                     </div>
-                    <form onSubmit={addImage} className="flex flex-wrap items-end gap-2">
-                      <input
-                        value={img.planId === p.id ? img.url : ''}
-                        onChange={(e) => setImg((s) => ({ ...s, url: e.target.value, planId: p.id }))}
-                        placeholder="URL de la imagen (https://)"
-                        className={`${inputClass} flex-1 min-w-[200px]`}
-                      />
-                      <input
-                        value={img.planId === p.id ? img.alt : ''}
-                        onChange={(e) => setImg((s) => ({ ...s, alt: e.target.value, planId: p.id }))}
-                        placeholder="Texto alternativo"
-                        className={`${inputClass} w-40`}
-                      />
-                      <label className="flex items-center gap-1.5 text-sm text-dark-600 pb-2">
-                        <input type="checkbox" checked={img.is_primary} onChange={(e) => setImg((s) => ({ ...s, is_primary: e.target.checked, planId: p.id }))} />
-                        Principal
-                      </label>
-                      <button
-                        type="submit"
-                        disabled={!img.url.trim() || img.planId !== p.id || img.saving}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 cursor-pointer"
-                      >
-                        {img.saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Agregar
-                      </button>
+                    <form onSubmit={addImage} className="mt-2 space-y-2">
+                      <div className="flex flex-wrap items-end gap-2">
+                        <div className="w-full max-w-md">
+                          <ImageUploader
+                            value={img.planId === p.id ? img.url : ''}
+                            onChange={(v) => setImg((s) => ({ ...s, url: v, planId: p.id }))}
+                            placeholder="URL de la imagen (https://)"
+                          />
+                        </div>
+                        <input
+                          value={img.planId === p.id ? img.alt : ''}
+                          onChange={(e) => setImg((s) => ({ ...s, alt: e.target.value, planId: p.id }))}
+                          placeholder="Texto alternativo"
+                          className={`${inputClass} w-40`}
+                        />
+                        <label className="flex items-center gap-1.5 text-sm text-dark-600 pb-2">
+                          <input type="checkbox" checked={img.is_primary} onChange={(e) => setImg((s) => ({ ...s, is_primary: e.target.checked, planId: p.id }))} />
+                          Principal
+                        </label>
+                        <button
+                          type="submit"
+                          disabled={!img.url.trim() || img.planId !== p.id || img.saving}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 cursor-pointer"
+                        >
+                          {img.saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Agregar
+                        </button>
+                      </div>
                     </form>
                     {p.itinerario?.length > 0 && (
                       <div className="mt-4">
@@ -380,7 +427,7 @@ export default function PlanesNegocio({ businessId }) {
                           {p.itinerario.map((d) => (
                             <li key={d.dia}>
                               <strong>Día {d.dia}:</strong>{' '}
-                              {d.actividades.map((a) => `${a.hora ? a.hora + ' — ' : ''}${a.descripcion}`).join(' · ')}
+                              {diaActividades(d).map((a) => `${a.hora ? a.hora + ' — ' : ''}${a.descripcion}`).join(' · ')}
                             </li>
                           ))}
                         </ul>
@@ -425,7 +472,7 @@ export default function PlanesNegocio({ businessId }) {
                         {pr.estado === 'activo' ? (vigente ? 'Vigente' : 'Fuera de vigencia') : 'Inactiva'}
                       </span>
                       <span className="text-sm font-bold text-primary-700">
-                        {pr.tipo_descuento === 'porcentaje' ? `-${pr.valor_descuento}%` : `-${formatMoney(pr.valor_descuento)}`}
+                        {pr.tipo_descuento === 'porcentaje' ? `-${Math.round(Number(pr.valor_descuento) || 0)}%` : `-${formatMoney(pr.valor_descuento)}`}
                       </span>
                     </div>
                     <h3 className="font-semibold text-dark-900 mt-1 truncate">{pr.nombre}</h3>
@@ -457,6 +504,42 @@ export default function PlanesNegocio({ businessId }) {
         </div>
       )}
 
+      {tab === 'grupales' && (
+        <div className="bg-white rounded-2xl border border-dark-100 p-4 sm:p-5">
+          {planes.length === 0 ? (
+            <EmptyState
+              icon={Users}
+              title="Sin planes para gestionar"
+              description="Crea primero un plan para programar salidas con cupo, inscripciones y transporte grupal."
+            />
+          ) : (
+            <>
+              <label className="block text-sm font-medium text-dark-700 mb-2">Plan grupal</label>
+              <select
+                value={grupalPlanId || ''}
+                onChange={(e) => setGrupalPlanId(e.target.value ? Number(e.target.value) : null)}
+                className="w-full sm:w-96 px-3 py-2 rounded-lg border border-dark-200 text-sm bg-white text-dark-900 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors cursor-pointer"
+              >
+                <option value="">Selecciona un plan...</option>
+                {planes.map((p) => (
+                  <option key={p.id} value={p.id}>{p.nombre}</option>
+                ))}
+              </select>
+              {grupalPlanId ? (
+                <div className="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <SalidasPanel businessId={businessId} planId={grupalPlanId} planNombre={planes.find((p) => p.id === grupalPlanId)?.nombre || 'Plan'} />
+                  <TransportePanel businessId={businessId} planId={grupalPlanId} />
+                </div>
+              ) : (
+                <p className="text-sm text-dark-400 mt-4">
+                  Selecciona un plan para programar salidas con cupo (inscripciones de turistas) y gestionar el transporte según la cantidad de personas.
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
       <Modal open={form !== null} onClose={() => setForm(null)} title={form?.mode === 'edit' ? 'Editar plan' : 'Nuevo plan'} size="xl">
         {form && (
           <PlanForm
@@ -468,7 +551,7 @@ export default function PlanesNegocio({ businessId }) {
         )}
       </Modal>
 
-      <Modal open={promoForm !== null} onClose={() => setPromoForm(null)} title={promoForm?.mode === 'edit' ? 'Editar promoción' : 'Nueva promoción'} size="md">
+      <Modal open={promoForm !== null} onClose={() => setPromoForm(null)} title={promoForm?.mode === 'edit' ? 'Editar promoción' : 'Nueva promoción'} size="lg">
         {promoForm && (
           <PromoForm
             businessId={businessId}

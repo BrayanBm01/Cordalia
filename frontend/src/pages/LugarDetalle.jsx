@@ -3,8 +3,8 @@ import { useParams, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   ArrowLeft, MapPin, Clock, DollarSign, Calendar,
-  Plane, Utensils, Camera, Star, Compass, Info,
-  Bed, Tag, ChevronRight, ImageOff, Store,
+  Plane, Camera, Star, Compass, Info,
+  Tag, ChevronRight, ImageOff, Store, ExternalLink,
 } from 'lucide-react'
 import { lugaresAPI } from '../services/api'
 import destinationDetails from '../data/destinos'
@@ -99,52 +99,6 @@ function SpotCard({ spot, index }) {
         )}
       </div>
       <p className="text-sm text-dark-500 leading-relaxed">{spot.description}</p>
-    </motion.div>
-  )
-}
-
-function FoodCard({ food, index }) {
-  return (
-    <motion.div
-      variants={fadeUp}
-      custom={index}
-      initial="hidden"
-      whileInView="visible"
-      viewport={{ once: true, margin: '-50px' }}
-      className="bg-white rounded-xl border border-dark-100 p-5 hover:shadow-md transition-shadow"
-    >
-      <div className="flex items-start gap-3">
-        <div className="w-8 h-8 rounded-lg bg-sand-50 flex items-center justify-center shrink-0 mt-0.5">
-          <Utensils className="w-4 h-4 text-sand-600" />
-        </div>
-        <div>
-          <h4 className="font-semibold text-dark-900">{food.name}</h4>
-          <p className="text-sm text-dark-500 mt-1 leading-relaxed">{food.description}</p>
-        </div>
-      </div>
-    </motion.div>
-  )
-}
-
-function ZoneCard({ zone, index }) {
-  return (
-    <motion.div
-      variants={fadeUp}
-      custom={index}
-      initial="hidden"
-      whileInView="visible"
-      viewport={{ once: true, margin: '-50px' }}
-      className="bg-white rounded-xl border border-dark-100 p-5 hover:shadow-md transition-shadow"
-    >
-      <div className="flex items-start gap-3">
-        <div className="w-8 h-8 rounded-lg bg-ocean-50 flex items-center justify-center shrink-0 mt-0.5">
-          <Bed className="w-4 h-4 text-ocean-600" />
-        </div>
-        <div>
-          <h4 className="font-semibold text-dark-900">{zone.name}</h4>
-          <p className="text-sm text-dark-500 mt-1 leading-relaxed">{zone.description}</p>
-        </div>
-      </div>
     </motion.div>
   )
 }
@@ -464,6 +418,44 @@ export default function LugarDetalle() {
         )}
 
         <section>
+          <SectionHeading icon={MapPin} title="Ubicación" />
+          <div className="bg-white rounded-2xl border border-dark-100 p-6">
+            <div className="flex items-start gap-4 flex-wrap">
+              <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center shrink-0">
+                <MapPin className="w-5 h-5 text-primary-600" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-lg font-semibold text-dark-900" style={{ fontFamily: 'var(--font-display)' }}>
+                  {lugar.nombre}
+                </h3>
+                <p className="text-dark-600 leading-relaxed break-words">{lugar.ubicacion}</p>
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-xl overflow-hidden border border-dark-100">
+              <iframe
+                title={`Mapa de ${lugar.nombre}`}
+                src={`https://maps.google.com/maps?q=${encodeURIComponent(`${lugar.nombre}, ${lugar.ubicacion}`)}&z=10&output=embed`}
+                className="w-full h-[320px] border-0 block"
+                loading="lazy"
+                allowFullScreen
+                referrerPolicy="no-referrer-when-downgrade"
+              />
+            </div>
+
+            <a
+              href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${lugar.nombre}, ${lugar.ubicacion}`)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-4 inline-flex items-center justify-center gap-2 w-full sm:w-auto px-5 py-2.5 rounded-xl bg-primary-600 text-white text-sm font-semibold hover:bg-primary-700 transition-colors"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Ver ruta en Google Maps
+            </a>
+          </div>
+        </section>
+
+        <section>
           <SectionHeading icon={Store} title="Negocios en este destino" />
           {negociosLoading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -513,28 +505,6 @@ export default function LugarDetalle() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {details.spots.map((spot, i) => (
                 <SpotCard key={i} spot={spot} index={i} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {details?.gastronomy?.length > 0 && (
-          <section>
-            <SectionHeading icon={Utensils} title="Sabores del destino" />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {details.gastronomy.map((food, i) => (
-                <FoodCard key={i} food={food} index={i} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {details?.zones?.length > 0 && (
-          <section>
-            <SectionHeading icon={Bed} title="Dónde quedarse" />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {details.zones.map((zone, i) => (
-                <ZoneCard key={i} zone={zone} index={i} />
               ))}
             </div>
           </section>

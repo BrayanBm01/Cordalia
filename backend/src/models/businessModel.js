@@ -383,6 +383,126 @@ const BusinessModel = {
     );
     return rowCount > 0;
   },
+
+  // ---------- Vehículos (flota) ----------
+  async listVehiculos(businessId) {
+    const { rows } = await pool.query(
+      `SELECT v.id, v.business_id, v.nombre, v.tipo, v.marca, v.modelo, v.anio, v.placa,
+              v.capacidad, v.estado, v.descripcion, v.conductor_id, v.created_at, v.updated_at,
+              c.nombre AS conductor_nombre, c.telefono AS conductor_telefono, c.disponible AS conductor_disponible
+       FROM vehiculos v
+       LEFT JOIN conductores c ON c.id = v.conductor_id
+       WHERE v.business_id = $1 ORDER BY v.capacidad DESC, v.id ASC`,
+      [businessId]
+    );
+    return rows;
+  },
+
+  async findVehiculoById(businessId, id) {
+    const { rows } = await pool.query(
+      `SELECT v.id, v.business_id, v.nombre, v.tipo, v.marca, v.modelo, v.anio, v.placa,
+              v.capacidad, v.estado, v.descripcion, v.conductor_id, v.created_at, v.updated_at,
+              c.nombre AS conductor_nombre, c.telefono AS conductor_telefono, c.disponible AS conductor_disponible
+       FROM vehiculos v
+       LEFT JOIN conductores c ON c.id = v.conductor_id
+       WHERE v.id = $1 AND v.business_id = $2 LIMIT 1`,
+      [id, businessId]
+    );
+    return rows[0] || null;
+  },
+
+  async addVehiculo(businessId, data) {
+    const { rows } = await pool.query(
+      `INSERT INTO vehiculos (business_id, nombre, tipo, marca, modelo, anio, placa, capacidad, estado, descripcion, conductor_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       RETURNING id, business_id, nombre, tipo, marca, modelo, anio, placa, capacidad, estado, descripcion, conductor_id, created_at, updated_at`,
+      [businessId, data.nombre, data.tipo || null, data.marca || null, data.modelo || null,
+       data.anio ?? null, data.placa || null, data.capacidad, data.estado || "disponible",
+       data.descripcion || null, data.conductor_id ?? null]
+    );
+    return rows[0];
+  },
+
+  async updateVehiculo(id, businessId, fields) {
+    const keys = Object.keys(fields);
+    if (keys.length === 0) return null;
+    const setClauses = keys.map((k, i) => `${k}=$${i + 1}`);
+    const values = keys.map((k) => fields[k]);
+    values.push(id, businessId);
+    const { rows } = await pool.query(
+      `UPDATE vehiculos SET ${setClauses.join(", ")}, updated_at = NOW()
+       WHERE id=$${values.length - 1} AND business_id=$${values.length}
+       RETURNING id, business_id, nombre, tipo, marca, modelo, anio, placa, capacidad, estado, descripcion, conductor_id, created_at, updated_at`,
+      values
+    );
+    return rows[0] || null;
+  },
+
+  async deleteVehiculo(id, businessId) {
+    const { rowCount } = await pool.query(
+      "DELETE FROM vehiculos WHERE id = $1 AND business_id = $2",
+      [id, businessId]
+    );
+    return rowCount > 0;
+  },
+
+  // ---------- Conductores ----------
+  async listConductores(businessId) {
+    const { rows } = await pool.query(
+      `SELECT id, business_id, nombre, email, telefono, licencia, licencia_categoria,
+              licencia_vencimiento, experiencia, disponible, created_at, updated_at
+       FROM conductores WHERE business_id = $1 ORDER BY nombre ASC, id ASC`,
+      [businessId]
+    );
+    return rows;
+  },
+
+  async findConductorById(businessId, id) {
+    const { rows } = await pool.query(
+      `SELECT id, business_id, nombre, email, telefono, licencia, licencia_categoria,
+              licencia_vencimiento, experiencia, disponible, created_at, updated_at
+       FROM conductores WHERE id = $1 AND business_id = $2 LIMIT 1`,
+      [id, businessId]
+    );
+    return rows[0] || null;
+  },
+
+  async addConductor(businessId, data) {
+    const { rows } = await pool.query(
+      `INSERT INTO conductores (business_id, nombre, email, telefono, licencia, licencia_categoria, licencia_vencimiento, experiencia, disponible)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING id, business_id, nombre, email, telefono, licencia, licencia_categoria,
+                 licencia_vencimiento, experiencia, disponible, created_at, updated_at`,
+      [businessId, data.nombre, data.email || null, data.telefono || null, data.licencia || null,
+       data.licencia_categoria || null, data.licencia_vencimiento || null, data.experiencia || null,
+       data.disponible !== false]
+    );
+    return rows[0];
+  },
+
+  async updateConductor(id, businessId, fields) {
+    const keys = Object.keys(fields);
+    if (keys.length === 0) return null;
+    const setClauses = keys.map((k, i) => `${k}=$${i + 1}`);
+    const values = keys.map((k) => fields[k]);
+    values.push(id, businessId);
+    const { rows } = await pool.query(
+      `UPDATE conductores SET ${setClauses.join(", ")}, updated_at = NOW()
+       WHERE id=$${values.length - 1} AND business_id=$${values.length}
+       RETURNING id, business_id, nombre, email, telefono, licencia, licencia_categoria,
+                 licencia_vencimiento, experiencia, disponible, created_at, updated_at`,
+      values
+    );
+    return rows[0] || null;
+  },
+
+  async deleteConductor(id, businessId) {
+    const { rowCount } = await pool.query(
+      "DELETE FROM conductores WHERE id = $1 AND business_id = $2",
+      [id, businessId]
+    );
+    return rowCount > 0;
+  },
 };
 
 module.exports = BusinessModel;

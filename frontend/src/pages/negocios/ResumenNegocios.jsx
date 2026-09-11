@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Store, CheckCircle2, Clock, MapPin, AlertTriangle, Plus, Eye, ImageOff } from 'lucide-react'
-import { businessesAPI } from '../../services/api'
-import { ESTADO_LABEL, ESTADO_BADGE } from './businessUtils'
+import { Store, CheckCircle2, Clock, MapPin, AlertTriangle, Plus, Eye, ImageOff, Ticket, CalendarDays, Users, Truck, Wallet } from 'lucide-react'
+import { businessesAPI, businessPlanesAPI, businessFlotaAPI } from '../../services/api'
+import { ESTADO_LABEL, ESTADO_BADGE, formatMoney } from './businessUtils'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import EmptyState from '../../components/EmptyState'
+import PieChartCard from '../../components/PieChartCard'
 import { toast } from 'sonner'
 
 const estadoStats = [
@@ -20,6 +21,9 @@ const estadoStats = [
 export default function ResumenNegocios() {
   const [negocios, setNegocios] = useState([])
   const [loading, setLoading] = useState(true)
+  const [actividad, setActividad] = useState({ loading: false })
+  const [stats, setStats] = useState({ planes: 0, salidas: 0, ocupados: 0, capacidad: 0, vehiculos: 0 })
+  const [proximas, setProximas] = useState([])
 
   useEffect(() => {
     let active = true
@@ -36,6 +40,57 @@ export default function ResumenNegocios() {
       })
     return () => { active = false }
   }, [])
+
+  useEffect(() => {
+    if (negocios.length === 0) return
+    let active = true
+    setActividad({ loading: true })
+    const hoy = new Date().toISOString().slice(0, 10)
+
+    async function loadActividad() {
+      let planes = 0, salidas = 0, ocupados = 0, capacidad = 0, vehiculos = 0
+      const prox = []
+      for (const n of negocios) {
+        const [pRes, vRes] = await Promise.all([
+          businessPlanesAPI.list(n.id).catch(() => null),
+          businessFlotaAPI.vehiculos.list(n.id).catch(() => null),
+        ])
+        const planList = Array.isArray(pRes?.data) ? pRes.data : []
+        planes += planList.length
+        vehiculos += Array.isArray(vRes?.data) ? vRes.data.length : 0
+        for (const p of planList) {
+          const sRes = await businessPlanesAPI.salidas.list(n.id, p.id).catch(() => null)
+          const sList = Array.isArray(sRes?.data) ? sRes.data : []
+          salidas += sList.length
+          for (const s of sList) {
+            capacidad += Number(s.cupo_maximo) || 0
+            ocupados += Number(s.cupo_ocupado) || 0
+            if ((s.fecha || '') >= hoy) {
+              let resumen = null
+              let transporte = null
+              try {
+                const rr = await businessPlanesAPI.salidas.inscripciones.resumen(n.id, p.id, s.id)
+                resumen = rr?.data
+              } catch { /* resumen indisponible */ }
+              try {
+                const tr = await businessPlanesAPI.salidas.transporte.sugerir(n.id, p.id, s.id)
+                transporte = tr?.data && typeof tr.data === 'object' ? tr.data : null
+              } catch { /* transporte indisponible */ }
+              prox.push({ ...s, negocio: n.nombre, plan: p.nombre, planId: p.id, businessId: n.id, resumen, transporte })
+            }
+          }
+        }
+      }
+      prox.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''))
+      if (active) {
+        setStats({ planes, salidas, ocupados, capacidad, vehiculos })
+        setProximas(prox.slice(0, 6))
+        setActividad({ loading: false })
+      }
+    }
+    loadActividad()
+    return () => { active = false }
+  }, [negocios])
 
   if (loading) return <LoadingSpinner />
 
@@ -99,6 +154,109 @@ export default function ResumenNegocios() {
                   <p className="text-sm text-dark-500">{c.label}</p>
                 </div>
               ))}
+            </div>
+
+            <div className="bg-white rounded-2xl border border-dark-100 p-6 shadow-sm">
+              <h2 className="font-semibold text-dark-900 mb-4" style={{ fontFamily: 'var(--font-display)' }}>
+                Actividad como vendedor
+              </h2>
+              {actividad.loading ? (
+                <LoadingSpinner />
+              ) : stats.salidas === 0 && stats.planes === 0 ? (
+                <p className="text-sm text-dark-400">
+                  Aún no hay actividad. Crea planes y prográmalos con salidas grupales para ver tus indicadores aquí.
+                </p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+                    {[
+                      { icon: Ticket, label: 'Planes publicados', value: stats.planes, color: 'bg-primary-50 text-primary-600' },
+                      { icon: CalendarDays, label: 'Salidas programadas', value: stats.salidas, color: 'bg-ocean-50 text-ocean-600' },
+                      { icon: Users, label: 'Personas inscritas', value: stats.ocupados, color: 'bg-emerald-50 text-emerald-600' },
+                      { icon: Truck, label: 'Vehículos en flota', value: stats.vehiculos, color: 'bg-amber-50 text-amber-600' },
+                    ].map((c) => (
+                      <div key={c.label} className="rounded-xl border border-dark-100 p-4">
+                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${c.color}`}>
+                          <c.icon className="w-4.5 h-4.5" style={{ width: 18, height: 18 }} />
+                        </div>
+                        <p className="mt-2 text-2xl font-bold text-dark-900" style={{ fontFamily: 'var(--font-display)' }}>{c.value}</p>
+                        <p className="text-xs text-dark-500">{c.label}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <h3 className="text-sm font-semibold text-dark-800 mb-3 flex items-center gap-1.5">
+                        <CalendarDays className="w-4 h-4 text-primary-600" /> Próximas salidas
+                      </h3>
+                      {proximas.length === 0 ? (
+                        <p className="text-sm text-dark-400">Sin salidas próximas programadas.</p>
+                      ) : (
+                        <ul className="space-y-2">
+                          {proximas.map((s) => {
+                            const llena = s.cupo_disponible <= 0
+                            const transporte = s.transporte
+                            return (
+                              <li key={`${s.businessId}-${s.planId}-${s.id}`} className="rounded-lg border border-dark-100 px-3 py-2 text-sm">
+                                <div className="flex items-center gap-2">
+                                  <CalendarDays className="w-4 h-4 text-dark-400 shrink-0" />
+                                  <span className="font-medium text-dark-800 truncate">
+                                    {new Date(s.fecha + 'T00:00:00').toLocaleDateString('es-CO', { weekday: 'short', day: '2-digit', month: 'short' })}
+                                    {s.hora ? ` · ${s.hora}` : ''}
+                                    <span className="text-dark-400 font-normal"> — {s.plan}</span>
+                                  </span>
+                                </div>
+                                <span className="text-xs text-dark-500 block mt-0.5">{s.negocio}</span>
+                                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-xs text-dark-500">
+                                  <span className="inline-flex items-center gap-1">
+                                    <Users className="w-3 h-3 text-primary-600" /> {s.cupo_ocupado} / {s.cupo_maximo} personas
+                                  </span>
+                                  {s.resumen?.valor_total != null && Number(s.resumen.valor_total) > 0 && (
+                                    <span className="inline-flex items-center gap-1 font-medium text-emerald-700">
+                                      <Wallet className="w-3 h-3" /> {formatMoney(s.resumen.valor_total)} en inscripciones
+                                    </span>
+                                  )}
+                                  {transporte?.vehiculo && (
+                                    <span className="inline-flex items-center gap-1">
+                                      <Truck className="w-3 h-3 text-ocean-600" />
+                                      Transporte: <span className="capitalize font-medium">{transporte.vehiculo.tipo || 'Vehículo'}</span>
+                                      {transporte.conductor ? ` · Conductor: ${transporte.conductor.nombre}` : ''}
+                                    </span>
+                                  )}
+                                </div>
+                                <span className={`mt-1 inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold ${llena ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                  {llena ? 'Llena' : `${s.cupo_disponible} libres`}
+                                </span>
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-dark-800 mb-3 flex items-center gap-1.5">
+                        <Users className="w-4 h-4 text-primary-600" /> Ocupación de cupos
+                      </h3>
+                      {stats.capacidad === 0 ? (
+                        <p className="text-sm text-dark-400">Sin salidas con cupos registrados.</p>
+                      ) : (
+                        <PieChartCard
+                          height={210}
+                          data={[
+                            { name: 'Cupos ocupados', cantidad: stats.ocupados },
+                            { name: 'Cupos libres', cantidad: Math.max(0, stats.capacidad - stats.ocupados) },
+                          ]}
+                          palette={['#10b981', '#e2e8f0']}
+                        />
+                      )}
+                      <p className="text-xs text-dark-400 mt-2">
+                        Personas con cupo reservado: {stats.ocupados}. Coordina el pago por WhatsApp; la inscripción es solo logística.
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="bg-white rounded-2xl border border-dark-100 p-6 shadow-sm">

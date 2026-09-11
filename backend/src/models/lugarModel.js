@@ -3,14 +3,14 @@ const pool = require("../config/db");
 const LugarModel = {
   async findAll() {
     const { rows } = await pool.query(
-      "SELECT id, nombre, slug, descripcion, ubicacion, imagen, created_at, updated_at FROM lugares ORDER BY id ASC"
+      "SELECT id, nombre, slug, descripcion, ubicacion, municipio, tipo, imagen, created_at, updated_at FROM lugares ORDER BY id ASC"
     );
     return rows;
   },
 
   async findById(id) {
     const { rows } = await pool.query(
-      "SELECT id, nombre, slug, descripcion, ubicacion, imagen, created_at, updated_at FROM lugares WHERE id = $1",
+      "SELECT id, nombre, slug, descripcion, ubicacion, municipio, tipo, imagen, created_at, updated_at FROM lugares WHERE id = $1",
       [id]
     );
     return rows[0] || null;
@@ -18,7 +18,7 @@ const LugarModel = {
 
   async findBySlug(slug) {
     const { rows } = await pool.query(
-      "SELECT id, nombre, slug, descripcion, ubicacion, imagen, created_at, updated_at FROM lugares WHERE slug = $1",
+      "SELECT id, nombre, slug, descripcion, ubicacion, municipio, tipo, imagen, created_at, updated_at FROM lugares WHERE slug = $1",
       [slug]
     );
     return rows[0] || null;
@@ -26,21 +26,21 @@ const LugarModel = {
 
   async search(query) {
     const { rows } = await pool.query(
-      `SELECT id, nombre, slug, descripcion, ubicacion, imagen, created_at, updated_at
+      `SELECT id, nombre, slug, descripcion, ubicacion, municipio, tipo, imagen, created_at, updated_at
        FROM lugares
-       WHERE nombre ILIKE $1 OR descripcion ILIKE $1 OR ubicacion ILIKE $1
+       WHERE nombre ILIKE $1 OR descripcion ILIKE $1 OR ubicacion ILIKE $1 OR municipio ILIKE $1
        ORDER BY nombre ASC`,
       [`%${query}%`]
     );
     return rows;
   },
 
-  async create(nombre, slug, descripcion, ubicacion, imagen) {
+  async create(nombre, slug, descripcion, ubicacion, municipio, tipo, imagen) {
     const { rows } = await pool.query(
-      `INSERT INTO lugares (nombre, slug, descripcion, ubicacion, imagen)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, nombre, slug, descripcion, ubicacion, imagen, created_at, updated_at`,
-      [nombre, slug, descripcion, ubicacion, imagen]
+      `INSERT INTO lugares (nombre, slug, descripcion, ubicacion, municipio, tipo, imagen)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, nombre, slug, descripcion, ubicacion, municipio, tipo, imagen, created_at, updated_at`,
+      [nombre, slug, descripcion, ubicacion, municipio, tipo, imagen]
     );
     return rows[0];
   },
@@ -49,7 +49,7 @@ const LugarModel = {
     const keys = Object.keys(fields);
     if (keys.length === 0) return null;
 
-    const allowed = ["nombre", "slug", "descripcion", "ubicacion", "imagen"];
+    const allowed = ["nombre", "slug", "descripcion", "ubicacion", "municipio", "tipo", "imagen"];
     const safeKeys = keys.filter((k) => allowed.includes(k));
     if (safeKeys.length === 0) return null;
 
@@ -65,7 +65,7 @@ const LugarModel = {
 
     const { rows } = await pool.query(
       `UPDATE lugares SET ${setClauses.join(", ")} WHERE id=$${values.length}
-       RETURNING id, nombre, slug, descripcion, ubicacion, imagen, created_at, updated_at`,
+       RETURNING id, nombre, slug, descripcion, ubicacion, municipio, tipo, imagen, created_at, updated_at`,
       values
     );
     return rows[0] || null;
