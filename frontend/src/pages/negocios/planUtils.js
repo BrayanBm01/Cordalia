@@ -138,7 +138,7 @@ export function buildWhatsAppText(plan, negocio, personas) {
   const precio = planPrecioText(plan)
   const lines = [
     `Hola ${negocio?.negocio_nombre || 'un gusto'} 👋`,
-    `Me interesa el ${TIPO_PLAN_LABEL[plan?.tipo_plan]?.toLowerCase() || 'plan'} "${nombrePlan}" en Explora Turismo.`,
+    `Me interesa el ${TIPO_PLAN_LABEL[plan?.tipo_plan]?.toLowerCase() || 'plan'} "${nombrePlan}" en Cordalia.`,
     `Precio: ${precio}.`,
   ]
   if (personas > 0) lines.push(`Seríamos ${personas} persona${personas !== 1 ? 's' : ''}.`)

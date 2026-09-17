@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Outlet, Link, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { Mountain, Menu, X, ChevronDown, User, Shield, Store, Heart, LogOut, Ticket, Code2, ExternalLink } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
@@ -38,13 +38,7 @@ function Navbar() {
     navigate('/')
   }
 
-  const handleExperienciasClick = useCallback((e) => {
-    setMobileOpen(false)
-    if (location.pathname === '/') {
-      e.preventDefault()
-      document.getElementById('experiencias')?.scrollIntoView({ behavior: 'smooth' })
-    }
-  }, [location.pathname])
+
 
   return (
     <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-dark-100">
@@ -53,7 +47,7 @@ function Navbar() {
           <Link to="/" className="flex items-center gap-2 group">
             <Mountain className="w-7 h-7 text-primary-600 group-hover:text-primary-700 transition-colors" />
             <span className="font-[family-name:var(--font-display)] text-xl font-bold text-dark-900">
-              Explora Turismo
+              Cordalia
             </span>
           </Link>
 
@@ -69,25 +63,6 @@ function Navbar() {
             </NavLink>
             <NavLink to="/planes" className={navLinkClass}>
               Planes
-            </NavLink>
-            {location.pathname === '/' ? (
-              <a
-                href="#experiencias"
-                onClick={handleExperienciasClick}
-                className="text-sm font-medium text-dark-600 hover:text-primary-600 transition-colors duration-200"
-              >
-                Experiencias
-              </a>
-            ) : (
-              <Link
-                to="/#experiencias"
-                className="text-sm font-medium text-dark-600 hover:text-primary-600 transition-colors duration-200"
-              >
-                Experiencias
-              </Link>
-            )}
-            <NavLink to="/lugares" className={navLinkClass}>
-              Explorar
             </NavLink>
           </div>
 
@@ -246,34 +221,6 @@ function Navbar() {
             >
               Planes
             </NavLink>
-            {location.pathname === '/' ? (
-              <a
-                href="#experiencias"
-                onClick={(e) => {
-                  setMobileOpen(false)
-                  e.preventDefault()
-                  document.getElementById('experiencias')?.scrollIntoView({ behavior: 'smooth' })
-                }}
-                className="block px-3 py-2.5 rounded-lg text-sm font-medium text-dark-700 hover:bg-dark-50 transition-colors"
-              >
-                Experiencias
-              </a>
-            ) : (
-              <Link
-                to="/#experiencias"
-                onClick={() => setMobileOpen(false)}
-                className="block px-3 py-2.5 rounded-lg text-sm font-medium text-dark-700 hover:bg-dark-50 transition-colors"
-              >
-                Experiencias
-              </Link>
-            )}
-            <NavLink
-              to="/lugares"
-              onClick={() => setMobileOpen(false)}
-              className="block px-3 py-2.5 rounded-lg text-sm font-medium text-dark-700 hover:bg-dark-50 transition-colors"
-            >
-              Explorar
-            </NavLink>
 
             <div className="border-t border-dark-100 pt-3 mt-3">
               {user ? (
@@ -374,12 +321,12 @@ function Footer() {
             <Link to="/" className="flex items-center gap-2">
               <Mountain className="w-7 h-7 text-primary-400" />
               <span className="font-[family-name:var(--font-display)] text-xl font-bold text-white">
-                Explora Turismo
+                Cordalia
               </span>
             </Link>
             <p className="text-sm leading-relaxed text-dark-400 max-w-xs">
-              Descubre la magia de Colombia. Desde las costas del Caribe hasta la
-              selva amazónica, encuentra tu próximo destino inolvidable.
+              Descubre Córdoba, Colombia. Explora sus destinos, negocios turísticos
+              y planes para vivir una experiencia auténtica en el departamento.
             </p>
           </div>
 
@@ -406,12 +353,7 @@ function Footer() {
               <li>
                 <Link to="/planes" className="text-sm text-dark-400 hover:text-primary-400 transition-colors inline-flex items-center gap-1.5">
                   <Ticket className="w-3.5 h-3.5" />
-                  Planes y experiencias
-                </Link>
-              </li>
-              <li>
-                <Link to="/lugares" className="text-sm text-dark-400 hover:text-primary-400 transition-colors">
-                  Explorar
+                  Planes turísticos
                 </Link>
               </li>
             </ul>
@@ -465,7 +407,7 @@ function Footer() {
             <h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-4">
               Desarrollador
             </h3>
-            <p className="text-sm text-dark-400 mb-3">Hecho con dedicación para el turismo colombiano.</p>
+            <p className="text-sm text-dark-400 mb-3">Construido para impulsar el turismo en Córdoba.</p>
             <a
               href="https://github.com/BrayanBm01"
               target="_blank"
@@ -482,14 +424,8 @@ function Footer() {
 
         <div className="mt-12 pt-8 border-t border-dark-800 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-sm text-dark-500">
-            &copy; {new Date().getFullYear()} Explora Turismo. Todos los derechos reservados.
+            &copy; {new Date().getFullYear()} Cordalia. Todos los derechos reservados.
           </p>
-          <div className="flex flex-col sm:flex-row items-center gap-3 text-sm text-dark-500">
-            <p className="inline-flex items-center gap-1.5">
-              <Heart className="w-3.5 h-3.5 text-primary-500" />
-              Hecho con amor en Colombia
-            </p>
-          </div>
         </div>
       </div>
     </footer>

@@ -44,10 +44,10 @@ const experiences = [
 ]
 
 const stats = [
-  { value: '1,849 km', label: 'de costa', icon: Waves },
-  { value: '59,683 km²', label: 'de área protegida', icon: Shield },
-  { value: '1,900+', label: 'especies de aves', icon: Feather },
-  { value: 'Patrimonio', label: 'UNESCO', icon: Globe },
+  { value: '30+', label: 'municipios en Córdoba', icon: MapPin },
+  { value: '100%', label: 'enfocado en Córdoba', icon: Shield },
+  { value: '2.5M', label: 'habitantes en el dpto.', icon: Globe },
+  { value: 'Turismo', label: 'auténtico y local', icon: Feather },
 ]
 
 export default function Home() {
@@ -81,7 +81,7 @@ export default function Home() {
           <motion.div initial="hidden" animate="visible" variants={staggerContainer}>
             <motion.div variants={fadeUp} custom={0}>
               <span className="inline-block px-4 py-1.5 rounded-full bg-white/10 text-white/80 text-sm font-medium tracking-wide mb-8 backdrop-blur-sm border border-white/10">
-                Tu plataforma de turismo en Colombia
+                Descubre Córdoba con Cordalia
               </span>
             </motion.div>
 
@@ -140,13 +140,13 @@ export default function Home() {
               className="flex items-center justify-center gap-8 sm:gap-12 text-white/60"
             >
               <div className="text-center">
-                <p className="text-2xl sm:text-3xl font-bold text-white">12+</p>
-                <p className="text-sm mt-0.5">Destinos</p>
+                <p className="text-2xl sm:text-3xl font-bold text-white">30+</p>
+                <p className="text-sm mt-0.5">Municipios</p>
               </div>
               <div className="w-px h-10 bg-white/20" />
               <div className="text-center">
                 <p className="text-2xl sm:text-3xl font-bold text-white">100%</p>
-                <p className="text-sm mt-0.5">Colombia</p>
+                <p className="text-sm mt-0.5">Córdoba</p>
               </div>
               <div className="w-px h-10 bg-white/20" />
               <div className="text-center">
@@ -294,7 +294,7 @@ export default function Home() {
               variants={fadeUp}
               className="mt-4 text-lg text-dark-500 max-w-2xl mx-auto"
             >
-              Colombia ofrece todo tipo de experiencias para cada tipo de viajero.
+              Córdoba ofrece todo tipo de experiencias para cada tipo de viajero.
             </motion.p>
           </motion.div>
 
@@ -345,19 +345,19 @@ export default function Home() {
                 variants={fadeUp}
                 className="inline-block px-4 py-1.5 rounded-full bg-sand-50 text-sand-700 text-sm font-semibold tracking-wide mb-4"
               >
-                ¿Por qué Colombia?
+                ¿Por qué Córdoba?
               </motion.span>
               <motion.h2
                 variants={fadeUp}
                 className="font-[family-name:var(--font-display)] text-4xl sm:text-5xl font-bold text-dark-900 mb-6"
               >
-                Un país sin igual
+                Un departamento sin igual
               </motion.h2>
               <motion.p variants={fadeUp} className="text-lg text-dark-500 leading-relaxed mb-8">
-                Colombia es un destino que lo tiene todo: desde costas caribeñas hasta montañas
-                nevadas, selvas tropicales hasta desiertos surrealistas. Con una biodiversidad que
-                ocupa el segundo lugar en el mundo, una historia que se remonta a civilizaciones
-                precolombinas y una cultura vibrante que mezcla lo ancestral con lo moderno.
+                Córdoba es un destino que lo tiene todo: desde las playas del golfo de Morrosquillo
+                hasta las sabanas y ciénagas del interior, pasando por ecosistemas únicos, gastronomía
+                auténtica y una cultura costeña vibrante. Con una biodiversidad impresionante y
+                municipios llenos de historia, Córdoba es el destino ideal para el viajero curioso.
               </motion.p>
               <motion.div variants={fadeUp}>
                 <Link
@@ -415,16 +415,17 @@ export default function Home() {
               variants={fadeUp}
               className="font-[family-name:var(--font-display)] text-4xl sm:text-5xl font-bold text-dark-900 mb-6"
             >
-              Sobre Explora Turismo
+              Sobre Cordalia
             </motion.h2>
             <motion.p variants={fadeUp} className="text-lg text-dark-500 leading-relaxed max-w-2xl mx-auto mb-4">
-              Somos una plataforma dedicada a ayudarte a descubrir los mejores destinos de Colombia.
-              Nuestro objetivo es conectar viajeros con la riqueza natural, cultural e histórica
-              de un país lleno de sorpresas.
+              Somos una plataforma especializada en el turismo de Córdoba, Colombia.
+              Nuestro objetivo es ayudarte a descubrir los mejores destinos del departamento,
+              conectarte con negocios turísticos locales y encontrar planes que se ajusten
+              a lo que buscas.
             </motion.p>
             <motion.p variants={fadeUp} className="text-lg text-dark-500 leading-relaxed max-w-2xl mx-auto">
-              Explora Turismo nació con la misión de hacer el turismo colombiano más accesible
-              y inspirador para todos.
+              Cordalia nació con la misión de hacer el turismo en Córdoba más accesible,
+              transparente y memorable para todos los viajeros.
             </motion.p>
           </motion.div>
         </div>
@@ -455,7 +456,8 @@ export default function Home() {
                 variants={fadeUp}
                 className="text-lg text-white/70 mb-10 max-w-2xl mx-auto"
               >
-                Únete a miles de viajeros que ya descubrieron la mejor forma de explorar Colombia.
+                Únete a los viajeros que ya descubrieron la mejor forma de explorar Córdoba
+                y encontrar planes que se ajustan a su presupuesto.
               </motion.p>
               <motion.div variants={fadeUp}>
                 <Link

@@ -1,44 +1,69 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ArrowLeft, Save, Loader2 } from 'lucide-react'
+import { ArrowLeft, Save, Loader2, Info } from 'lucide-react'
 import { businessesAPI, lugaresAPI } from '../../services/api'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import ImageUploader from '../../components/ImageUploader'
 import MoneyInput from '../../components/MoneyInput'
 import { toast } from 'sonner'
 
-const negocioSchema = z
-  .object({
-    nombre: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(200, 'Máximo 200 caracteres'),
-    category_id: z.string().transform((v) => (v === '' ? '' : Number(v))),
-    destination_id: z.string().transform((v) => (v === '' ? '' : Number(v))),
-    descripcion: z.string().max(5000).optional().or(z.literal('')),
-    direccion: z.string().max(300).optional().or(z.literal('')),
-    telefono: z.string().max(30).optional().or(z.literal('')),
-    whatsapp: z.string().max(30).optional().or(z.literal('')),
-    email_contacto: z.string().email('Email de contacto inválido').optional().or(z.literal('')),
-    website: z
-      .string()
-      .refine((v) => v === '' || /^https?:\/\/.+/i.test(v), 'URL inválida (http/https)')
-      .optional()
-      .or(z.literal('')),
-    portada_url: z
-      .string()
-      .refine((v) => v === '' || /^https?:\/\/.+/i.test(v) || /^data:image\//i.test(v), 'URL inválida (http/https o imagen base64)')
-      .optional()
-      .or(z.literal('')),
-    moneda: z.string().max(3, '3 letras').optional().or(z.literal('')),
-    precio_min: z.coerce.number().min(0).optional(),
-    precio_max: z.coerce.number().min(0).optional(),
-  })
-  .refine((d) => d.precio_max === undefined || d.precio_min === undefined || d.precio_max >= d.precio_min, {
-    message: 'El precio máximo no puede ser menor que el mínimo',
-    path: ['precio_max'],
-  })
+const MONEDAS = ['COP', 'USD', 'EUR', 'MXN', 'PEN']
+
+// Categorías que manejan rango de precios en su ficha pública.
+const CATEGORIAS_CON_PRECIO = [
+  'Restaurante', 'Hotel', 'Hostal', 'Tour', 'Agencia de viajes',
+  'Experiencia turistica', 'Atraccion turistica',
+]
+
+function buildSchema(categorias = []) {
+  const nombresPorId = new Map(categorias.map((c) => [String(c.id), c.nombre]))
+
+  return z
+    .object({
+      nombre: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(200, 'Máximo 200 caracteres'),
+      category_id: z.string().transform((v) => (v === '' ? '' : Number(v))),
+      destination_id: z.string().transform((v) => (v === '' ? '' : Number(v))),
+      descripcion: z.string().max(5000).optional().or(z.literal('')),
+      direccion: z.string().max(300).optional().or(z.literal('')),
+      telefono: z.string().max(30).optional().or(z.literal('')),
+      whatsapp: z.string().max(30).optional().or(z.literal('')),
+      email_contacto: z.string().email('Email de contacto inválido').optional().or(z.literal('')),
+      website: z
+        .string()
+        .refine((v) => v === '' || /^https?:\/\/.+/i.test(v), 'URL inválida (http/https)')
+        .optional()
+        .or(z.literal('')),
+      portada_url: z
+        .string()
+        .refine((v) => v === '' || /^https?:\/\/.+/i.test(v) || /^data:image\//i.test(v), 'URL inválida (http/https o imagen base64)')
+        .optional()
+        .or(z.literal('')),
+      moneda: z.enum(MONEDAS, { message: 'Selecciona una moneda válida' }),
+      precio_min: z.coerce.number().min(0).optional(),
+      precio_max: z.coerce.number().min(0).optional(),
+    })
+    .superRefine((d, ctx) => {
+      const nombre = nombresPorId.get(String(d.category_id))
+      const requierePrecio = !!nombre && CATEGORIAS_CON_PRECIO.includes(nombre)
+
+      if (requierePrecio) {
+        if (d.precio_min === undefined || d.precio_min === '') {
+          ctx.addIssue({ code: 'custom', path: ['precio_min'], message: 'Requerido para esta categoría' })
+        }
+        if (d.precio_max === undefined || d.precio_max === '') {
+          ctx.addIssue({ code: 'custom', path: ['precio_max'], message: 'Requerido para esta categoría' })
+        }
+      }
+
+      if (d.precio_max !== undefined && d.precio_min !== undefined && Number(d.precio_max) < Number(d.precio_min)) {
+        ctx.addIssue({ code: 'custom', path: ['precio_max'], message: 'El precio máximo no puede ser menor que el mínimo' })
+      }
+    })
+}
 
 const inputClass =
   'w-full px-3 py-2.5 rounded-xl border border-dark-200 text-sm bg-white text-dark-900 placeholder:text-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors'
@@ -52,6 +77,8 @@ export default function NegocioForm() {
   const [loading, setLoading] = useState(isEdit)
   const [submitting, setSubmitting] = useState(false)
 
+  const resolver = useMemo(() => zodResolver(buildSchema(categorias)), [categorias])
+
   const {
     control,
     register,
@@ -60,7 +87,7 @@ export default function NegocioForm() {
     watch,
     setValue,
     formState: { errors },
-  } = useForm({ resolver: zodResolver(negocioSchema) })
+  } = useForm({ resolver, defaultValues: { moneda: 'COP' } })
 
   useEffect(() => {
     lugaresAPI.getAll().then((r) => setLugares(Array.isArray(r.data) ? r.data : [])).catch(() => {})
@@ -96,12 +123,22 @@ export default function NegocioForm() {
       .finally(() => setLoading(false))
   }, [isEdit, id, reset])
 
+  const categoriaId = String(watch('category_id') || '')
+  const categoriaActual = categorias.find((c) => String(c.id) === categoriaId)
+  const requierePrecio = !!categoriaActual && CATEGORIAS_CON_PRECIO.includes(categoriaActual.nombre)
+  const sinPrecio = !!categoriaActual && !CATEGORIAS_CON_PRECIO.includes(categoriaActual.nombre)
+
   async function onSubmit(data) {
     setSubmitting(true)
     const body = {
       ...data,
       category_id: data.category_id || null,
       destination_id: data.destination_id === '' ? null : data.destination_id,
+    }
+    // Categorías sin rango de precios: no se envían precios (backend los rechaza).
+    if (sinPrecio) {
+      delete body.precio_min
+      delete body.precio_max
     }
     try {
       if (isEdit) {
@@ -222,39 +259,63 @@ export default function NegocioForm() {
             </div>
             <div>
               <label className="block text-sm font-medium text-dark-700 mb-1.5">Moneda</label>
-              <input {...register('moneda')} placeholder="COP" className={inputClass} maxLength={3} />
+              <select {...register('moneda')} className={`${inputClass} bg-white`}>
+                {MONEDAS.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+              {errors.moneda && <p className="text-red-500 text-xs mt-1">{errors.moneda.message}</p>}
             </div>
-            <div>
-              <label className="block text-sm font-medium text-dark-700 mb-1.5">Precio mínimo</label>
-              <Controller
-                control={control}
-                name="precio_min"
-                render={({ field }) => (
-                  <MoneyInput
-                    value={field.value}
-                    onChange={(v) => field.onChange(v ?? undefined)}
-                    placeholder="100000"
-                    className={inputClass}
+            {requierePrecio && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-dark-700 mb-1.5">
+                    Precio mínimo <span className="text-red-500">*</span>
+                  </label>
+                  <Controller
+                    control={control}
+                    name="precio_min"
+                    render={({ field }) => (
+                      <MoneyInput
+                        value={field.value}
+                        onChange={(v) => field.onChange(v ?? undefined)}
+                        placeholder="100000"
+                        className={inputClass}
+                      />
+                    )}
                   />
-                )}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-dark-700 mb-1.5">Precio máximo</label>
-              <Controller
-                control={control}
-                name="precio_max"
-                render={({ field }) => (
-                  <MoneyInput
-                    value={field.value}
-                    onChange={(v) => field.onChange(v ?? undefined)}
-                    placeholder="500000"
-                    className={inputClass}
+                  {errors.precio_min && <p className="text-red-500 text-xs mt-1">{errors.precio_min.message}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-dark-700 mb-1.5">
+                    Precio máximo <span className="text-red-500">*</span>
+                  </label>
+                  <Controller
+                    control={control}
+                    name="precio_max"
+                    render={({ field }) => (
+                      <MoneyInput
+                        value={field.value}
+                        onChange={(v) => field.onChange(v ?? undefined)}
+                        placeholder="500000"
+                        className={inputClass}
+                      />
+                    )}
                   />
-                )}
-              />
-              {errors.precio_max && <p className="text-red-500 text-xs mt-1">{errors.precio_max.message}</p>}
-            </div>
+                  {errors.precio_max && <p className="text-red-500 text-xs mt-1">{errors.precio_max.message}</p>}
+                </div>
+              </>
+            )}
+            {sinPrecio && (
+              <div className="sm:col-span-2">
+                <p className="flex items-center gap-2 text-xs text-dark-400">
+                  <Info className="w-4 h-4 shrink-0" />
+                  Esta categoría no publica rango de precios en su ficha.
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-dark-100">

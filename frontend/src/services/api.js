@@ -59,6 +59,33 @@ export const lugaresAPI = {
   create: (data) => api.post('/lugares', data),
   update: (id, data) => api.put(`/lugares/${id}`, data),
   delete: (id) => api.delete(`/lugares/${id}`),
+  contenido: (id) => api.get(`/lugares/${id}/contenido`),
+  presupuesto: (id) => api.get(`/lugares/${id}/presupuesto`),
+  administrar: (id) => api.get(`/lugares/${id}/administrar`),
+  assignActividad: (id, actividadId, orden = 0) =>
+    api.post(`/lugares/${id}/administrar/contenido/actividades`, { actividad_id: actividadId, orden }),
+  unassignActividad: (id, actividadId) =>
+    api.delete(`/lugares/${id}/administrar/contenido/actividades/${actividadId}`),
+  assignPunto: (id, puntoId, orden = 0) =>
+    api.post(`/lugares/${id}/administrar/contenido/puntos`, { punto_interes_id: puntoId, orden }),
+  unassignPunto: (id, puntoId) =>
+    api.delete(`/lugares/${id}/administrar/contenido/puntos/${puntoId}`),
+  saveInfoViaje: (id, data) => api.post(`/lugares/${id}/administrar/info-viaje`, data),
+}
+
+export const contenidoAPI = {
+  actividades: {
+    list: (activo) => api.get(`/contenido/actividades${activo ? `?activo=${activo}` : ''}`),
+    create: (data) => api.post('/contenido/actividades', data),
+    update: (id, data) => api.put(`/contenido/actividades/${id}`, data),
+    remove: (id) => api.delete(`/contenido/actividades/${id}`),
+  },
+  puntos: {
+    list: (activo) => api.get(`/contenido/puntos${activo ? `?activo=${activo}` : ''}`),
+    create: (data) => api.post('/contenido/puntos', data),
+    update: (id, data) => api.put(`/contenido/puntos/${id}`, data),
+    remove: (id) => api.delete(`/contenido/puntos/${id}`),
+  },
 }
 
 export const usuariosAPI = {
@@ -162,6 +189,14 @@ export const planesAPI = {
   transporteSalida: (planId, salidaId) => api.get(`/planes/${planId}/salidas/${salidaId}/transporte`),
   inscribir: (businessId, planId, salidaId, data) =>
     api.post(`/businesses/${businessId}/planes/${planId}/salidas/${salidaId}/inscripciones`, data),
+}
+
+// Inscripciones y pagos del turista (Cordalia)
+export const inscripcionesAPI = {
+  misInscripciones: () => api.get('/mis-inscripciones'),
+  comprobante: (id) => api.get(`/inscripciones/${id}/comprobante`),
+  pagar: (id, metodoPago) => api.post(`/inscripciones/${id}/pagar`, { metodo_pago: metodoPago }),
+  estadoPagos: () => api.get('/pagos/estado'),
 }
 
 export const businessPlanesAPI = {

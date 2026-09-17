@@ -33,7 +33,7 @@ const TIPOS = [
   {
     id: 'BUSINESS',
     title: 'Negocio',
-    subtitle: 'Tengo un negocio y quiero aparecer en Explora Turismo.',
+    subtitle: 'Tengo un negocio y quiero aparecer en Cordalia.',
     icon: Store,
   },
 ]
@@ -88,15 +88,15 @@ export default function Registro() {
               <MapPin className="w-6 h-6 text-white" />
             </div>
             <span className="font-[family-name:var(--font-display)] text-2xl font-bold text-white">
-              Explora Turismo
+              Cordalia
             </span>
           </div>
           <h2 className="font-[family-name:var(--font-display)] text-4xl font-bold text-white mb-4 leading-tight">
             Únete a la comunidad
           </h2>
           <p className="text-white/60 text-lg leading-relaxed">
-            Crea tu cuenta para acceder a experiencias exclusivas, guardar tus destinos favoritos
-            y planificar tu próxima aventura colombiana.
+            Crea tu cuenta para acceder a experiencias exclusivas, guardar tus planes favoritos
+            y descubrir lo mejor de Córdoba.
           </p>
         </div>
       </div>
@@ -109,7 +109,7 @@ export default function Registro() {
               <MapPin className="w-6 h-6 text-white" />
             </div>
             <span className="font-[family-name:var(--font-display)] text-2xl font-bold text-dark-900">
-              Explora Turismo
+              Cordalia
             </span>
           </div>
 

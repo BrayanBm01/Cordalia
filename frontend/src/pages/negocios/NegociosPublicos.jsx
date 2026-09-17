@@ -148,7 +148,7 @@ export default function NegociosPublicos() {
               Explora negocios
             </h1>
             <p className="text-lg md:text-xl text-white/70 max-w-2xl mx-auto mb-10">
-              Hoteles, restaurantes, tours y experiencias verificadas por la comunidad Explora Turismo.
+              Hoteles, restaurantes, tours y experiencias verificadas en Córdoba por Cordalia.
             </p>
             <div className="max-w-xl mx-auto relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-dark-400" />

@@ -227,7 +227,7 @@ export default function PlanForm({ businessId, plan, onSaved, onCancel }) {
             <input
               value={destinoLibre}
               onChange={(e) => setDestinoLibre(e.target.value)}
-              placeholder="O nombre libre del destino (ej: Guatapé, Antioquia)"
+              placeholder="O nombre libre del destino (ej: San Antero, Lorica...)"
               className={inputClass}
             />
           </div>
@@ -235,7 +235,7 @@ export default function PlanForm({ businessId, plan, onSaved, onCancel }) {
 
         <div className="space-y-3">
           <h4 className="text-sm font-semibold text-dark-700">Duración y precio</h4>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div>
               <label className="block text-xs text-dark-500 mb-1">Días *</label>
               <input type="number" min={1} max={60} value={duracionDias} onChange={(e) => setDuracionDias(Number(e.target.value))} className={inputClass} required />
@@ -287,39 +287,45 @@ export default function PlanForm({ businessId, plan, onSaved, onCancel }) {
             <div className="space-y-2">
               {rangos.map((r, i) => (
                 <div key={i} className="flex flex-wrap items-center gap-2">
-                  <label className="text-xs text-dark-500">Desde</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={r.min}
-                    onChange={(e) => setRango(i, 'min', e.target.value)}
-                    placeholder="1"
-                    className={`${inputClass} max-w-[100px]`}
-                  />
-                  <label className="text-xs text-dark-500">hasta</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={r.max}
-                    onChange={(e) => setRango(i, 'max', e.target.value)}
-                    placeholder="Ilimitado"
-                    className={`${inputClass} max-w-[100px]`}
-                  />
-                  <label className="text-xs text-dark-500">descuento %</label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={r.descuento}
-                    onChange={(e) => setRango(i, 'descuento', e.target.value)}
-                    placeholder="0"
-                    className={`${inputClass} max-w-[100px]`}
-                  />
+                  <div className="flex items-center gap-1.5">
+                    <label className="text-xs text-dark-500">Desde</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={r.min}
+                      onChange={(e) => setRango(i, 'min', e.target.value)}
+                      placeholder="1"
+                      className={`${inputClass} w-20`}
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <label className="text-xs text-dark-500">hasta</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={r.max}
+                      onChange={(e) => setRango(i, 'max', e.target.value)}
+                      placeholder="Ilimitado"
+                      className={`${inputClass} w-24`}
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <label className="text-xs text-dark-500">descuento %</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={r.descuento}
+                      onChange={(e) => setRango(i, 'descuento', e.target.value)}
+                      placeholder="0"
+                      className={`${inputClass} w-20`}
+                    />
+                  </div>
                   <button
                     type="button"
                     onClick={() => setRangos((prev) => prev.filter((_, j) => j !== i))}
                     disabled={rangos.length <= 1}
-                    className="p-2 rounded-lg text-dark-400 hover:text-red-600 transition-colors cursor-pointer disabled:opacity-30"
+                    className="p-2 rounded-lg text-dark-400 hover:text-red-600 transition-colors cursor-pointer disabled:opacity-30 shrink-0"
                     title="Quitar rango"
                   >
                     <Trash2 className="w-4 h-4" />

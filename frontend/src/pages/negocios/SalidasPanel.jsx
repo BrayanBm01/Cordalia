@@ -47,6 +47,22 @@ function CuposResumen({ ocupado, maximo, disponible }) {
   )
 }
 
+const ESTADO_BADGE = {
+  pagada: 'bg-emerald-100 text-emerald-700',
+  pendiente: 'bg-amber-100 text-amber-700',
+  fallida: 'bg-orange-100 text-orange-700',
+  cancelada: 'bg-dark-100 text-dark-500',
+  expirada: 'bg-red-100 text-red-600',
+}
+
+const ESTADO_LABEL = {
+  pagada: 'Pagada',
+  pendiente: 'Pendiente',
+  fallida: 'Fallida',
+  cancelada: 'Cancelada',
+  expirada: 'Expirada',
+}
+
 function InscripcionesList({ businessId, planId, salida, valor }) {
   const [open, setOpen] = useState(false)
   const [inscripciones, setInscripciones] = useState([])
@@ -90,25 +106,32 @@ function InscripcionesList({ businessId, planId, salida, valor }) {
       {open && (
         <div className="mt-2 space-y-1.5">
           {inscripciones.length === 0 && <p className="text-sm text-dark-400">Sin inscripciones todavía.</p>}
-          {inscripciones.map((i) => (
-            <div key={i.id} className="flex items-center gap-3 rounded-lg border border-dark-100 px-3 py-2 text-sm bg-dark-50/50">
-              <Users className="w-4 h-4 text-dark-400 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <span className="font-medium text-dark-800">{i.nombre || 'Anónimo'}</span>
-                {i.email && <span className="text-dark-500 text-xs block truncate">{i.email}</span>}
-                {i.mensaje && <span className="text-dark-500 text-xs block truncate">"{i.mensaje}"</span>}
-                {i.precio_total != null && (
-                  <span className="text-dark-500 text-xs block">Valor inscripción: {formatMoney(i.precio_total)}</span>
+          {inscripciones.map((i) => {
+            const estado = i.estado || 'confirmada' // retrocompatibilidad
+            return (
+              <div key={i.id} className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border border-dark-100 px-3 py-2 text-sm bg-dark-50/50">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium text-dark-800">{i.nombre || 'Anónimo'}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${ESTADO_BADGE[estado] || 'bg-dark-100 text-dark-500'}`}>
+                      {ESTADO_LABEL[estado] || estado.toUpperCase()}
+                    </span>
+                    <span className="text-xs font-semibold text-primary-700">{i.personas} pax</span>
+                  </div>
+                  {i.email && <span className="text-dark-500 text-xs block truncate mt-0.5">{i.email}</span>}
+                  {i.mensaje && <span className="text-dark-500 text-xs block truncate mt-0.5">"{i.mensaje}"</span>}
+                  {i.precio_total != null && (
+                    <span className="text-dark-500 text-xs block mt-0.5">Valor: {formatMoney(i.precio_total)} {i.pago_referencia ? `(Ref: ${i.pago_referencia})` : ''}</span>
+                  )}
+                </div>
+                {['pagada', 'pendiente', 'confirmada'].includes(estado) && (
+                  <button onClick={() => cancelar(i)} className="self-end sm:self-center p-1.5 rounded text-dark-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer shrink-0" title="Cancelar inscripción">
+                    <X className="w-4 h-4" />
+                  </button>
                 )}
               </div>
-              <span className="text-xs font-semibold text-primary-700">{i.personas} pax</span>
-              {i.estado === 'confirmada' && (
-                <button onClick={() => cancelar(i)} className="p-1.5 rounded text-dark-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer" title="Cancelar inscripción">
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
@@ -348,7 +371,7 @@ export default function SalidasPanel({ businessId, planId, planNombre }) {
 
       {showForm && (
         <form onSubmit={crear} className="mt-3 rounded-xl border border-primary-200 bg-primary-50/40 p-3 space-y-3">
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
             <div>
               <label className="block text-xs text-dark-500 mb-1">Fecha de salida *</label>
               <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className={inputClass} required />
@@ -424,7 +447,7 @@ export default function SalidasPanel({ businessId, planId, planNombre }) {
                     )}
                   </div>
                 </div>
-                <button onClick={() => eliminar(s)} className="p-2 rounded-lg text-dark-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer shrink-0" title="Eliminar salida">
+                <button onClick={() => eliminar(s)} className="self-end sm:self-center p-2 rounded-lg text-dark-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer shrink-0" title="Eliminar salida">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
@@ -437,7 +460,7 @@ export default function SalidasPanel({ businessId, planId, planNombre }) {
       </div>
 
       <p className="text-xs text-dark-400 mt-3">
-        Las inscripciones son solo logística: al registrar personas se descuenta el cupo y se guarda el precio del momento. El valor de inscripciones es informativo (no se cobra por el sistema).
+        Las inscripciones reflejan las reservas de cupos. Los turistas pueden pagar en línea mediante el sistema integrado. Se muestran los estados de pago de cada inscripción.
       </p>
     </div>
   )

@@ -1,12 +1,14 @@
-import { useState, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   User, Mail, Lock, Shield, Save, Loader2, CheckCircle2, Phone, MapPin,
-  Globe, Info, Camera, Trash2, Percent,
+  Info, Camera, Trash2, Percent, Ticket, Wallet, CalendarDays, XCircle,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../context/AuthContext'
-import { authAPI } from '../services/api'
+import { authAPI, inscripcionesAPI } from '../services/api'
+import { formatMoney } from './negocios/businessUtils'
 
 const inputBase =
   'w-full pl-10 pr-4 py-3 rounded-xl border border-dark-200 text-dark-900 placeholder:text-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition bg-white'
@@ -31,6 +33,92 @@ function toArray(value) {
 
 const FOTO_MAX = 1024 * 1024 * 2
 
+function formatFechaPago(fecha) {
+  if (!fecha) return null
+  const d = new Date(fecha)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toLocaleString('es-CO', {
+    weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  })
+}
+
+function formatoSalida(i) {
+  if (!i?.salida_fecha) return 'Sin fecha'
+  const fecha = new Date(i.salida_fecha + 'T00:00:00')
+  const base = Number.isNaN(fecha.getTime())
+    ? i.salida_fecha
+    : fecha.toLocaleDateString('es-CO', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
+  return i.salida_hora ? `${base} · ${i.salida_hora}` : base
+}
+
+const ESTADO_BADGE = {
+  pagada: 'bg-emerald-100 text-emerald-700',
+  pendiente: 'bg-amber-100 text-amber-700',
+  fallida: 'bg-orange-100 text-orange-700',
+  cancelada: 'bg-dark-100 text-dark-500',
+  expirada: 'bg-red-100 text-red-600',
+}
+
+const ESTADO_LABEL = {
+  pagada: 'Pagada',
+  pendiente: 'Pendiente de pago',
+  fallida: 'Pago fallido',
+  cancelada: 'Cancelada',
+  expirada: 'Expirada',
+}
+
+function InscripcionCard({ insc }) {
+  const estado = insc.estado
+  return (
+    <div className="rounded-xl border border-dark-100 bg-white p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+      <div className="w-10 h-10 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center shrink-0">
+        {estado === 'pagada' ? <CheckCircle2 className="w-5 h-5" /> : <Ticket className="w-5 h-5" />}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Link to={`/planes/${insc.plan_id}`} className="font-semibold text-dark-900 hover:text-primary-700 transition-colors">
+            {insc.plan_nombre}
+          </Link>
+          <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${ESTADO_BADGE[estado] || 'bg-dark-100 text-dark-500'}`}>
+            {ESTADO_LABEL[estado] || estado}
+          </span>
+        </div>
+        <p className="text-xs text-dark-500 mt-0.5">{insc.business_nombre}</p>
+        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-dark-600 mt-1">
+          <span className="inline-flex items-center gap-1"><CalendarDays className="w-3 h-3 text-primary-500" /> {formatoSalida(insc)}</span>
+          <span className="inline-flex items-center gap-1"><User className="w-3 h-3 text-primary-500" /> {insc.personas} {Number(insc.personas) === 1 ? 'persona' : 'personas'}</span>
+          <span className="font-semibold">{formatMoney(insc.precio_total)}</span>
+        </div>
+        {insc.pago_referencia && (
+          <p className="text-[11px] text-dark-400 mt-0.5">Ref: <span className="font-mono">{insc.pago_referencia}</span></p>
+        )}
+      </div>
+      <div className="shrink-0 flex flex-col items-start sm:items-end gap-1.5">
+        {estado === 'pendiente' && insc.fecha_limite_pago && (
+          <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1">
+            Paga antes de {formatFechaPago(insc.fecha_limite_pago)}
+          </span>
+        )}
+        {estado === 'fallida' && (
+          <span className="text-[11px] text-orange-700 bg-orange-50 border border-orange-200 rounded-lg px-2 py-1">
+            Puedes reintentar el pago
+          </span>
+        )}
+        <Link
+          to={`/planes/${insc.plan_id}`}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+            ['pendiente', 'fallida'].includes(estado)
+              ? 'bg-primary-600 text-white hover:bg-primary-700'
+              : 'bg-dark-50 text-dark-600 border border-dark-100 hover:border-primary-300'
+          }`}
+        >
+          {['pendiente', 'fallida'].includes(estado) ? 'Pagar / Ver cupo' : 'Ver plan'}
+        </Link>
+      </div>
+    </div>
+  )
+}
+
 function readAsDataURL(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -51,7 +139,6 @@ export default function Perfil() {
     email: user?.email || '',
     telefono: user?.telefono || '',
     ciudad: user?.ciudad || '',
-    pais: user?.pais || '',
     bio: user?.bio || '',
     intereses_turisticos: user?.intereses_turisticos || '',
     preferencias_viaje: user?.preferencias_viaje || '',
@@ -59,6 +146,29 @@ export default function Perfil() {
   })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [insc, setInsc] = useState({ pendientes: [], pagadas: [], historial: [], cargando: true })
+
+  useEffect(() => {
+    let activo = true
+    inscripcionesAPI
+      .misInscripciones()
+      .then((res) => {
+        if (!activo) return
+        const d = res.data || {}
+        setInsc({
+          pendientes: d.pendientes || [],
+          pagadas: d.pagadas || [],
+          historial: d.historial || [],
+          cargando: false,
+        })
+      })
+      .catch(() => {
+        if (activo) setInsc((s) => ({ ...s, cargando: false }))
+      })
+    return () => {
+      activo = false
+    }
+  }, [])
 
   const interesesSel = toArray(form.intereses_turisticos)
   const preferenciasSel = toArray(form.preferencias_viaje)
@@ -114,10 +224,10 @@ export default function Perfil() {
 
   // Indicador de completitud del perfil
   const camposCompletos = [
-    form.nombre, form.apellido, form.telefono, form.ciudad, form.pais,
+    form.nombre, form.apellido, form.telefono, form.ciudad,
     form.bio, form.avatar_url, form.intereses_turisticos, form.preferencias_viaje,
   ].filter(Boolean).length
-  const totalCampos = 9
+  const totalCampos = 8
   const completitud = Math.round((camposCompletos / totalCampos) * 100)
 
   const handleSubmit = async (e) => {
@@ -215,7 +325,7 @@ export default function Perfil() {
                 {nombreCompleto || 'Sin nombre'}
               </h3>
               <p className="text-dark-500 text-sm mt-1">
-                {[form.ciudad, form.pais].filter(Boolean).join(', ') || 'Ciudad pendiente'}
+                {form.ciudad || 'Ciudad pendiente'}
               </p>
 
               <div className="mt-4 flex flex-col sm:flex-row justify-center gap-2">
@@ -287,12 +397,12 @@ export default function Perfil() {
             </div>
           </motion.div>
 
-          {/* Columna derecha: formulario */}
+          {/* Columna derecha: formulario e inscripciones */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="lg:col-span-2"
+            className="lg:col-span-2 space-y-8"
           >
             <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-dark-100 p-6 md:p-8 space-y-8">
               <div>
@@ -338,20 +448,11 @@ export default function Perfil() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div>
-                  <label htmlFor="ciudad" className="block text-sm font-medium text-dark-700 mb-1.5">Ciudad</label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" />
-                    <input id="ciudad" name="ciudad" type="text" value={form.ciudad} onChange={handleChange} className={inputBase} placeholder="Santa Marta" />
-                  </div>
-                </div>
-                <div>
-                  <label htmlFor="pais" className="block text-sm font-medium text-dark-700 mb-1.5">País</label>
-                  <div className="relative">
-                    <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" />
-                    <input id="pais" name="pais" type="text" value={form.pais} onChange={handleChange} className={inputBase} placeholder="Colombia" />
-                  </div>
+              <div>
+                <label htmlFor="ciudad" className="block text-sm font-medium text-dark-700 mb-1.5">Ciudad / Municipio</label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" />
+                  <input id="ciudad" name="ciudad" type="text" value={form.ciudad} onChange={handleChange} className={inputBase} placeholder="Montería, Lorica, Cereté..." />
                 </div>
               </div>
 
@@ -428,6 +529,66 @@ export default function Perfil() {
                 </button>
               </div>
             </form>
+
+            {/* Sección Mis Inscripciones */}
+            <div className="bg-white rounded-2xl border border-dark-100 p-6 md:p-8">
+              <h2 className="text-xl font-bold text-dark-900 mb-6 flex items-center gap-2" style={{ fontFamily: 'var(--font-display)' }}>
+                <Ticket className="w-5 h-5 text-primary-600" /> Mis inscripciones
+              </h2>
+
+              {insc.cargando ? (
+                <div className="flex flex-col items-center justify-center py-8 gap-3 text-dark-400">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+                  <p className="text-sm">Cargando inscripciones...</p>
+                </div>
+              ) : (
+                <div className="space-y-8">
+                  {insc.pendientes.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-amber-700 mb-3 flex items-center gap-2">
+                        <Wallet className="w-4 h-4" /> Pendientes de pago
+                      </h3>
+                      <div className="space-y-3">
+                        {insc.pendientes.map(i => <InscripcionCard key={i.id} insc={i} />)}
+                      </div>
+                    </div>
+                  )}
+
+                  {insc.pagadas.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-emerald-700 mb-3 flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4" /> Pagadas y activas
+                      </h3>
+                      <div className="space-y-3">
+                        {insc.pagadas.map(i => <InscripcionCard key={i.id} insc={i} />)}
+                      </div>
+                    </div>
+                  )}
+
+                  {insc.historial.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-dark-600 mb-3 flex items-center gap-2">
+                        <CalendarDays className="w-4 h-4" /> Historial (canceladas/expiradas)
+                      </h3>
+                      <div className="space-y-3 opacity-80">
+                        {insc.historial.map(i => <InscripcionCard key={i.id} insc={i} />)}
+                      </div>
+                    </div>
+                  )}
+
+                  {insc.pendientes.length === 0 && insc.pagadas.length === 0 && insc.historial.length === 0 && (
+                    <div className="text-center py-8 rounded-xl bg-dark-50 border border-dark-100">
+                      <Ticket className="w-10 h-10 text-dark-300 mx-auto mb-3" />
+                      <p className="text-sm text-dark-600 font-medium">Aún no tienes inscripciones.</p>
+                      <p className="text-xs text-dark-400 mt-1">Explora nuestros planes y reserva tu lugar.</p>
+                      <Link to="/planes" className="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 transition-colors">
+                        Explorar planes
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </motion.div>
         </div>
       </div>

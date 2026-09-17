@@ -99,6 +99,17 @@ function tooltipStyle() {
   }
 }
 
+function calcYAxisWidth(data, minWidth = 100, maxWidth = 160) {
+  if (!data || data.length === 0) return minWidth
+  const maxLen = Math.max(...data.map((d) => (d.name ? String(d.name).length : 0)))
+  return Math.min(maxWidth, Math.max(minWidth, Math.round(maxLen * 7.5 + 16)))
+}
+
+function calcBarChartHeight(data, minHeight = 260, maxHeight = 420) {
+  if (!data || data.length === 0) return minHeight
+  return Math.min(maxHeight, Math.max(minHeight, data.length * 36 + 60))
+}
+
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null)
   const [historial, setHistorial] = useState([])
@@ -297,7 +308,7 @@ export default function AdminDashboard() {
         </ChartCard>
 
         <ChartCard icon={Store} title="Negocios por Categoría" hint={negociosPorCategoria.length === 0 ? 'No hay categorías asignadas' : undefined}>
-          <ResponsiveContainer width="100%" height={260}>
+          <ResponsiveContainer width="100%" height={calcBarChartHeight(negociosPorCategoria)}>
             <BarChart data={negociosPorCategoria} layout="vertical" margin={{ left: 8, right: 16 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis type="number" tick={{ fontSize: 13, fill: '#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} />
@@ -307,7 +318,7 @@ export default function AdminDashboard() {
                 tick={{ fontSize: 12, fill: '#64748b' }}
                 axisLine={false}
                 tickLine={false}
-                width={120}
+                width={calcYAxisWidth(negociosPorCategoria)}
               />
               <Tooltip {...tooltipStyle()} cursor={{ fill: '#f1f5f9' }} />
               <Bar dataKey="cantidad" name="Negocios" radius={[0, 6, 6, 0]}>
@@ -320,7 +331,7 @@ export default function AdminDashboard() {
         </ChartCard>
 
         <ChartCard icon={MapPin} title="Negocios por Destino" hint={negociosPorDestino.length === 0 ? 'No hay negocios asociados a destinos' : undefined}>
-          <ResponsiveContainer width="100%" height={260}>
+          <ResponsiveContainer width="100%" height={calcBarChartHeight(negociosPorDestino)}>
             <BarChart data={negociosPorDestino} layout="vertical" margin={{ left: 8, right: 16 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis type="number" tick={{ fontSize: 13, fill: '#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} />
@@ -330,7 +341,7 @@ export default function AdminDashboard() {
                 tick={{ fontSize: 12, fill: '#64748b' }}
                 axisLine={false}
                 tickLine={false}
-                width={120}
+                width={calcYAxisWidth(negociosPorDestino)}
               />
               <Tooltip {...tooltipStyle()} cursor={{ fill: '#f1f5f9' }} />
               <Bar dataKey="cantidad" name="Negocios" radius={[0, 6, 6, 0]}>
@@ -391,7 +402,7 @@ export default function AdminDashboard() {
         </ChartCard>
 
         <ChartCard icon={MapPin} title="Planes por Destino" hint={planesPorDestino.length === 0 ? 'No hay planes con destino' : undefined}>
-          <ResponsiveContainer width="100%" height={260}>
+          <ResponsiveContainer width="100%" height={calcBarChartHeight(planesPorDestino)}>
             <BarChart data={planesPorDestino} layout="vertical" margin={{ left: 8, right: 16 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis type="number" tick={{ fontSize: 13, fill: '#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} />
@@ -401,7 +412,7 @@ export default function AdminDashboard() {
                 tick={{ fontSize: 12, fill: '#64748b' }}
                 axisLine={false}
                 tickLine={false}
-                width={110}
+                width={calcYAxisWidth(planesPorDestino)}
               />
               <Tooltip {...tooltipStyle()} cursor={{ fill: '#f1f5f9' }} />
               <Bar dataKey="cantidad" name="Planes" radius={[0, 6, 6, 0]}>

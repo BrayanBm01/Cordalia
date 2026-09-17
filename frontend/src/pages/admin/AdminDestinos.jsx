@@ -3,13 +3,14 @@ import { motion } from 'framer-motion'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, Trash2, Search, MapPin, Image as ImageIcon, Info } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, MapPin, Image as ImageIcon, Info, Compass } from 'lucide-react'
 import { lugaresAPI } from '../../services/api'
 import ConfirmModal from '../../components/ConfirmModal'
 import EmptyState from '../../components/EmptyState'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import Modal from '../../components/Modal'
 import ImageUploader from '../../components/ImageUploader'
+import DestinoContenidoManager from './DestinoContenidoManager'
 import { toast } from 'sonner'
 
 const TIPOS_DESTINO = [
@@ -57,6 +58,8 @@ export default function AdminDestinos() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingDestino, setEditingDestino] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [contenidoDestino, setContenidoDestino] = useState(null)
+  const [contenidoOpen, setContenidoOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
   const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm({
@@ -219,6 +222,13 @@ export default function AdminDestinos() {
                     <td className="px-5 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button
+                          onClick={() => { setContenidoDestino(destino); setContenidoOpen(true) }}
+                          className="p-1.5 rounded-lg text-dark-400 hover:text-primary-600 hover:bg-primary-50 transition-colors cursor-pointer"
+                          title="Administrar contenido (Qué hacer / Qué visitar / Info de viaje)"
+                        >
+                          <Compass className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => openEdit(destino)}
                           className="p-1.5 rounded-lg text-dark-400 hover:text-ocean-600 hover:bg-ocean-50 transition-colors cursor-pointer"
                           title="Editar"
@@ -341,6 +351,12 @@ export default function AdminDestinos() {
         onConfirm={handleDelete}
         title="Eliminar destino"
         message={`¿Estás seguro de que deseas eliminar "${deleteTarget?.nombre}"? Esta acción no se puede deshacer.`}
+      />
+
+      <DestinoContenidoManager
+        destino={contenidoDestino}
+        open={contenidoOpen}
+        onClose={() => setContenidoOpen(false)}
       />
     </motion.div>
   )

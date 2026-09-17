@@ -41,7 +41,7 @@ function VehiculoForm({ conductores, inicial, onGuardar, onCancelar, saving }) {
     <form onSubmit={(e) => { e.preventDefault(); onGuardar(form) }} className="space-y-5">
       <div>
         {sectionTitle(<Car className="w-3.5 h-3.5" />, 'Datos del vehículo')}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
           <div>
             <label className="block text-xs text-dark-500 mb-1">Nombre *</label>
             <input value={form.nombre} onChange={set('nombre')} placeholder="ej. Van ABC-123" className={inputClass} required />
@@ -76,21 +76,21 @@ function VehiculoForm({ conductores, inicial, onGuardar, onCancelar, saving }) {
       </div>
       <div>
         {sectionTitle(<Users className="w-3.5 h-3.5" />, 'Estado y asignación')}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <div>
             <label className="block text-xs text-dark-500 mb-1">Estado</label>
             <select value={form.estado} onChange={set('estado')} className={`${inputClass} bg-white`}>
               {ESTADOS_VEHICULO.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
             </select>
           </div>
-          <div className="col-span-2">
+          <div className="sm:col-span-2">
             <label className="block text-xs text-dark-500 mb-1">Conductor asignado</label>
             <select value={form.conductor_id} onChange={set('conductor_id')} className={`${inputClass} bg-white`}>
               <option value="">Sin conductor asignado</option>
               {conductores.map((c) => <option key={c.id} value={c.id}>{c.nombre}{c.disponible ? '' : ' (ocupado)'}</option>)}
             </select>
           </div>
-          <div className="col-span-2 sm:col-span-3">
+          <div className="sm:col-span-3">
             <label className="block text-xs text-dark-500 mb-1">Descripción / observaciones</label>
             <input value={form.descripcion} onChange={set('descripcion')} placeholder="Opcional" className={inputClass} />
           </div>
@@ -371,27 +371,31 @@ export default function TransportePanel({ businessId, planId }) {
         )}
         <div className="space-y-1.5">
           {conductores.map((c) => (
-            <div key={c.id} className="flex items-center gap-2 rounded-lg border border-dark-100 px-3 py-2 text-sm">
-              <UserIcon className="w-4 h-4 text-dark-400 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <span className="font-medium text-dark-800">{c.nombre}</span>
-                <span className="text-dark-500 text-xs ml-2">
-                  {c.telefono ? `${c.telefono}` : ''}
-                  {c.email ? ` · ${c.email}` : ''}
-                  {c.licencia ? ` · Lic. ${c.licencia}` : ''}
-                  {c.licencia_categoria ? ` (${c.licencia_categoria})` : ''}
-                </span>
-                {c.experiencia && <span className="text-dark-500 text-xs block truncate mt-0.5">{c.experiencia}</span>}
+            <div key={c.id} className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-lg border border-dark-100 px-3 py-2 text-sm">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <UserIcon className="w-4 h-4 text-dark-400 shrink-0" />
+                <div className="min-w-0">
+                  <span className="font-medium text-dark-800">{c.nombre}</span>
+                  <span className="text-dark-500 text-xs ml-2">
+                    {c.telefono ? `${c.telefono}` : ''}
+                    {c.email ? ` · ${c.email}` : ''}
+                    {c.licencia ? ` · Lic. ${c.licencia}` : ''}
+                    {c.licencia_categoria ? ` (${c.licencia_categoria})` : ''}
+                  </span>
+                  {c.experiencia && <span className="text-dark-500 text-xs block truncate mt-0.5">{c.experiencia}</span>}
+                </div>
               </div>
-              <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${c.disponible ? 'bg-emerald-100 text-emerald-700' : 'bg-dark-100 text-dark-500'}`}>
-                {c.disponible ? 'Activo' : 'Inactivo'}
-              </span>
-              <button onClick={() => editarConductor(c)} className="p-1.5 rounded text-dark-400 hover:text-primary-700 hover:bg-primary-50 transition-colors cursor-pointer" title="Editar conductor">
-                <Pencil className="w-4 h-4" />
-              </button>
-              <button onClick={() => eliminarConductor(c)} className="p-1.5 rounded text-dark-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer" title="Eliminar conductor">
-                <Trash2 className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${c.disponible ? 'bg-emerald-100 text-emerald-700' : 'bg-dark-100 text-dark-500'}`}>
+                  {c.disponible ? 'Activo' : 'Inactivo'}
+                </span>
+                <button onClick={() => editarConductor(c)} className="p-1.5 rounded text-dark-400 hover:text-primary-700 hover:bg-primary-50 transition-colors cursor-pointer" title="Editar conductor">
+                  <Pencil className="w-4 h-4" />
+                </button>
+                <button onClick={() => eliminarConductor(c)} className="p-1.5 rounded text-dark-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer" title="Eliminar conductor">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -413,28 +417,32 @@ export default function TransportePanel({ businessId, planId }) {
         )}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {vehiculos.map((v) => (
-            <div key={v.id} className="flex items-center gap-2 rounded-xl border border-dark-100 px-3 py-2">
-              <Car className="w-4 h-4 text-dark-400 shrink-0" />
-              <div className="flex-1 min-w-0 text-sm">
-                <span className="font-medium text-dark-800">{v.nombre}</span>
-                <span className="text-dark-500 text-xs ml-2 capitalize">{v.tipo}{v.placa ? ` · ${v.placa}` : ''}</span>
-                {v.marca && <span className="text-dark-500 text-xs ml-1">{v.marca}{v.modelo ? ` ${v.modelo}` : ''}</span>}
-                <div className="flex items-center gap-1 text-xs text-dark-500"><Users className="w-3 h-3" /> {v.capacidad} pax</div>
-                {v.conductor_nombre ? (
-                  <span className="text-xs text-dark-500 block">Conductor: {v.conductor_nombre}</span>
-                ) : (
-                  <span className="text-xs text-dark-400 block">Sin conductor asignado</span>
-                )}
-                <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${v.estado === 'mantenimiento' ? 'bg-amber-100 text-amber-700' : v.estado === 'inactivo' ? 'bg-dark-100 text-dark-500' : 'bg-emerald-100 text-emerald-700'}`}>
-                  {v.estado === 'mantenimiento' ? 'Mantenimiento' : v.estado === 'inactivo' ? 'Inactivo' : 'Disponible'}
-                </span>
+            <div key={v.id} className="flex items-start justify-between gap-2 rounded-xl border border-dark-100 p-3">
+              <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                <Car className="w-4 h-4 text-dark-400 shrink-0 mt-0.5" />
+                <div className="min-w-0 text-sm">
+                  <span className="font-medium text-dark-800">{v.nombre}</span>
+                  <span className="text-dark-500 text-xs ml-2 capitalize">{v.tipo}{v.placa ? ` · ${v.placa}` : ''}</span>
+                  {v.marca && <span className="text-dark-500 text-xs ml-1">{v.marca}{v.modelo ? ` ${v.modelo}` : ''}</span>}
+                  <div className="flex items-center gap-1 text-xs text-dark-500 mt-0.5"><Users className="w-3 h-3" /> {v.capacidad} pax</div>
+                  {v.conductor_nombre ? (
+                    <span className="text-xs text-dark-500 block">Conductor: {v.conductor_nombre}</span>
+                  ) : (
+                    <span className="text-xs text-dark-400 block">Sin conductor asignado</span>
+                  )}
+                  <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${v.estado === 'mantenimiento' ? 'bg-amber-100 text-amber-700' : v.estado === 'inactivo' ? 'bg-dark-100 text-dark-500' : 'bg-emerald-100 text-emerald-700'}`}>
+                    {v.estado === 'mantenimiento' ? 'Mantenimiento' : v.estado === 'inactivo' ? 'Inactivo' : 'Disponible'}
+                  </span>
+                </div>
               </div>
-              <button onClick={() => editarVehiculo(v)} className="p-1.5 rounded text-dark-400 hover:text-primary-700 hover:bg-primary-50 transition-colors cursor-pointer" title="Editar vehículo">
-                <Pencil className="w-4 h-4" />
-              </button>
-              <button onClick={() => eliminarVehiculo(v)} className="p-1.5 rounded text-dark-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer" title="Eliminar vehículo">
-                <Trash2 className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-1 shrink-0">
+                <button onClick={() => editarVehiculo(v)} className="p-1.5 rounded text-dark-400 hover:text-primary-700 hover:bg-primary-50 transition-colors cursor-pointer" title="Editar vehículo">
+                  <Pencil className="w-4 h-4" />
+                </button>
+                <button onClick={() => eliminarVehiculo(v)} className="p-1.5 rounded text-dark-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer" title="Eliminar vehículo">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           ))}
         </div>

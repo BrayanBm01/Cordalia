@@ -121,7 +121,7 @@ export default function ResumenNegocios() {
             <h1 className="text-3xl font-bold text-dark-900" style={{ fontFamily: 'var(--font-display)' }}>
               Resumen
             </h1>
-            <p className="text-dark-500 mt-1">Estado general de tus negocios en Explora Turismo.</p>
+            <p className="text-dark-500 mt-1">Estado general de tus negocios en Cordalia.</p>
           </div>
           <Link
             to="/mis-negocios/nuevo"
@@ -137,12 +137,12 @@ export default function ResumenNegocios() {
             <EmptyState
               icon={Store}
               title="Aún no tienes negocios"
-              description="Crea tu primer negocio para aparecer en Explora Turismo. Un administrador lo revisará."
+              description="Crea tu primer negocio para aparecer en Cordalia. Un administrador lo revisará."
             />
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
               {cards.map((c) => (
                 <div key={c.label} className="bg-white rounded-2xl border border-dark-100 p-5 shadow-sm">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${c.color}`}>
@@ -168,7 +168,7 @@ export default function ResumenNegocios() {
                 </p>
               ) : (
                 <>
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
                     {[
                       { icon: Ticket, label: 'Planes publicados', value: stats.planes, color: 'bg-primary-50 text-primary-600' },
                       { icon: CalendarDays, label: 'Salidas programadas', value: stats.salidas, color: 'bg-ocean-50 text-ocean-600' },

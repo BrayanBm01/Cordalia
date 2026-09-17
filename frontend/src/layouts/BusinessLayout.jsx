@@ -137,7 +137,7 @@ function Sidebar({ collapsed, onToggle }) {
         {!collapsed && (
           <div className="min-w-0">
             <span className="block text-base font-bold text-white truncate" style={{ fontFamily: 'var(--font-display)' }}>
-              Explora Turismo
+              Cordalia
             </span>
             <span className="block text-xs text-dark-400">Panel del negocio</span>
           </div>
@@ -189,15 +189,15 @@ function MobileDrawer({ open, onClose }) {
       )}
 
       <div
-        className={`fixed inset-y-0 left-0 z-50 w-72 bg-dark-900 transform transition-transform duration-300 ease-in-out lg:hidden ${
+        className={`fixed inset-y-0 left-0 z-50 w-72 bg-dark-900 flex flex-col transform transition-transform duration-300 ease-in-out lg:hidden ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="flex items-center justify-between px-4 h-16 border-b border-dark-800">
+        <div className="flex items-center justify-between px-4 h-16 border-b border-dark-800 shrink-0">
           <div className="flex items-center gap-2">
             <Mountain className="w-6 h-6 text-primary-400" />
             <span className="text-lg font-bold text-white" style={{ fontFamily: 'var(--font-display)' }}>
-              Explora Turismo
+              Cordalia
             </span>
           </div>
           <button
@@ -209,7 +209,7 @@ function MobileDrawer({ open, onClose }) {
           </button>
         </div>
 
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col flex-1 min-h-0">
           <nav className="flex-1 overflow-y-auto px-3 pb-4">
             <SectionLabel>Principal</SectionLabel>
             {principalLinks.map((link) => (

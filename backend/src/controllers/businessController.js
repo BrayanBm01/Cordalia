@@ -10,6 +10,20 @@ const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "
 const IMAGEN_MAX_BYTES = 1500 * 1024; // 1.5 MB por imagen
 const IMAGENES_PERMITIDAS = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
+// Monedas disponibles en los catálogos de la plataforma.
+const MONEDAS_PERMITIDAS = ["COP", "USD", "EUR", "MXN", "PEN"];
+
+// Categorías que trabajan con rango de precios (min/max) en su ficha.
+const CATEGORIAS_CON_PRECIO = new Set([
+  "Restaurante", "Hotel", "Hostal", "Tour", "Agencia de viajes",
+  "Experiencia turistica", "Atraccion turistica",
+]);
+
+// Categorías que NO manejan rango de precios en su ficha.
+const CATEGORIAS_SIN_PRECIO = new Set([
+  "Bar", "Cafe", "Tienda", "Transporte", "Otro",
+]);
+
 function validarImagenDataUrl(dataUrl) {
   const match = /^data:([^;,]+);base64,(.+)$/i.exec(dataUrl);
   if (!match) return "Imagen inválida: formato no reconocido";
@@ -121,8 +135,13 @@ function validarBusiness(body, esCreacion = false) {
   if (moneda !== undefined) {
     const m = sanitizeString(moneda).toUpperCase();
     data.moneda = m === "" ? null : m;
-    if (data.moneda && !/^[A-Z]{3}$/.test(data.moneda)) {
-      return { error: { status: 400, message: "Moneda inválida (3 letras)" } };
+    if (data.moneda && !MONEDAS_PERMITIDAS.includes(data.moneda)) {
+      return {
+        error: {
+          status: 400,
+          message: `Moneda inválida: selecciona una moneda permitida (${MONEDAS_PERMITIDAS.join(", ")})`,
+        },
+      };
     }
   }
 
@@ -170,6 +189,24 @@ function serverError(res, error, context) {
   return res.status(500).json({ success: false, message: "Error interno del servidor" });
 }
 
+// Valida el rango de precios según la categoría del negocio:
+// - categorías CON_PRECIO: precio min/max obligatorios al crear.
+// - categorías SIN_PRECIO: no se aceptan precios en la ficha.
+function validarPreciosPorCategoria(categoriaNombre, data) {
+  if (!categoriaNombre) return null;
+  const conPrecio = CATEGORIAS_CON_PRECIO.has(categoriaNombre);
+  const sinPrecio = CATEGORIAS_SIN_PRECIO.has(categoriaNombre);
+  if (!conPrecio && !sinPrecio) return null; // categoría sin regla específica
+
+  const tienePrecio = data.precio_min != null || data.precio_max != null;
+
+  if (sinPrecio && tienePrecio) {
+    return { status: 400, message: `La categoría "${categoriaNombre}" no maneja rango de precios` };
+  }
+
+  return null;
+}
+
 // ---------- Categorías ----------
 exports.getCategories = async (_req, res) => {
   try {
@@ -205,6 +242,10 @@ exports.create = async (req, res) => {
       const categoria = await BusinessModel.findCategoryById(data.category_id);
       if (!categoria) {
         return res.status(400).json({ success: false, message: "La categoría seleccionada no existe" });
+      }
+      const precioError = validarPreciosPorCategoria(categoria.nombre, data, true);
+      if (precioError) {
+        return res.status(precioError.status).json({ success: false, message: precioError.message });
       }
     }
 
@@ -259,10 +300,15 @@ exports.update = async (req, res) => {
       data.slug = await uniqueSlugFor(data.nombre, req.business.id);
     }
 
-    if (data.category_id) {
-      const categoria = await BusinessModel.findCategoryById(data.category_id);
+    if (data.category_id || req.business.category_id) {
+      const catId = data.category_id || req.business.category_id;
+      const categoria = await BusinessModel.findCategoryById(catId);
       if (!categoria) {
         return res.status(400).json({ success: false, message: "La categoría seleccionada no existe" });
+      }
+      const precioError = validarPreciosPorCategoria(categoria.nombre, data);
+      if (precioError) {
+        return res.status(precioError.status).json({ success: false, message: precioError.message });
       }
     }
 

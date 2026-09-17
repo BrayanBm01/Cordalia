@@ -56,7 +56,7 @@ function Sidebar({ collapsed, onToggle }) {
         <Mountain className="w-7 h-7 text-primary-400 flex-shrink-0" />
         {!collapsed && (
           <span className="text-lg font-bold text-white whitespace-nowrap" style={{ fontFamily: 'var(--font-display)' }}>
-            Explora Turismo
+            Cordalia
           </span>
         )}
         <button
@@ -166,7 +166,7 @@ function MobileDrawer({ open, onClose }) {
           <div className="flex items-center gap-2">
             <Mountain className="w-6 h-6 text-primary-400" />
             <span className="text-lg font-bold text-white" style={{ fontFamily: 'var(--font-display)' }}>
-              Explora Turismo
+              Cordalia
             </span>
           </div>
           <button

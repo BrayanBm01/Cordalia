@@ -3,9 +3,9 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   ArrowLeft, MapPin, Clock, Users, CheckCircle2, Phone, Mail, Globe,
-  MessageCircle, ImageOff, CalendarDays, BadgePercent, Printer, Truck, Loader2, Ticket,
+  MessageCircle, ImageOff, CalendarDays, BadgePercent, Printer, Truck, Loader2, Ticket, Wallet,
 } from 'lucide-react'
-import { planesAPI } from '../../services/api'
+import { planesAPI, inscripcionesAPI } from '../../services/api'
 import { toast } from 'sonner'
 import { useAuth } from '../../context/AuthContext'
 import LoadingSpinner from '../../components/LoadingSpinner'
@@ -14,6 +14,23 @@ import {
   TIPO_PLAN_LABEL, TIPO_PLAN_BADGE, TIPO_PRECIO_LABEL, formatDuracion,
   planPrecios, buildWhatsAppText, whatsappLink, whatsappNumber, telLink, diaActividades,
 } from '../negocios/planUtils'
+
+function formatFechaPago(fecha) {
+  if (!fecha) return null
+  const d = new Date(fecha)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toLocaleString('es-CO', {
+    weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  })
+}
+
+const METODOS_PAGO = [
+  { value: 'nequi', label: 'Nequi' },
+  { value: 'daviplata', label: 'Daviplata' },
+  { value: 'bancolombia', label: 'Bancolombia' },
+  { value: 'pse', label: 'PSE' },
+  { value: 'tarjeta', label: 'Tarjeta' },
+]
 
 export default function PlanDetalle() {
   const { id } = useParams()
@@ -35,6 +52,8 @@ export default function PlanDetalle() {
   const [mensaje, setMensaje] = useState('')
   const [inscLoading, setInscLoading] = useState(false)
   const [inscrito, setInscrito] = useState(null)
+  const [pagando, setPagando] = useState(false)
+  const [metodoPago, setMetodoPago] = useState('nequi')
   const [sugTransporte, setSugTransporte] = useState(null)
   const [sugLoading, setSugLoading] = useState(false)
   const precioTimer = useRef(null)
@@ -140,6 +159,22 @@ export default function PlanDetalle() {
       toast.error(err.message || 'No se pudo inscribir')
     } finally {
       setInscLoading(false)
+    }
+  }
+
+  async function pagarInscripcion(e) {
+    e.preventDefault()
+    if (!inscrito?.id) return
+    setPagando(true)
+    try {
+      const res = await inscripcionesAPI.pagar(inscrito.id, metodoPago)
+      toast.success(res.message || 'Pago confirmado')
+      setInscrito(res.data.inscripcion)
+      cargarSalidas()
+    } catch (err) {
+      toast.error(err.message || 'No se pudo procesar el pago')
+    } finally {
+      setPagando(false)
     }
   }
 
@@ -504,20 +539,93 @@ export default function PlanDetalle() {
                 )}
 
                 {inscrito ? (
-                  <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-                    <div className="flex items-center gap-2 font-semibold">
-                      <CheckCircle2 className="w-4 h-4" /> ¡Inscripción registrada!
+                  inscrito.estado === 'pagada' ? (
+                    <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+                      <div className="flex items-center gap-2 font-semibold">
+                        <CheckCircle2 className="w-4 h-4" /> ¡Pago confirmado!
+                      </div>
+                      <div className="mt-2 space-y-1 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span>Total pagado</span>
+                          <span className="font-semibold">{formatMoney(inscrito.precio_total)}</span>
+                        </div>
+                        {inscrito.pago_metodo && (
+                          <div className="flex items-center justify-between">
+                            <span>Método</span>
+                            <span className="capitalize font-medium">{inscrito.pago_metodo}</span>
+                          </div>
+                        )}
+                        {inscrito.pago_referencia && (
+                          <div className="flex items-center justify-between">
+                            <span>Referencia</span>
+                            <span className="font-mono">{inscrito.pago_referencia}</span>
+                          </div>
+                        )}
+                        {inscrito.fecha_pago && (
+                          <div className="flex items-center justify-between">
+                            <span>Fecha de pago</span>
+                            <span>{formatFechaPago(inscrito.fecha_pago)}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Link
+                          to="/perfil"
+                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 transition-colors cursor-pointer"
+                        >
+                          Ver en mi perfil
+                        </Link>
+                        <button
+                          onClick={() => window.print()}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-emerald-300 text-emerald-700 text-xs font-medium hover:bg-emerald-100 transition-colors cursor-pointer"
+                        >
+                          <Printer className="w-3.5 h-3.5" /> Imprimir comprobante
+                        </button>
+                      </div>
                     </div>
-                    <p className="text-xs mt-1">
-                      {inscrito.personas || personas} persona(s) apartada(s) en la salida seleccionada. Este es tu comprobante:
-                    </p>
-                    <button
-                      onClick={() => window.print()}
-                      className="mt-3 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 transition-colors cursor-pointer"
-                    >
-                      <Printer className="w-3.5 h-3.5" /> Imprimir comprobante
-                    </button>
-                  </div>
+                  ) : (
+                    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                      <div className="flex items-center gap-2 font-semibold">
+                        <Wallet className="w-4 h-4" /> Cupo reservado — falta pagar
+                      </div>
+                      <div className="mt-2 space-y-1 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span>{inscrito.personas || personas} {Number(inscrito.personas) === 1 ? 'persona' : 'personas'}</span>
+                          <span className="font-semibold text-base">{formatMoney(inscrito.precio_total)}</span>
+                        </div>
+                        {inscrito.fecha_limite_pago && (
+                          <div className="flex items-center justify-between">
+                            <span>Paga antes de</span>
+                            <span className="font-medium">{formatFechaPago(inscrito.fecha_limite_pago)}</span>
+                          </div>
+                        )}
+                      </div>
+                      <form onSubmit={pagarInscripcion} className="mt-3 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={metodoPago}
+                            onChange={(e) => setMetodoPago(e.target.value)}
+                            className="flex-1 px-3 py-2 rounded-lg border border-amber-300 bg-white text-sm text-dark-900 focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                          >
+                            {METODOS_PAGO.map((m) => (
+                              <option key={m.value} value={m.value}>{m.label}</option>
+                            ))}
+                          </select>
+                          <button
+                            type="submit"
+                            disabled={pagando}
+                            className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-amber-600 text-white text-xs font-semibold hover:bg-amber-700 disabled:opacity-50 transition-colors cursor-pointer"
+                          >
+                            {pagando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                            Pagar ahora
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-amber-700/80">
+                          El pago se procesa de forma simulada (sandbox) por el momento. Completa el pago antes del vencimiento para conservar tu cupo.
+                        </p>
+                      </form>
+                    </div>
+                  )
                 ) : !confirmando ? (
                   salidas.length > 0 && !salidaBloqueada && (
                     <div className="mt-3 space-y-2">
@@ -539,7 +647,7 @@ export default function PlanDetalle() {
                 ) : (
                   <form onSubmit={inscribirse} className="mt-3 space-y-2">
                     <p className="text-xs text-dark-500">
-                      Registrándote como <strong>{user?.nombre || user?.email}</strong>. Esta inscripción es solo logística (cupo); el pago se coordina por WhatsApp.
+                      Registrándote como <strong>{user?.nombre || user?.email}</strong>. Se reserva el cupo y queda pendiente de pago; podrás pagar en línea al confirmar.
                     </p>
                     <div className="rounded-lg bg-dark-50 border border-dark-100 p-3 text-sm">
                       <div className="flex items-center justify-between text-dark-600">
@@ -597,7 +705,7 @@ export default function PlanDetalle() {
               </div>
 
               <p className="text-xs text-dark-400 mt-4 leading-relaxed">
-                El precio es informativo. Para reservar, cotizar o coordinar el transporte, contacta directamente al negocio por WhatsApp.
+                El precio se cobra al pagar tu inscripción en línea (confirmable desde tu perfil). Para dudas de logística, contacta al negocio por WhatsApp.
               </p>
 
               <div className="mt-4 space-y-2">

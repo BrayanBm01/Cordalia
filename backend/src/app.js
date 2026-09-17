@@ -54,11 +54,21 @@ app.use(express.urlencoded({ extended: true, limit: "4mb" }));
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/usuarios", require("./routes/usuarioRoutes"));
 app.use("/api/lugares", require("./routes/lugaresRoutes"));
+// Contenido de destinos: catálogos asignables y enlace a un destino.
+app.use("/api/contenido", require("./routes/destinoContenidoRoutes").contenidoRouter);
+app.use(
+  "/api/lugares/:id/administrar",
+  require("./routes/destinoContenidoRoutes").lugarContenidoRouter
+);
 app.use("/api/businesses", require("./routes/businessRoutes"));
 app.use("/api/planes", require("./routes/planRoutes").publicRouter);
 app.use("/api/favoritos", require("./routes/favoritoRoutes"));
 app.use("/api/reviews", require("./routes/reviewRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
+// Inscripciones y pagos (turista): /api/mis-inscripciones, /api/inscripciones/:id/...
+app.use("/api", require("./routes/inscripcionRoutes"));
+// Pagos: /api/pagos/estado y webhook del proveedor.
+app.use("/api/pagos", require("./routes/inscripcionRoutes").pagosRouter);
 
 app.get("/api/health", (req, res) => {
   res.json({ success: true, message: "API funcionando" });

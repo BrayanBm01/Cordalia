@@ -539,8 +539,8 @@ export default function NegocioDetalle({ manage = false }) {
                 <ManageHourForm businessId={business.id} onAdded={() => fetchChildren(business.id)} />
                 <ul className="mt-4 space-y-2">
                   {horarios.map((h) => (
-                    <li key={h.id} className="flex items-center justify-between gap-3 p-3 rounded-xl border border-dark-100">
-                      <div className="flex items-center gap-3">
+                    <li key={h.id} className="flex items-center justify-between gap-2 p-3 rounded-xl border border-dark-100">
+                      <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                         <span className="w-24 text-sm font-medium text-dark-800">{DIAS_LABEL[h.day_of_week]}</span>
                         {h.is_closed ? (
                           <span className="text-sm text-red-600 font-medium">Cerrado</span>
@@ -548,7 +548,7 @@ export default function NegocioDetalle({ manage = false }) {
                           <span className="text-sm text-dark-600">{h.open_time} - {h.close_time}</span>
                         )}
                       </div>
-                      <button onClick={() => removeHour(h.id)} className="p-1.5 rounded-lg text-dark-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer">
+                      <button onClick={() => removeHour(h.id)} className="p-1.5 rounded-lg text-dark-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer shrink-0">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </li>
@@ -569,7 +569,7 @@ export default function NegocioDetalle({ manage = false }) {
                           {r.url}
                         </a>
                       </div>
-                      <button onClick={() => removeSocial(r.id)} className="p-1.5 rounded-lg text-dark-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer">
+                      <button onClick={() => removeSocial(r.id)} className="p-1.5 rounded-lg text-dark-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer shrink-0">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </li>

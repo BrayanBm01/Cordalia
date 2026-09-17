@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const { EXPIRACION_MINUTOS } = require("../services/paymentService");
 
 const BASE_COLUMNS = `p.id, p.business_id, p.nombre, p.slug, p.descripcion, p.destination_id,
        p.destino, p.duracion_dias, p.duracion_noches, p.precio, p.tipo_precio,
@@ -523,7 +524,10 @@ const PlanModel = {
     const { rows } = await pool.query(
       `SELECT i.id, i.salida_id, i.user_id, i.nombre, i.email, i.personas, i.mensaje,
               i.precio_original_persona, i.precio_persona, i.descuento_porcentaje,
-              i.precio_total, i.tipo_descuento, i.estado, i.created_at
+              i.precio_total, i.tipo_descuento, i.estado, i.created_at, i.updated_at,
+              to_char(i.fecha_limite_pago, 'YYYY-MM-DD"T"HH24:MI:SS')::text AS fecha_limite_pago,
+              to_char(i.fecha_pago, 'YYYY-MM-DD"T"HH24:MI:SS')::text AS fecha_pago,
+              i.pago_proveedor, i.pago_referencia, i.pago_metodo
        FROM inscripciones i
        JOIN tour_plan_salidas s ON s.id = i.salida_id
        WHERE i.salida_id = $1 AND s.plan_id = $2
@@ -533,12 +537,19 @@ const PlanModel = {
     return rows;
   },
 
-  // Resumen logístico de una salida (información SIN pago).
+  // Resumen logístico de una salida: inscritos = PENDIENTE + PAGADA
+  // (reservan cupo y aportan valor); canceladas/expiradas liberan cupo.
   async resumenInscripciones(salidaId, planId) {
     const { rows } = await pool.query(
-      `SELECT COALESCE(SUM(CASE WHEN i.estado = 'confirmada' THEN i.personas ELSE 0 END), 0)::int AS inscritos,
-              COALESCE(SUM(CASE WHEN i.estado = 'confirmada' THEN i.precio_total ELSE 0 END), 0)::bigint AS valor_total,
-              COUNT(*)::int AS total_solicitudes
+      `SELECT COALESCE(SUM(CASE WHEN i.estado IN ('pendiente', 'pagada') THEN i.personas ELSE 0 END), 0)::int AS inscritos,
+              COALESCE(SUM(CASE WHEN i.estado IN ('pendiente', 'pagada') THEN i.precio_total ELSE 0 END), 0)::bigint AS valor_total,
+              COUNT(*)::int AS total_solicitudes,
+              COALESCE(SUM(CASE WHEN i.estado = 'pendiente' THEN i.personas ELSE 0 END), 0)::int AS pendientes,
+              COALESCE(SUM(CASE WHEN i.estado = 'pendiente' THEN i.precio_total ELSE 0 END), 0)::bigint AS valor_pendiente,
+              COALESCE(SUM(CASE WHEN i.estado = 'pagada' THEN i.personas ELSE 0 END), 0)::int AS pagados,
+              COALESCE(SUM(CASE WHEN i.estado = 'pagada' THEN i.precio_total ELSE 0 END), 0)::bigint AS valor_pagado,
+              COALESCE(SUM(CASE WHEN i.estado = 'fallida' THEN i.personas ELSE 0 END), 0)::int AS fallidas,
+              COALESCE(SUM(CASE WHEN i.estado IN ('cancelada', 'expirada') THEN i.personas ELSE 0 END), 0)::int AS retirados
        FROM inscripciones i
        JOIN tour_plan_salidas s ON s.id = i.salida_id
        WHERE i.salida_id = $1 AND s.plan_id = $2`,
@@ -551,7 +562,10 @@ const PlanModel = {
     const { rows } = await pool.query(
       `SELECT i.id, i.salida_id, i.user_id, i.nombre, i.email, i.personas, i.mensaje,
               i.precio_original_persona, i.precio_persona, i.descuento_porcentaje,
-              i.precio_total, i.tipo_descuento, i.estado, i.created_at
+              i.precio_total, i.tipo_descuento, i.estado, i.created_at, i.updated_at,
+              to_char(i.fecha_limite_pago, 'YYYY-MM-DD"T"HH24:MI:SS')::text AS fecha_limite_pago,
+              to_char(i.fecha_pago, 'YYYY-MM-DD"T"HH24:MI:SS')::text AS fecha_pago,
+              i.pago_proveedor, i.pago_referencia, i.pago_metodo
        FROM inscripciones i
        JOIN tour_plan_salidas s ON s.id = i.salida_id
        WHERE i.id = $1 AND i.salida_id = $2 AND s.plan_id = $3
@@ -596,6 +610,16 @@ const PlanModel = {
         throw { status: 400, message: `Cupo insuficiente: quedan ${cupoDisponible} de ${salida.cupo_maximo}` };
       }
 
+      // Fecha límite para pagar (backend la controla): el usuario tiene
+      // EXPIRACION_MINUTOS desde que crea la inscripción, pero nunca más allá
+      // del cierre de inscripciones de la salida (si existe).
+      let fechaLimitePago = new Date(Date.now() + EXPIRACION_MINUTOS * 60000);
+      if (salida.fecha_limite) {
+        const horaLim = salida.hora_limite ? String(salida.hora_limite).slice(0, 5) : "23:59";
+        const corte = new Date(`${fmtFecha(salida.fecha_limite)}T${horaLim}:00`);
+        if (corte < fechaLimitePago) fechaLimitePago = corte;
+      }
+
       // Snapshot del precio calculado EN ESTE MOMENTO (la promoción puede
       // cambiar después sin afectar inscripciones pasadas).
       let precio = null;
@@ -607,18 +631,21 @@ const PlanModel = {
 
       const { rows } = await client.query(
         `INSERT INTO inscripciones (salida_id, user_id, nombre, email, personas, mensaje,
-                precio_original_persona, precio_persona, descuento_porcentaje, precio_total, tipo_descuento)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                precio_original_persona, precio_persona, descuento_porcentaje, precio_total, tipo_descuento,
+                estado, fecha_limite_pago)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pendiente', $12)
          RETURNING id, salida_id, user_id, nombre, email, personas, mensaje,
                    precio_original_persona, precio_persona, descuento_porcentaje,
-                   precio_total, tipo_descuento, estado, created_at`,
+                   precio_total, tipo_descuento, estado, created_at, updated_at,
+                   to_char(fecha_limite_pago, 'YYYY-MM-DD"T"HH24:MI:SS')::text AS fecha_limite_pago`,
         [salidaId, data.user_id || null, data.nombre || null, data.email || null,
          data.personas, data.mensaje || null,
          precio?.precio_original_persona ?? null,
          precio?.precio_persona ?? null,
          precio?.descuento_porcentaje ?? (precio?.descuento_total ?? 0),
          precio?.total ?? null,
-         precio?.tipo_descuento ?? null]
+         precio?.tipo_descuento ?? null,
+         fechaLimitePago]
       );
       await client.query(
         `UPDATE tour_plan_salidas SET cupo_ocupado = cupo_ocupado + $1, updated_at = NOW()
@@ -654,9 +681,17 @@ const PlanModel = {
           [salidaId, planId]
         );
         if (joins.length === 0) throw { status: 404, message: "Inscripción no encontrada" };
-        if (insc.estado !== "confirmada") throw { status: 400, message: "La inscripción ya está cancelada" };
+        // Estados de pago: solo se puede cancelar/liberar cupo lo que aún no
+        // fue pagado ('pendiente'/'fallida'). 'cancelada'/'expirada' ya no
+        // reservan cupo y 'pagada' no se cancela sin devolución.
+        if (insc.estado === "cancelada" || insc.estado === "expirada") {
+          throw { status: 400, message: "La inscripción ya está cancelada o vencida" };
+        }
+        if (insc.estado === "pagada") {
+          throw { status: 400, message: "No se puede cancelar una inscripción ya pagada" };
+        }
         await client.query(
-          `UPDATE inscripciones SET estado = 'cancelada' WHERE id = $1`,
+          `UPDATE inscripciones SET estado = 'cancelada', updated_at = NOW() WHERE id = $1`,
           [inscripcionId]
         );
         await client.query(

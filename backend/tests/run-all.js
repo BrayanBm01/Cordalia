@@ -9,4 +9,6 @@ require("./07-perfil.test");
 require("./08-grupales.test");
 require("./09-datos-cordoba.test");
 require("./10-precio.test");
+require("./11-pagos.test");
+require("./12-contenido-destinos.test");
 require("./helpers").main();

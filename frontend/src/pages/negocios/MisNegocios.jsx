@@ -73,7 +73,7 @@ export default function MisNegocios() {
             <EmptyState
               icon={Store}
               title="Aún no tienes negocios"
-              description="Crea tu primer negocio para aparecer en Explora Turismo. Un administrador lo revisará."
+              description="Crea tu primer negocio para aparecer en Cordalia. Un administrador lo revisará."
             />
           </div>
         ) : (

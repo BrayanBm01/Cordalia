@@ -66,15 +66,15 @@ export default function Login() {
               <MapPin className="w-6 h-6 text-white" />
             </div>
             <span className="font-[family-name:var(--font-display)] text-2xl font-bold text-white">
-              Explora Turismo
+              Cordalia
             </span>
           </div>
           <h2 className="font-[family-name:var(--font-display)] text-4xl font-bold text-white mb-4 leading-tight">
-            Descubre la magia de Colombia
+            Descubre la magia de Córdoba
           </h2>
           <p className="text-white/60 text-lg leading-relaxed">
-            Accede a tu cuenta para guardar favoritos, planificar viajes y explorar todos los
-            destinos que Colombia tiene para ofrecer.
+            Accede a tu cuenta para guardar favoritos, reservar experiencias y descubrir los
+            planes turísticos que Córdoba tiene para ofrecer.
           </p>
         </div>
       </div>
@@ -87,7 +87,7 @@ export default function Login() {
               <MapPin className="w-6 h-6 text-white" />
             </div>
             <span className="font-[family-name:var(--font-display)] text-2xl font-bold text-dark-900">
-              Explora Turismo
+              Cordalia
             </span>
           </div>
 

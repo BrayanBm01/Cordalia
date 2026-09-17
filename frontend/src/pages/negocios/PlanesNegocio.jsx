@@ -339,7 +339,7 @@ export default function PlanesNegocio({ businessId }) {
                         <span className="font-semibold text-dark-800">{formatMoney(p.precio)} <span className="text-dark-400 font-normal">· {TIPO_PRECIO_LABEL[p.tipo_precio] || p.tipo_precio}</span></span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                       <button
                         onClick={() => toggleEstado('plan', p)}
                         title={p.estado === 'activo' ? 'Desactivar' : 'Activar'}
@@ -393,8 +393,8 @@ export default function PlanesNegocio({ businessId }) {
                       ))}
                     </div>
                     <form onSubmit={addImage} className="mt-2 space-y-2">
-                      <div className="flex flex-wrap items-end gap-2">
-                        <div className="w-full max-w-md">
+                      <div className="flex flex-col sm:flex-row sm:items-end gap-2">
+                        <div className="w-full sm:max-w-md">
                           <ImageUploader
                             value={img.planId === p.id ? img.url : ''}
                             onChange={(v) => setImg((s) => ({ ...s, url: v, planId: p.id }))}
@@ -405,7 +405,7 @@ export default function PlanesNegocio({ businessId }) {
                           value={img.planId === p.id ? img.alt : ''}
                           onChange={(e) => setImg((s) => ({ ...s, alt: e.target.value, planId: p.id }))}
                           placeholder="Texto alternativo"
-                          className={`${inputClass} w-40`}
+                          className={`${inputClass} sm:w-40`}
                         />
                         <label className="flex items-center gap-1.5 text-sm text-dark-600 pb-2">
                           <input type="checkbox" checked={img.is_primary} onChange={(e) => setImg((s) => ({ ...s, is_primary: e.target.checked, planId: p.id }))} />
@@ -414,7 +414,7 @@ export default function PlanesNegocio({ businessId }) {
                         <button
                           type="submit"
                           disabled={!img.url.trim() || img.planId !== p.id || img.saving}
-                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 cursor-pointer"
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 cursor-pointer w-full sm:w-auto"
                         >
                           {img.saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Agregar
                         </button>
@@ -482,7 +482,7 @@ export default function PlanesNegocio({ businessId }) {
                     </p>
                     <p className="text-xs text-dark-400 mt-1">{formatFechas(pr.fecha_inicio, pr.fecha_fin)}</p>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                     <button
                       onClick={() => toggleEstado('promo', pr)}
                       title={pr.estado === 'activo' ? 'Desactivar' : 'Activar'}
