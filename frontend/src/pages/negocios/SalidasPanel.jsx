@@ -53,6 +53,7 @@ const ESTADO_BADGE = {
   fallida: 'bg-orange-100 text-orange-700',
   cancelada: 'bg-dark-100 text-dark-500',
   expirada: 'bg-red-100 text-red-600',
+  vencida: 'bg-red-100 text-red-600',
 }
 
 const ESTADO_LABEL = {
@@ -61,6 +62,7 @@ const ESTADO_LABEL = {
   fallida: 'Fallida',
   cancelada: 'Cancelada',
   expirada: 'Expirada',
+  vencida: 'Viaje vencido',
 }
 
 function InscripcionesList({ businessId, planId, salida, valor }) {

@@ -3,11 +3,10 @@ import { useParams, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   ArrowLeft, MapPin, Clock, DollarSign, Calendar,
-  Plane, Camera, Star, Compass, Info,
+  Plane, Star, Compass, Info,
   Tag, ChevronRight, ImageOff, Store, ExternalLink, Wallet, Users,
 } from 'lucide-react'
 import { lugaresAPI } from '../services/api'
-import destinationDetails from '../data/destinos'
 import FavoritoButton from '../components/FavoritoButton'
 
 const fadeUp = {
@@ -17,17 +16,6 @@ const fadeUp = {
     y: 0,
     transition: { duration: 0.5, delay: i * 0.07, ease: [0.25, 0.46, 0.45, 0.94] },
   }),
-}
-
-function GalleryImage({ src, alt, className }) {
-  const [error, setError] = useState(false)
-  return error ? (
-    <div className={`bg-dark-100 flex items-center justify-center ${className}`}>
-      <ImageOff className="w-8 h-8 text-dark-300" />
-    </div>
-  ) : (
-    <img src={src} alt={alt} onError={() => setError(true)} className={className} />
-  )
 }
 
 function SectionHeading({ icon: Icon, title }) {
@@ -193,6 +181,26 @@ function BusinessCard({ business }) {
 const formatMoney = (n, moneda) => {
   if (n === null || n === undefined || n === '') return '—'
   return `${Number(n).toLocaleString('es-CO')} ${moneda || 'COP'}`
+}
+
+// Precio efectivo por persona cuando hay promo vigente (porcentaje o valor
+// fijo COP), calculado SIEMPRE sobre el precio normal del plan.
+function escribePrecioEfectivo(p) {
+  const base = Number(p.precio) || 0
+  const promo = Array.isArray(p.promociones) ? p.promociones[0] : null
+  const valor = Number(promo?.valor_descuento) || 0
+  if (!promo) return base
+  return promo.tipo_descuento === 'porcentaje'
+    ? Math.max(0, Math.round(base * (1 - Math.min(Math.max(valor, 0), 100) / 100)))
+    : Math.max(0, base - Math.round(valor))
+}
+
+function textoPromo(p) {
+  const promo = Array.isArray(p.promociones) ? p.promociones[0] : null
+  if (!promo) return ''
+  return promo.tipo_descuento === 'porcentaje'
+    ? `Promoción activa: -${Math.min(Math.max(Number(promo.valor_descuento) || 0, 0), 100)}%`
+    : `Promoción activa: -${formatMoney(promo.valor_descuento, 'COP')}`
 }
 
 function InfoViajeDinamico({ infoViaje }) {
@@ -432,7 +440,7 @@ function PresupuestoComparacion({ presupuesto, lugarNombre }) {
                     </div>
                     <div className="text-right shrink-0">
                       <p className="text-sm font-bold text-primary-700">
-                        {formatMoney(p.precio, p.moneda)}
+                        {formatMoney(p.promociones?.length > 0 ? (escribePrecioEfectivo(p)) : p.precio, p.moneda)}
                       </p>
                       <p className="text-[11px] text-dark-400 capitalize">
                         {p.tipo_precio === 'por_persona' ? 'por persona' : 'por grupo'} · {p.duracion_dias} día(s)
@@ -441,7 +449,7 @@ function PresupuestoComparacion({ presupuesto, lugarNombre }) {
                   </div>
                   {p.promociones?.length > 0 && (
                     <p className="text-xs font-medium text-sand-700 mt-1">
-                      Promo activa: {p.promociones[0].valor_descuento}% de descuento
+                      {textoPromo(p)}
                     </p>
                   )}
                 </Link>
@@ -471,7 +479,6 @@ export default function LugarDetalle() {
   const [negociosLoading, setNegociosLoading] = useState(true)
   const [contenido, setContenido] = useState(null)
   const [presupuesto, setPresupuesto] = useState(null)
-  const details = destinationDetails[id]
 
   useEffect(() => {
     async function fetchLugar() {
@@ -540,20 +547,32 @@ export default function LugarDetalle() {
     return () => { active = false }
   }, [id])
 
+  // Lugares relacionados, siempre desde la API: se priorizan los del mismo
+  // municipio, luego los mismos tipo y por último el resto de Córdoba.
   useEffect(() => {
-    if (!details?.related) return
+    let active = true
     async function fetchRelated() {
-      const results = await Promise.allSettled(
-        details.related.map((rid) => lugaresAPI.getById(rid))
-      )
-      setRelatedLugares(
-        results
-          .filter((r) => r.status === 'fulfilled' && r.value?.data)
-          .map((r) => r.value.data)
-      )
+      try {
+        const res = await lugaresAPI.getAll()
+        const todos = Array.isArray(res.data) ? res.data : []
+        const otros = todos.filter((l) => String(l.id) !== String(id))
+        const ordenado = [...otros].sort((a, b) => {
+          const score = (l) => {
+            let s = 0
+            if (l.municipio) s += l.municipio === lugar?.municipio ? 2 : 0
+            if (l.tipo) s += l.tipo === lugar?.tipo ? 1 : 0
+            return s
+          }
+          return score(b) - score(a)
+        })
+        if (active) setRelatedLugares(ordenado.slice(0, 3))
+      } catch {
+        if (active) setRelatedLugares([])
+      }
     }
     fetchRelated()
-  }, [details])
+    return () => { active = false }
+  }, [id, lugar])
 
   if (loading) {
     return (
@@ -603,11 +622,11 @@ export default function LugarDetalle() {
     )
   }
 
-  const heroImage = details?.heroImage || lugar.imagen || lugar.foto || lugar.image
+  const heroImage = lugar.imagen || lugar.foto || lugar.image
 
   return (
     <div className="min-h-screen bg-white">
-      <section className="relative aspect-[21/9] min-h-[400px] md:min-h-[500px] overflow-hidden">
+      <section className="relative w-full aspect-[21/9] min-h-[400px] md:min-h-[500px] overflow-hidden">
         {heroImage ? (
           <img
             src={heroImage}
@@ -652,12 +671,8 @@ export default function LugarDetalle() {
               <FavoritoButton tipo="destino" id={lugar.id} withLabel className="mb-3 shadow-lg" />
             </div>
 
-            {details?.tagline && (
-              <p className="text-lg md:text-xl text-white/70 italic">{details.tagline}</p>
-            )}
-
-            {!details && lugar.descripcion && (
-              <p className="text-lg text-white/70 max-w-3xl">{lugar.descripcion}</p>
+            {lugar.descripcion && (
+              <p className="text-lg md:text-xl text-white/70 italic">{lugar.descripcion}</p>
             )}
           </motion.div>
         </div>
@@ -665,50 +680,7 @@ export default function LugarDetalle() {
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16 space-y-16">
 
-        {details?.gallery && (
-          <motion.section
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
-          >
-            <SectionHeading icon={Camera} title="Galería" />
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-              <motion.div variants={fadeUp} className="col-span-2 row-span-2 rounded-2xl overflow-hidden">
-                <GalleryImage
-                  src={details.gallery[0]}
-                  alt={`${lugar.nombre} - galería`}
-                  className="w-full h-full object-cover aspect-square md:aspect-auto min-h-[200px]"
-                />
-              </motion.div>
-              {details.gallery.slice(1, 4).map((img, i) => (
-                <motion.div key={i} variants={fadeUp} className="rounded-2xl overflow-hidden">
-                  <GalleryImage
-                    src={img}
-                    alt={`${lugar.nombre} - galería ${i + 2}`}
-                    className="w-full h-full object-cover aspect-square"
-                  />
-                </motion.div>
-              ))}
-            </div>
-          </motion.section>
-        )}
-
-        {details?.overview && (
-          <motion.section
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-          >
-            <SectionHeading icon={Info} title="Sobre este destino" />
-            <div className="prose prose-lg max-w-none">
-              <p className="text-dark-600 leading-relaxed text-base md:text-lg">{details.overview}</p>
-            </div>
-          </motion.section>
-        )}
-
-        {lugar.descripcion && !details?.overview && (
+        {lugar.descripcion && (
           <motion.section
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}

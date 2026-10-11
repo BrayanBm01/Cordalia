@@ -150,7 +150,7 @@ function validarDescuentosRango(val) {
 function validarPlan(body, esCreacion = false) {
   let {
     nombre, descripcion, destination_id, destino, duracion_dias, duracion_noches,
-    precio, tipo_precio, precio_anterior, tipo_plan, incluye, itinerario, moneda,
+    precio, tipo_precio, tipo_plan, incluye, itinerario, moneda,
     descuentos_rango, capacidad_referencial,
   } = body || {};
 
@@ -230,14 +230,9 @@ function validarPlan(body, esCreacion = false) {
     data.tipo_precio = "por_persona";
   }
 
-  if (precio_anterior !== undefined && precio_anterior !== null && precio_anterior !== "") {
-    const p = parseNumber(precio_anterior);
-    if (Number.isNaN(p) || p < 0) {
-      return { error: { status: 400, message: "El precio anterior debe ser un número mayor o igual a 0" } };
-    }
-    data.precio_anterior = p;
-  } else if (precio_anterior === "" || precio_anterior === null) {
-    data.precio_anterior = null;
+  const bodyDePromos = body || {};
+  if (bodyDePromos.precio_anterior !== undefined || bodyDePromos.precio_promocional !== undefined) {
+    return { error: { status: 400, message: "Los campos precio_anterior y precio_promocional ya no existen: el plan solo tiene su precio normal y las promociones aplican un descuento temporal sobre él" } };
   }
 
   if (tipo_plan !== undefined) {
@@ -292,10 +287,6 @@ function validarPlan(body, esCreacion = false) {
     data.capacidad_referencial = c;
   } else if (esCreacion || capacidad_referencial === "" || capacidad_referencial === null) {
     data.capacidad_referencial = null;
-  }
-
-  if (data.precio != null && data.precio_anterior != null && data.precio_anterior < data.precio) {
-    return { error: { status: 400, message: "El precio anterior no puede ser menor que el precio actual" } };
   }
 
   return { data };

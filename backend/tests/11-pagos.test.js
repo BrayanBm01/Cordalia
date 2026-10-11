@@ -224,6 +224,93 @@ h.test("PAGO: cancelar una inscripción PENDIENTE la libera; una PAGADA no se ca
   h.assertMsg(cancPagada.json, "pagada");
 });
 
+h.test("PAGO: promoción vencida al pagar → el backend recalcula y cobra precio normal", async () => {
+  const { id } = h.test.neg;
+  const pid = h.test.plan.id;
+
+  const promo = await h.api(`/api/businesses/${id}/promociones`, {
+    method: "POST", token: h.test.O.token,
+    body: {
+      nombre: "Promo a vencer", plan_id: pid,
+      tipo_descuento: "porcentaje", valor_descuento: 50,
+      fecha_inicio: "2000-01-01", fecha_fin: "2099-12-31",
+    },
+  });
+  h.assertStatus(promo.status, 201, "crear promo 50%");
+
+  const salida = await h.api(`/api/businesses/${id}/planes/${pid}/salidas`, {
+    method: "POST", token: h.test.O.token,
+    body: { fecha: "2027-03-10", hora: "08:00", cupo_maximo: 10 },
+  });
+  h.assertStatus(salida.status, 201, "salida para recálculo");
+  const sid = salida.json.data.id;
+
+  const insc = await h.api(`/api/businesses/${id}/planes/${pid}/salidas/${sid}/inscripciones`, {
+    method: "POST", token: h.test.T1.token, body: { personas: 2 },
+  });
+  h.assertStatus(insc.status, 201, "inscribirse con promo activa");
+  h.assert(Number(insc.json.data.precio_total) === 150000, "snapshot con promo 50% = 150.000");
+
+  // La promoción vence entre la inscripción y el pago.
+  await h.q("UPDATE promotions SET fecha_fin = CURRENT_DATE - 1 WHERE id = $1", [promo.json.data.id]);
+
+  const pago = await h.api(`/api/inscripciones/${insc.json.data.id}/pagar`, {
+    method: "POST", token: h.test.T1.token, body: { metodo_pago: "nequi", monto: 1, paymentSuccess: true },
+  });
+  h.assertStatus(pago.status, 200, "pago exitoso tras recálculo");
+  h.assert(Number(pago.json.data.pago.monto) === 300000, "monto recalculado sin promo: 300.000");
+  h.assert(pago.json.data.inscripcion.tipo_descuento === "ninguno", "sin descuento efectivo al pagar");
+
+  const comp = await h.api(`/api/inscripciones/${insc.json.data.id}/comprobante`, { token: h.test.T1.token });
+  h.assert(Number(comp.json.data.precio_total) === 300000, "comprobante con precio normal 300.000");
+});
+
+h.test("PAGO: viaje pagado ya ocurrido → VENCIDA en perfil, no se paga ni libera cupo", async () => {
+  const { id } = h.test.neg;
+  const pid = h.test.plan.id;
+
+  const salida = await h.api(`/api/businesses/${id}/planes/${pid}/salidas`, {
+    method: "POST", token: h.test.O.token,
+    body: { fecha: "2027-06-15", hora: "09:00", cupo_maximo: 10 },
+  });
+  h.assertStatus(salida.status, 201, "salida futura para viaje vencido");
+  const sid = salida.json.data.id;
+
+  const insc = await h.api(`/api/businesses/${id}/planes/${pid}/salidas/${sid}/inscripciones`, {
+    method: "POST", token: h.test.T2.token, body: { personas: 2 },
+  });
+  h.assertStatus(insc.status, 201, "inscribirse turista 2");
+  const iid = insc.json.data.id;
+
+  const pago = await h.api(`/api/inscripciones/${iid}/pagar`, {
+    method: "POST", token: h.test.T2.token, body: { metodo_pago: "nequi" },
+  });
+  h.assertStatus(pago.status, 200, "pagar viaje");
+  h.assert(pago.json.data.inscripcion.estado === "pagada", "inicialmente PAGADA");
+
+  // El viaje ya ocurrió: mover la fecha de la salida al pasado.
+  await h.q("UPDATE tour_plan_salidas SET fecha = '2020-01-05' WHERE id = $1", [sid]);
+
+  const perfil = await h.api("/api/mis-inscripciones", { token: h.test.T2.token });
+  const vencidas = perfil.json.data.vencidas || [];
+  h.assert(vencidas.length === 1, "1 inscripción agrupada en vencidas");
+  h.assert(vencidas[0].id === iid, "es la inscripción pagada del viaje pasado");
+  h.assert(vencidas[0].estado === "vencida", "estado VENCIDA");
+  h.assert(!perfil.json.data.pagadas.some((x) => x.id === iid), "ya no aparece en pagadas");
+
+  const salidas = await h.api(`/api/businesses/${id}/planes/${pid}/salidas`, { token: h.test.O.token });
+  h.assert(Number(salidas.json.data.find((s) => String(s.id) === String(sid)).cupo_ocupado) === 2, "cupo sigue ocupado (no se libera)");
+
+  const reintento = await h.api(`/api/inscripciones/${iid}/pagar`, {
+    method: "POST", token: h.test.T2.token, body: { metodo_pago: "nequi" },
+  });
+  h.assertStatus(reintento.status, 400, "no se puede pagar un viaje vencido");
+  h.assertMsg(reintento.json, "vencida");
+
+  const comp = await h.api(`/api/inscripciones/${iid}/comprobante`, { token: h.test.T2.token });
+  h.assert(comp.json.data.estado === "vencida", "comprobante refleja VENCIDA");
+});
+
 h.test("PAGO: webhook del proveedor es inofensivo en modo mock y expone estado", async () => {
   const webhook = await h.api("/api/pagos/webhook/mercadopago", { method: "POST", body: { type: "payment" } });
   h.assertStatus(webhook.status, 200, "webhook acusa recibo");

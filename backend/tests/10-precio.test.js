@@ -34,7 +34,7 @@ h.test("PRECIO: setup (admin, owner, turista y negocio aprobado)", async () => {
   h.test.neg = neg.json.data;
 });
 
-h.test("PRECIO: $132.000 × 24% manda pese a precio_promocional desactualizado", async () => {
+h.test("PRECIO: $132.000 × 24% se calcula SIEMPRE sobre el precio normal (el cliente no puede fijar precio)", async () => {
   const id = h.test.neg.id;
   const creado = await h.api(`/api/businesses/${id}/planes`, {
     method: "POST", token: h.test.O.token,
@@ -52,18 +52,18 @@ h.test("PRECIO: $132.000 × 24% manda pese a precio_promocional desactualizado",
   // Contrato: el backend recibe/guarda enteros puros (COP), sin decimales.
   h.assert(Number(creado.json.data.precio) === 132000, "precio guardado 132000 (entero)");
 
-  // Promo porcentual con un precio fijo desactualizado (el caso del bug
-  // reportado: mostraba $100.000 en vez de $100.320).
+  // Promo porcentual: el descuento se aplica sobre el precio normal
+  // (132.000). El backend ignora cualquier intento del cliente de fijar
+  // un precio distinto.
   const promo = await h.api(`/api/businesses/${id}/promociones`, {
     method: "POST", token: h.test.O.token,
     body: {
       nombre: "24% vigente", plan_id: pid,
       tipo_descuento: "porcentaje", valor_descuento: 24,
-      precio_promocional: 100000,
       fecha_inicio: "2000-01-01", fecha_fin: "2099-12-31",
     },
   });
-  h.assertStatus(promo.status, 201, "crear promoción 24% con precio fijo viejo");
+  h.assertStatus(promo.status, 201, "crear promoción 24%");
   h.assert(Number(promo.json.data.valor_descuento) === 24, "valor_descuento 24 (entero)");
 
   // 1 persona: 132000 - 24% = 100320 (no 100000).

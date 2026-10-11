@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -7,6 +7,7 @@ import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { Mail, Lock, Eye, EyeOff, Loader2, MapPin } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { SESION_INACTIVIDAD_FLAG } from '../utils/session'
 import GoogleButton from '../components/GoogleButton'
 
 const loginSchema = z.object({
@@ -19,6 +20,15 @@ export default function Login() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { login } = useAuth()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (sessionStorage.getItem(SESION_INACTIVIDAD_FLAG)) {
+      sessionStorage.removeItem(SESION_INACTIVIDAD_FLAG)
+      toast.info('Sesión cerrada por inactividad', {
+        description: 'Por seguridad, tu sesión se cerró tras 2 minutos sin actividad. Vuelve a iniciar sesión para continuar.',
+      })
+    }
+  }, [])
 
   const {
     register,

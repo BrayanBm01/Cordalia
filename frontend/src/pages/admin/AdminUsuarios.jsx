@@ -281,9 +281,9 @@ export default function AdminUsuarios() {
               exit={{ opacity: 0, scale: 0.95, y: 8 }}
               transition={{ duration: 0.2 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-xl shadow-xl w-full max-w-md border border-dark-200"
+              className="bg-white rounded-xl shadow-xl w-full max-w-md border border-dark-200 max-h-[85vh] flex flex-col"
             >
-              <div className="flex items-center justify-between px-6 py-4 border-b border-dark-100">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-dark-100 shrink-0">
                 <h2 className="text-lg font-semibold text-dark-900">
                   {editingUser ? 'Editar usuario' : 'Crear usuario'}
                 </h2>
@@ -292,7 +292,7 @@ export default function AdminUsuarios() {
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
+              <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4 overflow-y-auto">
                 <div>
                   <label className="block text-sm font-medium text-dark-700 mb-1">Nombre</label>
                   <input

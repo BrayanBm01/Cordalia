@@ -59,10 +59,15 @@ function isOwnerView(req, business) {
 async function validarPromo(body, business, esCreacion = false) {
   let {
     plan_id, service_id, nombre, descripcion, tipo_descuento, valor_descuento,
-    precio_anterior, precio_promocional, imagen_url, fecha_inicio, fecha_fin, estado,
+    imagen_url, fecha_inicio, fecha_fin, estado,
   } = body || {};
 
   const data = {};
+
+  const camposLegado = body || {};
+  if (camposLegado.precio_anterior !== undefined || camposLegado.precio_promocional !== undefined) {
+    return { error: { status: 400, message: "Los campos precio_anterior y precio_promocional ya no existen: la promoción solo define un descuento temporal (porcentaje o valor fijo COP) sobre el precio normal del plan" } };
+  }
 
   if (estado !== undefined) {
     const e = sanitizeString(estado).toLowerCase();
@@ -159,30 +164,6 @@ async function validarPromo(body, business, esCreacion = false) {
     return { error: { status: 400, message: "El porcentaje de descuento no puede superar 100" } };
   }
 
-  if (precio_anterior !== undefined && precio_anterior !== null && precio_anterior !== "") {
-    const p = parseNumber(precio_anterior);
-    if (Number.isNaN(p) || p < 0) {
-      return { error: { status: 400, message: "El precio anterior debe ser un número mayor o igual a 0" } };
-    }
-    data.precio_anterior = p;
-  } else if (precio_anterior === "" || precio_anterior === null) {
-    data.precio_anterior = null;
-  }
-
-  if (precio_promocional !== undefined && precio_promocional !== null && precio_promocional !== "") {
-    const p = parseNumber(precio_promocional);
-    if (Number.isNaN(p) || p < 0) {
-      return { error: { status: 400, message: "El precio promocional debe ser un número mayor o igual a 0" } };
-    }
-    data.precio_promocional = p;
-  } else if (precio_promocional === "" || precio_promocional === null) {
-    data.precio_promocional = null;
-  }
-
-  if (data.precio_anterior != null && data.precio_promocional != null && data.precio_promocional > data.precio_anterior) {
-    return { error: { status: 400, message: "El precio promocional no puede ser mayor que el anterior" } };
-  }
-
   if (imagen_url !== undefined) {
     const i = sanitizeString(imagen_url);
     data.imagen_url = i === "" ? null : i;
@@ -249,6 +230,16 @@ exports.create = async (req, res) => {
     const { error, data } = await validarPromo(req.body, req.business, true);
     if (error) return res.status(error.status).json({ success: false, message: error.message });
 
+    if (data.plan_id && (data.estado || "activo") === "activo" && data.fecha_inicio && data.fecha_fin) {
+      const solapa = await PromotionModel.hasActiveOverlap(data.plan_id, data.fecha_inicio, data.fecha_fin);
+      if (solapa) {
+        return res.status(400).json({
+          success: false,
+          message: "El plan ya tiene una promoción activa vigente en ese rango de fechas. Desactívala primero o ajusta las fechas.",
+        });
+      }
+    }
+
     const promo = await PromotionModel.create({ ...data, business_id: businessId });
     return res.status(201).json({
       success: true,
@@ -274,6 +265,21 @@ exports.update = async (req, res) => {
       return res.status(400).json({ success: false, message: "No hay datos para actualizar" });
     }
 
+    // Solapamiento: usa los valores EFECTIVOS tras el update.
+    const planIdEf = data.plan_id != null ? data.plan_id : existing.plan_id;
+    const fechaIniEf = data.fecha_inicio != null ? data.fecha_inicio : existing.fecha_inicio;
+    const fechaFinEf = data.fecha_fin != null ? data.fecha_fin : existing.fecha_fin;
+    const estadoEf = data.estado != null ? data.estado : existing.estado;
+    if (planIdEf && estadoEf === "activo" && fechaIniEf && fechaFinEf) {
+      const solapa = await PromotionModel.hasActiveOverlap(planIdEf, fechaIniEf, fechaFinEf, promoId);
+      if (solapa) {
+        return res.status(400).json({
+          success: false,
+          message: "El plan ya tiene otra promoción activa vigente en ese rango de fechas. Desactívala primero o ajusta las fechas.",
+        });
+      }
+    }
+
     const updated = await PromotionModel.update(promoId, data);
     return res.json({ success: true, message: "Promoción actualizada correctamente", data: updated });
   } catch (error) {
@@ -292,6 +298,22 @@ exports.setEstado = async (req, res) => {
     }
     const existing = await PromotionModel.findByBusinessAndId(businessId, promoId);
     if (!existing) return res.status(404).json({ success: false, message: "Promoción no encontrada" });
+
+    if (estado === "activo" && existing.plan_id) {
+      const solapa = await PromotionModel.hasActiveOverlap(
+        existing.plan_id,
+        existing.fecha_inicio,
+        existing.fecha_fin,
+        promoId
+      );
+      if (solapa) {
+        return res.status(400).json({
+          success: false,
+          message: "El plan ya tiene otra promoción activa vigente en ese rango de fechas.",
+        });
+      }
+    }
+
     const updated = await PromotionModel.setEstado(promoId, estado);
     return res.json({ success: true, message: "Estado actualizado correctamente", data: updated });
   } catch (error) {

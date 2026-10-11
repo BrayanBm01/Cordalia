@@ -38,8 +38,6 @@ function PromoForm({ businessId, planes, promo, onSaved, onCancel }) {
   const [descripcion, setDescripcion] = useState(promo?.descripcion || '')
   const [tipoDescuento, setTipoDescuento] = useState(promo?.tipo_descuento || 'porcentaje')
   const [valorDescuento, setValorDescuento] = useState(promo?.valor_descuento != null ? String(promo.valor_descuento) : '')
-  const [precioAnterior, setPrecioAnterior] = useState(promo?.precio_anterior != null ? String(promo.precio_anterior) : '')
-  const [precioPromocional, setPrecioPromocional] = useState(promo?.precio_promocional != null ? String(promo.precio_promocional) : '')
   const [imagenUrl, setImagenUrl] = useState(promo?.imagen_url || '')
   const [fechaInicio, setFechaInicio] = useState(promo?.fecha_inicio || '')
   const [fechaFin, setFechaFin] = useState(promo?.fecha_fin || '')
@@ -48,9 +46,7 @@ function PromoForm({ businessId, planes, promo, onSaved, onCancel }) {
   const esPorcentaje = tipoDescuento === 'porcentaje'
 
   function cambiarTipo(e) {
-    const t = e.target.value
-    setTipoDescuento(t)
-    if (t === 'porcentaje') setPrecioPromocional('')
+    setTipoDescuento(e.target.value)
   }
 
   async function submit(e) {
@@ -61,8 +57,6 @@ function PromoForm({ businessId, planes, promo, onSaved, onCancel }) {
       plan_id: planId ? Number(planId) : null,
       tipo_descuento: tipoDescuento,
       valor_descuento: valorDescuento != null && valorDescuento !== '' ? Number(valorDescuento) : null,
-      precio_anterior: precioAnterior != null && precioAnterior !== '' ? Number(precioAnterior) : null,
-      precio_promocional: esPorcentaje ? null : (precioPromocional != null && precioPromocional !== '' ? Number(precioPromocional) : null),
       imagen_url: imagenUrl.trim() || null,
       fecha_inicio: fechaInicio || null,
       fecha_fin: fechaFin || null,
@@ -98,7 +92,7 @@ function PromoForm({ businessId, planes, promo, onSaved, onCancel }) {
       </div>
 
       <div>
-        {sectionTitle(<BadgePercent className="w-3.5 h-3.5" />, 'Descuento')}
+        {sectionTitle(<BadgePercent className="w-3.5 h-3.5" />, 'Descuento sobre el precio normal')}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-xs text-dark-500 mb-1">Tipo de descuento</label>
@@ -115,17 +109,32 @@ function PromoForm({ businessId, planes, promo, onSaved, onCancel }) {
               <MoneyInput value={valorDescuento} onChange={setValorDescuento} className={inputClass} required placeholder="Ej: 20000" />
             )}
           </div>
-          <div>
-            <label className="block text-xs text-dark-500 mb-1">Precio anterior (referencia)</label>
-            <MoneyInput value={precioAnterior} onChange={setPrecioAnterior} className={inputClass} placeholder="Ej: 150000" />
-          </div>
-          {!esPorcentaje && (
-            <div>
-              <label className="block text-xs text-dark-500 mb-1">Precio promocional</label>
-              <MoneyInput value={precioPromocional} onChange={setPrecioPromocional} className={inputClass} placeholder="Ej: 130000" />
-            </div>
-          )}
         </div>
+        <div className="mt-3 rounded-lg bg-primary-50 border border-primary-100 px-3 py-2.5 text-sm text-dark-700">
+          {(function () {
+            const plan = planes.find((p) => String(p.id) === String(planId))
+            const normal = Number(plan?.precio) || 0
+            const valor = Number(valorDescuento) || 0
+            const resultado = esPorcentaje
+              ? Math.max(0, Math.round(normal * (1 - Math.min(Math.max(valor, 0), 100) / 100)))
+              : Math.max(0, normal - Math.round(valor))
+            const textoSegunTipo = esPorcentaje
+              ? `-${Math.min(Math.max(valor, 0), 100)}%`
+              : `-${formatMoney(valor)}`
+            return plan ? (
+              <>
+                Precio normal: <strong>{formatMoney(normal)}</strong> · Descuento:{' '}
+                <strong className="text-primary-700">{textoSegunTipo}</strong> · Queda en{' '}
+                <strong>{formatMoney(resultado)}</strong>
+              </>
+            ) : (
+              'Selecciona un plan para ver el precio promocional calculado.'
+            )
+          })()}
+        </div>
+        <p className="text-xs text-dark-400 mt-1.5">
+          La promoción descuenta siempre sobre el precio normal del plan. No se guarda ningún "precio anterior" ni precio fijo.
+        </p>
       </div>
 
       <div>
@@ -154,7 +163,7 @@ function PromoForm({ businessId, planes, promo, onSaved, onCancel }) {
           </div>
         </div>
         <p className="text-xs text-dark-400 mt-2 leading-relaxed">
-          Solo una promoción <strong>activa y vigente</strong> descuenta del precio por persona y tiene prioridad sobre el descuento por rango grupal. Si está inactiva o fuera de fechas, el precio usará el descuento por grupo (o ninguno).
+          Solo una promoción <strong>activa y vigente</strong> descuenta del precio normal por persona y tiene prioridad sobre el descuento por rango grupal. No pueden existir dos promociones activas con fechas que se solapen para el mismo plan. Si está inactiva o fuera de fechas, el precio usará el descuento por grupo (o ninguno).
         </p>
       </div>
 

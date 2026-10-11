@@ -111,7 +111,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok('PlanForm: 132000 -> 132.000', moneyPlanFinal === '132.000');
   await page.screenshot({ path: '/tmp/opencode/shot_plan_form_money.png' });
 
-  // ===== 5) PromoForm: % → oculta precio_promocional; COP → MoneyInput =====
+  // ===== 5) PromoForm: descuento sobre el precio normal (% o COP) =====
   await page.evaluate(() => {
     const bts = Array.from(document.querySelectorAll('button'));
     const b = bts.find((x) => /nueva promoc/i.test(x.innerText));
@@ -131,21 +131,20 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const promoSelLabel = await page.evaluate(() => {
     const t = document.body.innerText.toLowerCase();
     const hasSoles = t.includes('precio promocional');
-    const hasMoney = Array.from(document.querySelectorAll('input')).some((i) => i.placeholder === 'Ej: 20000');
-    return { hasSoles, hasMoney };
+    const hasDefault = t.includes('precio anterior');
+    return { hasSoles, hasDefault };
   });
   ok('PromoForm %: sin "Precio promocional"', !promoSelLabel.hasSoles);
-  ok('PromoForm %: MoneyInput descuento (COP)', promoSelLabel.hasMoney);
+  ok('PromoForm %: sin "Precio anterior"', !promoSelLabel.hasDefault);
   await page.select('select', 'valor');
   await sleep(700);
   const promoVal = await page.evaluate(() => {
-    const t = document.body.innerText.toLowerCase();
-    const hasPromoPrecio = t.includes('precio promocional');
     const hasMoney = Array.from(document.querySelectorAll('input')).some((i) => i.placeholder === 'Ej: 20000');
-    return { hasPromoPrecio, hasMoney };
+    const hasLabPre = Array.from(document.querySelectorAll('label')).some((l) => /valor del descuento \(cop\)/i.test(l.textContent));
+    return { hasMoney, hasLabPre };
   });
-  ok('PromoForm valor: muestra "Precio promocional"', promoVal.hasPromoPrecio);
   ok('PromoForm valor: MoneyInput descuento (COP)', promoVal.hasMoney);
+  ok('PromoForm valor: label "Valor del descuento (COP)"', promoVal.hasLabPre);
   await page.screenshot({ path: '/tmp/opencode/shot_promo_form.png' });
 
   console.log('\n== VERIFICACIÓN VISUAL ==');

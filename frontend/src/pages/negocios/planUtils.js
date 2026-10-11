@@ -96,32 +96,48 @@ export function presente(fechaInicio, fechaFin) {
   return true
 }
 
-// Precio efectivo del plan considerando su promo activa (si existe).
+// ¿La promoción está vigente HOY (fechas locales, día completo de
+// fecha_fin)? El backend es la fuente de verdad (CURRENT_DATE), pero
+// este guard evita que un payload desactualizado muestre descuentos
+// de promociones ya vencidas o inactivas.
+export function promoVigente(promo) {
+  if (!promo) return false
+  if (promo.estado === 'inactivo') return false
+  const hoy = new Date()
+  hoy.setHours(0, 0, 0, 0)
+  const desde = promo.fecha_inicio ? new Date(promo.fecha_inicio + 'T00:00:00') : null
+  const hasta = promo.fecha_fin ? new Date(promo.fecha_fin + 'T00:00:00') : null
+  if (desde && desde > hoy) return false
+  if (hasta && hasta < hoy) return false
+  return true
+}
+
+// Precio efectivo del plan considerando su promo vigente (si existe).
+// El plan solo tiene PRECIO NORMAL (plan.precio). La promoción es un
+// descuento temporal calculado SIEMPRE sobre ese precio; el "Antes" es
+// SOLO informativo y equivale al precio normal mientras la promo está
+// vigente. Cuando la promo vence o se desactiva se vuelve al precio normal.
 export function planPrecios(plan) {
   const base = Number(plan?.precio) || 0
   let efectivo = base
-  let anterior = plan?.precio_anterior != null ? Number(plan.precio_anterior) : null
   let descuento = 0
 
-  const promo = Array.isArray(plan?.promociones) ? plan.promociones[0] : null
+  const promos = Array.isArray(plan?.promociones) ? plan.promociones : []
+  const promo = promoVigente(promos[0]) ? promos[0] : null
   if (promo) {
     const valor = Number(promo.valor_descuento) || 0
-    if (anterior == null) anterior = base
     if (promo.tipo_descuento === 'porcentaje') {
       const pct = Math.max(0, Math.min(Math.round(valor), 100))
       efectivo = Math.round(base * (1 - pct / 100))
       descuento = pct
-    } else if (promo.precio_promocional != null) {
-      efectivo = Math.max(0, Math.round(Number(promo.precio_promocional) || 0))
     } else if (valor > 0) {
       efectivo = Math.max(0, Math.round(base - valor))
+      descuento = Math.round((1 - efectivo / base) * 100)
     }
   }
 
-  if (anterior != null && anterior <= efectivo) anterior = null
-  if (descuento === 0 && promo && anterior != null && anterior > efectivo) {
-    descuento = Math.round((1 - efectivo / anterior) * 100)
-  }
+  // "Antes" solo se muestra con promo vigente y si de verdad hay ahorro.
+  const anterior = promo && efectivo < base ? base : null
   return { efectivo, anterior, descuento }
 }
 

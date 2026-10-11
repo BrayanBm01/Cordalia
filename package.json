@@ -1,7 +1,7 @@
 {
   "name": "explora-turismo",
   "version": "2.0.0",
-  "description": "Explora Turismo - Plataforma de turismo colombiano con React + Express + PostgreSQL",
+  "description": "Cordalia - Plataforma de turismo enfocada en Córdoba, Colombia (React + Express + PostgreSQL)",
   "private": true,
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
@@ -11,7 +11,7 @@
     "start": "cd backend && npm start",
     "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install"
   },
-  "keywords": ["turismo", "colombia", "react", "express", "postgresql"],
+  "keywords": ["turismo", "cordoba", "colombia", "react", "express", "postgresql"],
   "author": "",
   "license": "ISC",
   "devDependencies": {

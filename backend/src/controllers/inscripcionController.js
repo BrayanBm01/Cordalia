@@ -12,6 +12,7 @@
 //     negocios solo a las de su negocio; el admin a todas.
 // ============================================================
 const InscripcionModel = require("../models/inscripcionModel");
+const PlanModel = require("../models/planModel");
 const paymentService = require("../services/paymentService");
 const pool = require("../config/db");
 
@@ -42,10 +43,11 @@ exports.misInscripciones = async (req, res) => {
   try {
     await InscripcionModel.expirarVencidas();
     const rows = await InscripcionModel.listMisInscripciones(req.usuario.id);
-    const data = { pendientes: [], pagadas: [], historial: [] };
+    const data = { pendientes: [], pagadas: [], vencidas: [], historial: [] };
     for (const i of rows) {
       if (["pendiente", "fallida"].includes(i.estado)) data.pendientes.push(i);
       else if (i.estado === "pagada") data.pagadas.push(i);
+      else if (i.estado === "vencida") data.vencidas.push(i);
       else data.historial.push(i); // cancelada / expirada
     }
     return res.json({
@@ -96,7 +98,7 @@ exports.pagar = async (req, res) => {
     // El backend expira vencidas antes de intentar pagar.
     await InscripcionModel.expirarVencidas();
 
-    const inscripcion = await InscripcionModel.findById(inscripcionId);
+    let inscripcion = await InscripcionModel.findById(inscripcionId);
     if (!inscripcion) {
       return res.status(404).json({ success: false, message: "Inscripción no encontrada" });
     }
@@ -111,7 +113,7 @@ exports.pagar = async (req, res) => {
     if (inscripcion.estado === "pagada") {
       return res.status(400).json({ success: false, message: "La inscripción ya está pagada" });
     }
-    if (["cancelada", "expirada"].includes(inscripcion.estado)) {
+    if (["cancelada", "expirada", "vencida"].includes(inscripcion.estado)) {
       return res.status(400).json({ success: false, message: `No se puede pagar una inscripción ${inscripcion.estado}` });
     }
 
@@ -121,6 +123,15 @@ exports.pagar = async (req, res) => {
     }
 
     // El pago lo crea y aprueba el BACKEND; los flags del cliente se ignoran.
+    // El precio se recalcula AHORA (calcularPrecio usa solo promociones
+    // vigentes según CURRENT_DATE en PostgreSQL): si la promoción venció,
+    // el snapshot se actualiza al precio normal antes de cobrar.
+    const precioVigente = await PlanModel.calcularPrecio(inscripcion.plan_id, inscripcion.personas, false);
+    if (precioVigente && Number(precioVigente.total) !== Number(inscripcion.precio_total)) {
+      await InscripcionModel.actualizarSnapshotPrecio(inscripcionId, precioVigente);
+      inscripcion = await InscripcionModel.findById(inscripcionId);
+    }
+
     const pago = await paymentService.crearPago({ inscripcion, metodoPago });
 
     if (pago.estado !== paymentService.ESTADOS_PROVEEDOR.APPROVED) {

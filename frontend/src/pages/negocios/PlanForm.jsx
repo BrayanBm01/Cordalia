@@ -42,7 +42,6 @@ export default function PlanForm({ businessId, plan, onSaved, onCancel }) {
   const [duracionDias, setDuracionDias] = useState(plan?.duracion_dias ? Number(plan.duracion_dias) : 1)
   const [duracionNoches, setDuracionNoches] = useState(plan?.duracion_noches ? Number(plan.duracion_noches) : 0)
   const [precio, setPrecio] = useState(plan?.precio != null ? String(plan.precio) : '')
-  const [precioAnterior, setPrecioAnterior] = useState(plan?.precio_anterior != null ? String(plan.precio_anterior) : '')
   const [tipoPrecio, setTipoPrecio] = useState(plan?.tipo_precio || 'por_persona')
   const [capacidadReferencial, setCapacidadReferencial] = useState(plan?.capacidad_referencial != null ? String(plan.capacidad_referencial) : '')
   const [rangos, setRangos] = useState(() =>
@@ -147,7 +146,6 @@ export default function PlanForm({ businessId, plan, onSaved, onCancel }) {
       duracion_dias: Number(duracionDias) || 0,
       duracion_noches: Number(duracionNoches) || 0,
       precio: precio !== '' ? Number(precio) : null,
-      precio_anterior: precioAnterior !== '' ? Number(precioAnterior) : null,
       tipo_precio: tipoPrecio,
       moneda: 'COP',
       capacidad_referencial: capacidadReferencial !== '' ? Number(capacidadReferencial) : null,
@@ -235,7 +233,7 @@ export default function PlanForm({ businessId, plan, onSaved, onCancel }) {
 
         <div className="space-y-3">
           <h4 className="text-sm font-semibold text-dark-700">Duración y precio</h4>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <div>
               <label className="block text-xs text-dark-500 mb-1">Días *</label>
               <input type="number" min={1} max={60} value={duracionDias} onChange={(e) => setDuracionDias(Number(e.target.value))} className={inputClass} required />
@@ -245,12 +243,8 @@ export default function PlanForm({ businessId, plan, onSaved, onCancel }) {
               <input type="number" min={0} max={59} value={duracionNoches} onChange={(e) => setDuracionNoches(Number(e.target.value))} className={inputClass} />
             </div>
             <div>
-              <label className="block text-xs text-dark-500 mb-1">Precio (COP) *</label>
+              <label className="block text-xs text-dark-500 mb-1">Precio normal (COP) *</label>
               <MoneyInput value={precio} onChange={(v) => setPrecio(v ?? '')} placeholder="Ej: 132000" className={inputClass} required />
-            </div>
-            <div>
-              <label className="block text-xs text-dark-500 mb-1">Precio anterior</label>
-              <MoneyInput value={precioAnterior} onChange={(v) => setPrecioAnterior(v ?? '')} placeholder="Ej: 150000" className={inputClass} />
             </div>
           </div>
           <select value={tipoPrecio} onChange={(e) => setTipoPrecio(e.target.value)} className={`${inputClass} bg-white max-w-sm`} required>

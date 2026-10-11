@@ -73,10 +73,38 @@ const InscripcionModel = {
     return rows.length > 0;
   },
 
+  // Actualiza el snapshot de precios al cobrar (el backend recalcula
+  // el precio vigente en el momento del pago; nunca lo informa el
+  // frontend). Solo afecta a inscripciones aún no pagadas.
+  async actualizarSnapshotPrecio(inscripcionId, precio) {
+    if (!precio) return false;
+    const { rowCount } = await pool.query(
+      `UPDATE inscripciones SET
+         precio_original_persona = $2,
+         precio_persona = $3,
+         descuento_porcentaje = $4,
+         precio_total = $5,
+         tipo_descuento = $6,
+         updated_at = NOW()
+       WHERE id = $1 AND estado IN ('pendiente', 'fallida')`,
+      [
+        inscripcionId,
+        precio.precio_original_persona ?? null,
+        precio.precio_persona ?? null,
+        precio.descuento_porcentaje ?? (precio.descuento_total ?? 0),
+        precio.total ?? null,
+        precio.tipo_descuento ?? null,
+      ]
+    );
+    return rowCount > 0;
+  },
+
   // ------------------------------------------------------------
-  // Expiración: PENDIENTE/FALLIDA vencida -> EXPIRADA (libera cupo).
-  // Se llama de forma perezosa (pagar, mis-inscripciones) y por el
-  // cron del servidor. Cada llamada es atómica (cupo y estado juntos).
+  // Expiración: PENDIENTE/FALLIDA vencida -> EXPIRADA (libera cupo)
+  // y PAGADA cuyo viaje ya ocurrió -> VENCIDA (historial, sin
+  // liberar cupo). Se llama de forma perezosa (pagar,
+  // mis-inscripciones) y por el cron del servidor. Cada llamada es
+  // atómica (cupo y estado juntos).
   // ------------------------------------------------------------
   async expirarVencidas() {
     const client = await pool.connect();
@@ -102,6 +130,17 @@ const InscripcionModel = {
           );
         }
       }
+      // Viajes pagados cuya fecha de salida ya pasó: el viaje se
+      // consideró realizado. No libera cupo y queda en el historial.
+      await client.query(
+        `UPDATE inscripciones AS i
+         SET estado = 'vencida', updated_at = NOW()
+         FROM tour_plan_salidas AS s
+         WHERE s.id = i.salida_id
+           AND i.estado = 'pagada'
+           AND s.fecha::date < CURRENT_DATE`,
+        []
+      );
       await client.query("COMMIT");
       return rows.length;
     } catch (error) {

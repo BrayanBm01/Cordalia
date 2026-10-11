@@ -1,12 +1,12 @@
 const pool = require("../config/db");
 
 const COLUMNS = `pr.id, pr.business_id, pr.plan_id, pr.service_id, pr.nombre, pr.descripcion,
-       pr.tipo_descuento, pr.valor_descuento, pr.precio_anterior, pr.precio_promocional,
+       pr.tipo_descuento, pr.valor_descuento,
        pr.imagen_url, pr.fecha_inicio, pr.fecha_fin, pr.estado, pr.created_at, pr.updated_at`;
 
 // Sin prefijo para cláusulas RETURNING (no existe alias pr en INSERT/UPDATE).
 const RETURN_COLUMNS = `id, business_id, plan_id, service_id, nombre, descripcion,
-       tipo_descuento, valor_descuento, precio_anterior, precio_promocional,
+       tipo_descuento, valor_descuento,
        imagen_url, fecha_inicio, fecha_fin, estado, created_at, updated_at`;
 
 async function withRelated(promo) {
@@ -86,20 +86,36 @@ const PromotionModel = {
 
   async create(data) {
     const { business_id, plan_id, service_id, nombre, descripcion, tipo_descuento,
-            valor_descuento, precio_anterior, precio_promocional, imagen_url,
+            valor_descuento, imagen_url,
             fecha_inicio, fecha_fin, estado } = data;
     const { rows } = await pool.query(
       `INSERT INTO promotions
         (business_id, plan_id, service_id, nombre, descripcion, tipo_descuento,
-         valor_descuento, precio_anterior, precio_promocional, imagen_url,
+         valor_descuento, imagen_url,
          fecha_inicio, fecha_fin, estado)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
        RETURNING ${RETURN_COLUMNS}`,
       [business_id, plan_id || null, service_id || null, nombre, descripcion, tipo_descuento,
-       valor_descuento, precio_anterior, precio_promocional, imagen_url, fecha_inicio, fecha_fin,
+       valor_descuento, imagen_url, fecha_inicio, fecha_fin,
        estado || "activo"]
     );
     return withRelated(rows[0]);
+  },
+
+  // ¿Existe otra promoción ACTIVA de un plan cuyas fechas se solapen con
+  // [fechaInicio, fechaFin]? Evita dos descuentos simultáneos por plan.
+  async hasActiveOverlap(planId, fechaInicio, fechaFin, excludeId = null) {
+    const { rows } = await pool.query(
+      `SELECT id FROM promotions
+       WHERE plan_id = $1
+         AND estado = 'activo'
+         AND ($2::int IS NULL OR id <> $2)
+         AND fecha_inicio <= $3
+         AND fecha_fin >= $4
+       LIMIT 1`,
+      [planId, excludeId, fechaFin, fechaInicio]
+    );
+    return rows.length > 0;
   },
 
   async update(id, fields) {

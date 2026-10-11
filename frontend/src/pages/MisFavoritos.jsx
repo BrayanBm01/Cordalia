@@ -228,7 +228,7 @@ export default function MisFavoritos() {
       </section>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-14">
-        <div className="flex gap-1 bg-white rounded-xl border border-dark-100 p-1 mb-8 w-fit">
+        <div className="flex flex-wrap gap-1 bg-white rounded-xl border border-dark-100 p-1 mb-8 w-fit">
           {tabs.map((t) => (
             <button
               key={t.id}

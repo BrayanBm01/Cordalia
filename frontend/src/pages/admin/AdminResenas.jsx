@@ -111,7 +111,7 @@ export default function AdminResenas() {
         <p className="text-dark-500 mt-1">Modera las reseñas de los negocios de la plataforma.</p>
       </div>
 
-      <div className="flex gap-1 bg-white rounded-xl border border-dark-100 p-1 w-fit">
+      <div className="flex flex-wrap gap-1 bg-white rounded-xl border border-dark-100 p-1 w-fit">
         {FILTROS.map((f) => (
           <button
             key={f.id}

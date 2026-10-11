@@ -73,7 +73,6 @@ h.test("PLN: BUSINESS crea plan con itinerario e incluidos", async () => {
       duracion_dias: 3,
       duracion_noches: 2,
       precio: 650000,
-      precio_anterior: 800000,
       tipo_precio: "por_persona",
       tipo_plan: "plan",
       incluye: ["Transporte", "Alojamiento", "Desayuno", "Almuerzo", "Guía"],
@@ -94,7 +93,7 @@ h.test("PLN: BUSINESS crea plan con itinerario e incluidos", async () => {
   h.assert(plan.itinerario[0].actividades[0].hora === "08:00", "hora guardada");
   h.assert(plan.duracion_dias === 3 && plan.duracion_noches === 2, "duración");
   h.assert(Number(plan.precio) === 650000, "precio");
-  h.assert(Number(plan.precio_anterior) === 800000, "precio anterior");
+  h.assert(plan.precio_anterior === undefined, "no existe precio_anterior");
   h.assert(Array.isArray(plan.plan_imagenes), "plan_imagenes presente");
   h.test.planA = plan;
 });
@@ -113,7 +112,7 @@ h.test("PLN: validaciones de plan rechazadas", async () => {
     [{ ...base, duracion_noches: -1 }, "noches inválidas"],
     [{ ...base, tipo_precio: "raro" }, "tipo precio inválido"],
     [{ ...base, tipo_plan: "raro" }, "tipo plan inválido"],
-    [{ ...base, precio_anterior: 50000 }, "precio anterior menor al actual"],
+    [{ ...base, precio_anterior: 100000 }, "campo precio_anterior eliminado"],
     [{ ...base, itinerario: [{ dia: 1, actividades: [{ hora: "88:99", descripcion: "x" }] }] }, "hora inválida"],
     [{ ...base, itinerario: [{ dia: 1, actividades: [{ hora: "10:00", descripcion: "" }] }] }, "actividad vacía"],
     [{ ...base, incluye: [""] }, "incluido vacío"],
@@ -339,7 +338,7 @@ h.test("PLN: promociones (crear, válidas, filtrar promos)", async () => {
     body: {
       nombre: "20% de descuento en Guatapé", plan_id: pid,
       descripcion: "Oferta de temporada", tipo_descuento: "porcentaje",
-      valor_descuento: 20, precio_anterior: 800000, precio_promocional: 650000,
+      valor_descuento: 20,
       fecha_inicio: INICIO, fecha_fin: FIN,
     },
   });
@@ -360,16 +359,24 @@ h.test("PLN: promociones (crear, válidas, filtrar promos)", async () => {
   h.test.pidVigente = pid;
 });
 
-h.test("PLN: promoción con precio promocional > anterior falla; desactivar promo la oculta", async () => {
+h.test("PLN: campos caducados rechazados; no hay promos activas solapadas; desactivar promo la oculta", async () => {
   const idA = h.test.negA.id;
   const pid = h.test.planA.id;
 
-  const mal = await h.api(`/api/businesses/${idA}/promociones`, {
+  const legado = await h.api(`/api/businesses/${idA}/promociones`, {
     method: "POST", token: h.test.A.token,
-    body: { nombre: "Subida", plan_id: pid, tipo_descuento: "valor", valor_descuento: 0, precio_anterior: 100000, precio_promocional: 200000, fecha_inicio: INICIO, fecha_fin: FIN },
+    body: { nombre: "Legada", plan_id: pid, tipo_descuento: "valor", valor_descuento: 100000, precio_anterior: 800000, precio_promocional: 650000, fecha_inicio: INICIO, fecha_fin: FIN },
   });
-  h.assertStatus(mal.status, 400, "promo > anterior → 400");
+  h.assertStatus(legado.status, 400, "campo precio_anterior/precio_promocional rechazado → 400");
 
+  // La promo creada antes (h.test.promo) está ACTIVA y vigente en INICIO→FIN.
+  const solape = await h.api(`/api/businesses/${idA}/promociones`, {
+    method: "POST", token: h.test.A.token,
+    body: { nombre: "Solape", plan_id: pid, tipo_descuento: "porcentaje", valor_descuento: 10, fecha_inicio: INICIO, fecha_fin: FIN },
+  });
+  h.assertStatus(solape.status, 400, "promo activa solapada con otra activa del mismo plan → 400");
+
+  // Desactivar la promo permite crear una nueva activa (no solapada con ninguna activa).
   const off = await h.api(`/api/businesses/${idA}/promociones/${h.test.promo.id}/estado`, {
     method: "PUT", token: h.test.A.token, body: { estado: "inactivo" },
   });
@@ -377,6 +384,15 @@ h.test("PLN: promoción con precio promocional > anterior falla; desactivar prom
 
   const detallePlan = await h.api(`/api/planes/${pid}`);
   h.assert(detallePlan.json.data.promociones.length === 0, "promo inactiva no se muestra");
+
+  const sucesiva = await h.api(`/api/businesses/${idA}/promociones`, {
+    method: "POST", token: h.test.A.token,
+    body: { nombre: "Sucesiva", plan_id: pid, tipo_descuento: "porcentaje", valor_descuento: 15, fecha_inicio: INICIO, fecha_fin: FIN },
+  });
+  h.assertStatus(sucesiva.status, 201, "tras desactivarla, nueva promo activa es válida");
+  await h.api(`/api/businesses/${idA}/promociones/${sucesiva.json.data.id}`, {
+    method: "DELETE", token: h.test.A.token,
+  });
 
   const Bmb = await h.api(`/api/businesses/${idA}/promociones/${h.test.promo.id}/estado`, {
     method: "PUT", token: h.test.B.token, body: { estado: "activo" },

@@ -11,4 +11,5 @@ require("./09-datos-cordoba.test");
 require("./10-precio.test");
 require("./11-pagos.test");
 require("./12-contenido-destinos.test");
+require("./13-promos-vigencia.test");
 require("./helpers").main();

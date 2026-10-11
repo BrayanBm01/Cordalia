@@ -70,14 +70,23 @@ export default function Home() {
   return (
     <div className="min-h-screen">
       {/* Hero */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-ocean-950 via-ocean-900 to-primary-900">
+      <section
+        className="relative min-h-screen flex items-center justify-center overflow-hidden bg-ocean-950"
+        style={{
+          backgroundImage: 'url("/img/img1.jpeg")',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      >
+        {/* Overlay de legibilidad: oscurece la foto manteniendo el texto blanco legible */}
+        <div className="absolute inset-0 bg-gradient-to-b from-dark-950/70 via-dark-950/40 to-dark-950/60" />
         <div className="absolute inset-0">
           <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] rounded-full bg-primary-500/10 blur-3xl" />
           <div className="absolute bottom-[-15%] right-[-5%] w-[500px] h-[500px] rounded-full bg-ocean-400/10 blur-3xl" />
           <div className="absolute top-[30%] right-[20%] w-[300px] h-[300px] rounded-full bg-sand-400/8 blur-3xl" />
         </div>
 
-        <div className="relative z-10 max-w-6xl mx-auto px-6 py-24 text-center">
+        <div className="relative z-10 max-w-6xl mx-auto px-6 py-24 text-center -mt-5">
           <motion.div initial="hidden" animate="visible" variants={staggerContainer}>
             <motion.div variants={fadeUp} custom={0}>
               <span className="inline-block px-4 py-1.5 rounded-full bg-white/10 text-white/80 text-sm font-medium tracking-wide mb-8 backdrop-blur-sm border border-white/10">
@@ -92,7 +101,7 @@ export default function Home() {
             >
               Explora{' '}
               <span className="bg-gradient-to-r from-primary-300 via-ocean-300 to-sand-300 bg-clip-text text-transparent">
-                Colombia
+                Córdoba
               </span>
             </motion.h1>
 
@@ -102,7 +111,7 @@ export default function Home() {
               className="max-w-2xl mx-auto text-lg sm:text-xl text-white/70 leading-relaxed mb-10"
             >
               Descubre destinos únicos, vive experiencias inolvidables y conecta con la magia de
-              un país lleno de cultura, naturaleza y aventura.
+              un departamento lleno de cultura, naturaleza y aventura.
             </motion.p>
 
             <motion.div
@@ -231,7 +240,7 @@ export default function Home() {
                     <div className="relative z-10 flex flex-col justify-end h-full p-6 md:p-8">
                       <div className="flex items-center gap-1.5 text-white/70 text-sm mb-2">
                         <MapPin className="w-4 h-4" />
-                        <span>{destino.ubicacion || destino.ciudad || 'Colombia'}</span>
+                        <span>{destino.ubicacion || destino.ciudad || 'Córdoba, Colombia'}</span>
                       </div>
                       <h3 className="font-[family-name:var(--font-display)] text-2xl md:text-3xl font-bold text-white mb-2">
                         {destino.nombre}

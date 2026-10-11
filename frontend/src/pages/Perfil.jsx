@@ -57,6 +57,7 @@ const ESTADO_BADGE = {
   fallida: 'bg-orange-100 text-orange-700',
   cancelada: 'bg-dark-100 text-dark-500',
   expirada: 'bg-red-100 text-red-600',
+  vencida: 'bg-red-100 text-red-600',
 }
 
 const ESTADO_LABEL = {
@@ -65,6 +66,7 @@ const ESTADO_LABEL = {
   fallida: 'Pago fallido',
   cancelada: 'Cancelada',
   expirada: 'Expirada',
+  vencida: 'Viaje vencido',
 }
 
 function InscripcionCard({ insc }) {
@@ -146,7 +148,7 @@ export default function Perfil() {
   })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
-  const [insc, setInsc] = useState({ pendientes: [], pagadas: [], historial: [], cargando: true })
+  const [insc, setInsc] = useState({ pendientes: [], pagadas: [], vencidas: [], historial: [], cargando: true })
 
   useEffect(() => {
     let activo = true
@@ -158,6 +160,7 @@ export default function Perfil() {
         setInsc({
           pendientes: d.pendientes || [],
           pagadas: d.pagadas || [],
+          vencidas: d.vencidas || [],
           historial: d.historial || [],
           cargando: false,
         })
@@ -565,6 +568,17 @@ export default function Perfil() {
                     </div>
                   )}
 
+                  {insc.vencidas.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-red-700 mb-3 flex items-center gap-2">
+                        <CalendarDays className="w-4 h-4" /> Viajes vencidos (ya ocurrieron)
+                      </h3>
+                      <div className="space-y-3 opacity-90">
+                        {insc.vencidas.map(i => <InscripcionCard key={i.id} insc={i} />)}
+                      </div>
+                    </div>
+                  )}
+
                   {insc.historial.length > 0 && (
                     <div>
                       <h3 className="text-sm font-semibold text-dark-600 mb-3 flex items-center gap-2">
@@ -576,7 +590,7 @@ export default function Perfil() {
                     </div>
                   )}
 
-                  {insc.pendientes.length === 0 && insc.pagadas.length === 0 && insc.historial.length === 0 && (
+                  {insc.pendientes.length === 0 && insc.pagadas.length === 0 && insc.vencidas.length === 0 && insc.historial.length === 0 && (
                     <div className="text-center py-8 rounded-xl bg-dark-50 border border-dark-100">
                       <Ticket className="w-10 h-10 text-dark-300 mx-auto mb-3" />
                       <p className="text-sm text-dark-600 font-medium">Aún no tienes inscripciones.</p>

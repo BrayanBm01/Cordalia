@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { authAPI } from '../services/api'
+import { SESION_INACTIVIDAD_MS, SESION_INACTIVIDAD_FLAG } from '../utils/session'
 
 const AuthContext = createContext(null)
 
@@ -74,6 +75,43 @@ export function AuthProvider({ children }) {
       return updated
     })
   }
+
+  // Auto-logout por inactividad: solo cuenta la interacción humana
+  // (puntero, teclado, toque, scroll/rueda). Los renders, fetches y
+  // polling NO resetean el temporizador. Al expirar se invalida la
+  // sesión en el backend (POST /auth/logout) y se avisa en /login.
+  useEffect(() => {
+    if (!user) return
+    let timer = null
+    const eventos = ['pointermove', 'mousedown', 'keydown', 'touchstart', 'wheel']
+
+    const cerrarPorInactividad = async () => {
+      if (timer) clearTimeout(timer)
+      try {
+        await authAPI.logout()
+      } catch {
+      } finally {
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+        setUser(null)
+      }
+      sessionStorage.setItem(SESION_INACTIVIDAD_FLAG, '1')
+      window.location.href = '/login'
+    }
+
+    const reiniciarTimer = () => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(cerrarPorInactividad, SESION_INACTIVIDAD_MS)
+    }
+
+    eventos.forEach((ev) => window.addEventListener(ev, reiniciarTimer, { passive: true }))
+    reiniciarTimer()
+
+    return () => {
+      if (timer) clearTimeout(timer)
+      eventos.forEach((ev) => window.removeEventListener(ev, reiniciarTimer))
+    }
+  }, [user])
 
   return (
     <AuthContext.Provider value={{ user, loading, login, googleLogin, register, logout, updateUser }}>

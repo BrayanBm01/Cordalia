@@ -3,14 +3,14 @@ const { EXPIRACION_MINUTOS } = require("../services/paymentService");
 
 const BASE_COLUMNS = `p.id, p.business_id, p.nombre, p.slug, p.descripcion, p.destination_id,
        p.destino, p.duracion_dias, p.duracion_noches, p.precio, p.tipo_precio,
-       p.precio_anterior, p.tipo_plan, p.incluye, p.itinerario, p.moneda,
+       p.tipo_plan, p.incluye, p.itinerario, p.moneda,
        p.descuentos_rango, p.capacidad_referencial,
        p.estado, p.created_at, p.updated_at`;
 
 // Misma lista sin el prefijo de alias, para cláusulas RETURNING (no hay alias p).
 const RETURN_COLUMNS = `id, business_id, nombre, slug, descripcion, destination_id,
        destino, duracion_dias, duracion_noches, precio, tipo_precio,
-       precio_anterior, tipo_plan, incluye, itinerario, moneda,
+       tipo_plan, incluye, itinerario, moneda,
        descuentos_rango, capacidad_referencial,
        estado, created_at, updated_at`;
 
@@ -151,7 +151,7 @@ const PlanModel = {
     const ids = plans.map((p) => p.id);
     const { rows } = await pool.query(
       `SELECT id, business_id, plan_id, service_id, nombre, descripcion,
-              tipo_descuento, valor_descuento, precio_anterior, precio_promocional,
+              tipo_descuento, valor_descuento,
               imagen_url, fecha_inicio, fecha_fin, estado, created_at, updated_at
        FROM promotions
        WHERE plan_id = ANY($1)
@@ -206,17 +206,17 @@ const PlanModel = {
 
   async create(data) {
     const { business_id, nombre, slug, descripcion, destination_id, destino, duracion_dias,
-            duracion_noches, precio, tipo_precio, precio_anterior, tipo_plan, incluye,
+            duracion_noches, precio, tipo_precio, tipo_plan, incluye,
             itinerario, moneda, descuentos_rango, capacidad_referencial } = data;
     const { rows } = await pool.query(
       `INSERT INTO tour_plans
         (business_id, nombre, slug, descripcion, destination_id, destino, duracion_dias,
-         duracion_noches, precio, tipo_precio, precio_anterior, tipo_plan, incluye,
+         duracion_noches, precio, tipo_precio, tipo_plan, incluye,
          itinerario, moneda, descuentos_rango, capacidad_referencial)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
        RETURNING ${RETURN_COLUMNS}`,
       [business_id, nombre, slug, descripcion, destination_id, destino, duracion_dias,
-       duracion_noches, precio, tipo_precio, precio_anterior, tipo_plan, JSON.stringify(incluye),
+       duracion_noches, precio, tipo_precio, tipo_plan, JSON.stringify(incluye),
        JSON.stringify(itinerario), moneda, JSON.stringify(descuentos_rango || []),
        capacidad_referencial ?? null]
     );
@@ -303,18 +303,15 @@ const PlanModel = {
        // La promoción activa tiene prioridad sobre el rango por personas.
        tipoDescuento = "promocion";
        const valor = Number(promo.valor_descuento) || 0;
-       if (promo.tipo_descuento === "porcentaje") {
-         // Promo porcentual: el porcentaje configura el precio (el precio fijo,
-         // si quedó desactualizado, no debe sobreescribir el cálculo).
-         pctPromo = clampPct(valor);
-         precioPorPersona = Math.round(precioOriginalPersona * (1 - pctPromo / 100));
-       } else if (promo.precio_promocional != null) {
-         // Promo de precio fijo: reemplaza el precio base por persona.
-         precioPorPersona = Math.max(0, Math.round(Number(promo.precio_promocional) || 0));
-       } else if (valor > 0) {
-         // Promo de valor fijo en COP.
-         precioPorPersona = Math.max(0, precioOriginalPersona - Math.round(valor));
-       }
+if (promo.tipo_descuento === "porcentaje") {
+          // Promo porcentual: el porcentaje configura el precio sobre el
+          // precio normal del plan. Nunca se parte de otro precio.
+          pctPromo = clampPct(valor);
+          precioPorPersona = Math.round(precioOriginalPersona * (1 - pctPromo / 100));
+        } else if (valor > 0) {
+          // Promo de valor fijo: resta el monto COP al precio normal.
+          precioPorPersona = Math.max(0, precioOriginalPersona - Math.round(valor));
+        }
      } else {
        const ordenados = [...rangos].sort((a, b) => (Number(a.min) || 0) - (Number(b.min) || 0));
        for (const r of ordenados) {
