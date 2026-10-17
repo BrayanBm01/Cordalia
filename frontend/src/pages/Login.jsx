@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { Mail, Lock, Eye, EyeOff, Loader2, MapPin } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, Loader2, Sprout, ShieldCheck, Compass, CheckCircle2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { SESION_INACTIVIDAD_FLAG } from '../utils/session'
 import GoogleButton from '../components/GoogleButton'
@@ -42,7 +42,7 @@ export default function Login() {
     setIsSubmitting(true)
     try {
       await login(data.email, data.password)
-      toast.success('Bienvenido de vuelta')
+      toast.success('Bienvenido de vuelta a Cordalia')
       navigate('/')
     } catch (err) {
       const msg = err.message || 'Error al iniciar sesión'
@@ -63,145 +63,215 @@ export default function Login() {
   }
 
   return (
-    <div className="h-screen overflow-hidden flex">
-      {/* Left side - decorative */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-ocean-900 via-primary-900 to-ocean-950 items-center justify-center">
-        <div className="absolute inset-0">
-          <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full bg-primary-500/10 blur-3xl" />
-          <div className="absolute bottom-[-15%] right-[-5%] w-[400px] h-[400px] rounded-full bg-ocean-400/10 blur-3xl" />
+    <div className="min-h-screen bg-cream-50 flex flex-col lg:flex-row">
+      {/* ── Left side: Editorial Brand Showcase (Desktop) ─────────────── */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-moss-950 flex-col justify-between p-12 xl:p-16">
+        {/* Background Image con overlay TerraGo */}
+        <div
+          className="absolute inset-0 bg-cover bg-center transition-transform duration-1000 scale-105"
+          style={{ backgroundImage: 'url("/img/hero/hero-nature.jpg")' }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-t from-moss-950 via-moss-950/70 to-moss-900/60" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
         </div>
-        <div className="relative z-10 px-12 max-w-lg">
-          <div className="flex items-center gap-2 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-primary-500 flex items-center justify-center">
-              <MapPin className="w-6 h-6 text-white" />
+
+        {/* Brand header */}
+        <div className="relative z-10">
+          <Link to="/" className="inline-flex items-center gap-3 group">
+            <div className="w-11 h-11 rounded-full bg-moss-900 border border-moss-700/60 text-white flex items-center justify-center shadow-md transition-transform duration-300 group-hover:scale-105">
+              <Sprout className="w-5 h-5 text-moss-200" />
             </div>
-            <span className="font-[family-name:var(--font-display)] text-2xl font-bold text-white">
-              Cordalia
+            <div>
+              <span className="font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight text-white block leading-none">
+                Cordalia
+              </span>
+              <span className="text-[10px] uppercase tracking-[0.2em] font-semibold text-moss-200/80 mt-1 block">
+                Turismo Sostenible • Córdoba
+              </span>
+            </div>
+          </Link>
+        </div>
+
+        {/* Hero editorial message */}
+        <div className="relative z-10 max-w-lg my-auto py-12">
+          <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-moss-300 mb-4">
+            <Compass className="w-4 h-4 text-moss-400" />
+            VIAJA CON PROPÓSITO
+          </span>
+          <h2
+            className="text-4xl xl:text-5xl font-bold text-white mb-5 leading-[1.12] tracking-tight"
+            style={{ fontFamily: 'var(--font-display)' }}
+          >
+            Descubre la magia de Córdoba{' '}
+            <span className="font-serif italic font-normal text-moss-200">
+              de forma consciente
             </span>
-          </div>
-          <h2 className="font-[family-name:var(--font-display)] text-4xl font-bold text-white mb-4 leading-tight">
-            Descubre la magia de Córdoba
           </h2>
-          <p className="text-white/60 text-lg leading-relaxed">
-            Accede a tu cuenta para guardar favoritos, reservar experiencias y descubrir los
-            planes turísticos que Córdoba tiene para ofrecer.
+          <p className="text-stone-300 text-base leading-relaxed mb-8">
+            Accede a tu cuenta para gestionar tus favoritos, reservar planes con operadores locales verificados y proteger la riqueza natural de nuestro territorio.
           </p>
+
+          {/* Trust bullets */}
+          <div className="space-y-3 pt-4 border-t border-white/10">
+            <div className="flex items-center gap-3 text-sm text-stone-200">
+              <span className="w-5 h-5 rounded-full bg-moss-800/90 text-moss-300 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              </span>
+              <span>Operadores y experiencias 100% locales verificadas</span>
+            </div>
+            <div className="flex items-center gap-3 text-sm text-stone-200">
+              <span className="w-5 h-5 rounded-full bg-moss-800/90 text-moss-300 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              </span>
+              <span>Protección y apoyo a comunidades de ríos, ciénagas y playas</span>
+            </div>
+            <div className="flex items-center gap-3 text-sm text-stone-200">
+              <span className="w-5 h-5 rounded-full bg-moss-800/90 text-moss-300 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              </span>
+              <span>Gestión transparente de tus reservas e itinerarios</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer caligráfico */}
+        <div className="relative z-10 flex items-center justify-between text-xs text-stone-400 border-t border-white/10 pt-4">
+          <span>© 2026 Cordalia Turismo Sostenible</span>
+          <span className="font-[family-name:var(--font-script)] text-xl text-moss-300/90">
+            Córdoba te espera
+          </span>
         </div>
       </div>
 
-      {/* Right side - form */}
-      <div className="flex-1 min-h-0 flex flex-col">
-        <div className="flex-none px-6 pt-6 sm:pt-8">
-          <div className="lg:hidden flex items-center gap-2 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-primary-500 flex items-center justify-center">
-              <MapPin className="w-6 h-6 text-white" />
+      {/* ── Right side: Login Form (Responsive) ───────────────────────── */}
+      <div className="flex-1 min-h-screen flex flex-col justify-center px-6 sm:px-10 lg:px-16 py-16 sm:py-20">
+        <div className="w-full max-w-md mx-auto">
+          {/* Mobile brand header */}
+          <div className="lg:hidden flex items-center gap-2.5 mb-8">
+            <div className="w-10 h-10 rounded-full bg-moss-900 text-white flex items-center justify-center shadow-sm">
+              <Sprout className="w-5 h-5 text-moss-200" />
             </div>
-            <span className="font-[family-name:var(--font-display)] text-2xl font-bold text-dark-900">
-              Cordalia
-            </span>
+            <div>
+              <span className="font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight text-moss-950 block leading-none">
+                Cordalia
+              </span>
+              <span className="text-[9px] uppercase tracking-[0.18em] font-semibold text-moss-700/80 mt-1 block">
+                Turismo Sostenible • Córdoba
+              </span>
+            </div>
           </div>
 
-          <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold text-dark-900 mb-2">
-            Iniciar sesión
-          </h1>
-          <p className="text-dark-500 mb-4">
-            Ingresa tus credenciales para acceder a tu cuenta
-          </p>
-        </div>
-
-        <div className="flex-1 min-h-0 overflow-y-auto px-6 pt-2 pb-8">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-            className="w-full max-w-md mx-auto"
+            transition={{ duration: 0.4 }}
           >
-
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-dark-700 mb-1.5">
-                Email
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-dark-400" />
-                <input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="tu@email.com"
-                  className={`w-full pl-11 pr-4 py-3 rounded-xl border bg-white text-dark-900 placeholder:text-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors ${
-                    errors.email ? 'border-red-300' : 'border-dark-200'
-                  }`}
-                  {...register('email')}
-                />
-              </div>
-              {errors.email && (
-                <p className="mt-1.5 text-sm text-red-500">{errors.email.message}</p>
-              )}
+            <div className="mb-8">
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.18em] text-moss-700 mb-2">
+                <Sprout className="w-3.5 h-3.5" />
+                BIENVENIDO DE VUELTA
+              </span>
+              <h1
+                className="text-3xl sm:text-4xl font-bold text-dark-900 tracking-tight"
+                style={{ fontFamily: 'var(--font-display)' }}
+              >
+                Iniciar sesión
+              </h1>
+              <p className="text-dark-500 text-sm sm:text-base mt-2">
+                Ingresa tus credenciales para acceder a tu cuenta de viajero.
+              </p>
             </div>
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-dark-700 mb-1.5">
-                Contraseña
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-dark-400" />
-                <input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
-                  placeholder="••••••••"
-                  className={`w-full pl-11 pr-12 py-3 rounded-xl border bg-white text-dark-900 placeholder:text-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors ${
-                    errors.password ? 'border-red-300' : 'border-dark-200'
-                  }`}
-                  {...register('password')}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-dark-400 hover:text-dark-600 transition-colors"
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              <div>
+                <label htmlFor="email" className="block text-xs sm:text-sm font-semibold text-dark-800 mb-1.5">
+                  Correo electrónico
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" />
+                  <input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="tu@correo.com"
+                    className={`w-full pl-11 pr-4 py-3 rounded-2xl border bg-white text-dark-900 text-sm placeholder:text-dark-400 focus:outline-none focus:ring-2 focus:ring-moss-600/20 focus:border-moss-700 transition-colors shadow-sm ${
+                      errors.email ? 'border-red-300 ring-2 ring-red-100' : 'border-cream-300'
+                    }`}
+                    {...register('email')}
+                  />
+                </div>
+                {errors.email && (
+                  <p className="mt-1.5 text-xs font-medium text-red-600">{errors.email.message}</p>
+                )}
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label htmlFor="password" className="block text-xs sm:text-sm font-semibold text-dark-800">
+                    Contraseña
+                  </label>
+                </div>
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" />
+                  <input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    placeholder="••••••••"
+                    className={`w-full pl-11 pr-11 py-3 rounded-2xl border bg-white text-dark-900 text-sm placeholder:text-dark-400 focus:outline-none focus:ring-2 focus:ring-moss-600/20 focus:border-moss-700 transition-colors shadow-sm ${
+                      errors.password ? 'border-red-300 ring-2 ring-red-100' : 'border-cream-300'
+                    }`}
+                    {...register('password')}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-dark-400 hover:text-dark-600 transition-colors cursor-pointer"
+                    aria-label={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                {errors.password && (
+                  <p className="mt-1.5 text-xs font-medium text-red-600">{errors.password.message}</p>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full py-3.5 px-6 bg-moss-900 hover:bg-moss-800 disabled:bg-moss-700 text-white font-semibold text-sm sm:text-base rounded-full transition-all duration-300 shadow-pill hover:shadow-xl hover:-translate-y-0.5 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer mt-2"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-moss-200" />
+                    <span>Iniciando sesión...</span>
+                  </>
+                ) : (
+                  <span>Iniciar sesión</span>
+                )}
+              </button>
+            </form>
+
+            <div className="flex items-center gap-3 my-6">
+              <div className="flex-1 h-px bg-cream-300" />
+              <span className="text-xs font-medium text-dark-400 uppercase tracking-wider">o</span>
+              <div className="flex-1 h-px bg-cream-300" />
+            </div>
+
+            <GoogleButton label="Continuar con Google" redirectTo="/" />
+
+            <div className="mt-8 text-center pt-6 border-t border-cream-200">
+              <p className="text-xs sm:text-sm text-dark-600">
+                ¿Aún no tienes una cuenta?{' '}
+                <Link
+                  to="/registro"
+                  className="text-moss-800 hover:text-moss-950 font-bold hover:underline transition-colors ml-1"
                 >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-              {errors.password && (
-                <p className="mt-1.5 text-sm text-red-500">{errors.password.message}</p>
-              )}
+                  Regístrate aquí
+                </Link>
+              </p>
             </div>
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full py-3 px-6 bg-primary-500 hover:bg-primary-600 disabled:bg-primary-300 text-white font-semibold rounded-xl transition-all duration-300 shadow-lg shadow-primary-500/25 hover:shadow-xl hover:shadow-primary-500/30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Iniciando sesión...
-                </>
-              ) : (
-                'Iniciar sesión'
-              )}
-            </button>
-          </form>
-
-          <div className="flex items-center gap-4 my-6">
-            <div className="flex-1 h-px bg-dark-200" />
-            <span className="text-sm text-dark-400">o</span>
-            <div className="flex-1 h-px bg-dark-200" />
-          </div>
-
-          <GoogleButton label="Continuar con Google" />
-
-          <p className="mt-8 text-center text-dark-500">
-            ¿No tienes una cuenta?{' '}
-            <Link
-              to="/registro"
-              className="text-primary-600 hover:text-primary-700 font-semibold transition-colors"
-            >
-              Crear cuenta
-            </Link>
-          </p>
           </motion.div>
         </div>
       </div>

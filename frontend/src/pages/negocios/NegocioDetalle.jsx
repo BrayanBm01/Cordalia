@@ -2,11 +2,12 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
-  ArrowLeft, Pencil, ImageOff, MapPin, Phone, Globe, Mail, Star,
+  ArrowLeft, Pencil, MapPin, Phone, Globe, Mail, Star,
   Building2, Clock, Share2, Plus, Trash2, Loader2, Image as ImageIcon,
-  CheckCircle2, Map as MapIcon, Ticket, ArrowRight, ImageOff as PlanImgOff,
+  CheckCircle2, Map as MapIcon, Ticket, ArrowRight, Store,
 } from 'lucide-react'
 import { businessesAPI, lugaresAPI, businessPlanesAPI } from '../../services/api'
+import { esImagenDeRelleno } from '../../utils/media'
 import { useAuth } from '../../context/AuthContext'
 import { ESTADO_LABEL, ESTADO_BADGE, DIAS_LABEL, formatRango } from './businessUtils'
 import { formatMoney } from './businessUtils'
@@ -238,11 +239,11 @@ function PublicPlanesSection({ businessId }) {
               className="group flex gap-4 rounded-xl border border-dark-100 p-3 hover:shadow-md hover:border-primary-200 transition-all"
             >
               <div className="w-28 h-24 shrink-0 rounded-lg overflow-hidden bg-dark-100">
-                {portada ? (
+                {portada?.url && !esImagenDeRelleno(portada.url) ? (
                   <img src={portada.url} alt={plan.nombre} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-dark-300">
-                    <PlanImgOff className="w-7 h-7" />
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary-700 via-ocean-700 to-dark-900 text-white/70">
+                    <Ticket className="w-7 h-7" />
                   </div>
                 )}
               </div>
@@ -401,24 +402,24 @@ export default function NegocioDetalle({ manage = false }) {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className={manage ? 'bg-dark-50' : 'bg-dark-50 min-h-screen'}
+      className={manage ? 'bg-dark-50' : 'bg-cream-50 min-h-screen'}
     >
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
         <button
           onClick={() => navigate(manage ? '/mis-negocios' : '/negocios')}
-          className="inline-flex items-center gap-2 text-sm text-dark-600 hover:text-primary-700 mb-5 transition-colors cursor-pointer"
+          className="inline-flex items-center gap-2 text-sm text-dark-600 hover:text-moss-700 mb-5 transition-colors cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" />
           {manage ? 'Volver a mis negocios' : 'Volver a negocios'}
         </button>
 
         <div className="flex flex-col sm:flex-row sm:items-start gap-6 mb-6">
-          <div className="w-full sm:w-56 h-40 rounded-2xl overflow-hidden bg-dark-100 flex-shrink-0">
-            {business.portada_url ? (
+          <div className="w-full sm:w-56 h-40 rounded-2xl overflow-hidden bg-cream-100 flex-shrink-0 border border-cream-200">
+            {business.portada_url && !esImagenDeRelleno(business.portada_url) ? (
               <img src={business.portada_url} alt={business.nombre} className="w-full h-full object-cover" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-dark-300">
-                <ImageOff className="w-10 h-10" />
+              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-moss-800 via-moss-900 to-moss-950 text-moss-200">
+                <Store className="w-10 h-10" />
               </div>
             )}
           </div>

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Store, MapPin, ArrowRight, ImageOff, Search } from 'lucide-react'
+import { Store, MapPin, ArrowRight, Search } from 'lucide-react'
 import { businessesAPI } from '../../services/api'
+import { esImagenDeRelleno } from '../../utils/media'
 import { formatRango } from './businessUtils'
 
 function SkeletonCard() {
@@ -25,16 +26,16 @@ function BusinessCard({ business, index }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 30 }}
+      initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: index * 0.08, ease: [0.25, 0.46, 0.45, 0.94] }}
+      transition={{ duration: 0.45, delay: index * 0.06, ease: [0.22, 1, 0.36, 1] }}
     >
       <Link
         to={`/negocios/${business.id}`}
-        className="group block bg-white rounded-2xl overflow-hidden shadow-sm border border-dark-100 hover:shadow-xl hover:border-primary-200 transition-all duration-300"
+        className="group block bg-white rounded-[22px] overflow-hidden shadow-card border border-cream-200 hover:shadow-card-hover transition-all duration-300"
       >
-        <div className="aspect-[16/10] overflow-hidden bg-dark-100 relative">
-          {portada && !imgError ? (
+        <div className="aspect-[16/10] overflow-hidden bg-cream-200 relative">
+          {portada && !imgError && !esImagenDeRelleno(portada) ? (
             <img
               src={portada}
               alt={business.nombre}
@@ -42,13 +43,15 @@ function BusinessCard({ business, index }) {
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             />
           ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center text-dark-400 gap-2">
-              <ImageOff className="w-10 h-10" />
-              <span className="text-sm">Sin imagen</span>
+            <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-moss-800 via-moss-900 to-dark-950 text-white/70">
+              <Store className="w-9 h-9 text-moss-300" />
+              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-white/80 px-3 text-center line-clamp-1">
+                {business.categoria || 'Negocio'}
+              </span>
             </div>
           )}
           {business.categoria && (
-            <span className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-white/90 text-xs font-semibold text-primary-700 shadow-sm">
+            <span className="absolute top-3 left-3 px-3 py-1 rounded-full bg-white/95 text-xs font-bold text-moss-900 shadow-sm border border-black/5">
               {business.categoria}
             </span>
           )}
@@ -129,35 +132,39 @@ export default function NegociosPublicos() {
   }
 
   return (
-    <div className="min-h-screen bg-dark-50">
-      <section className="relative overflow-hidden bg-gradient-to-br from-ocean-900 via-primary-900 to-primary-950">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 right-10 w-72 h-72 bg-sand-400 rounded-full blur-3xl" />
-          <div className="absolute bottom-10 left-20 w-96 h-96 bg-ocean-400 rounded-full blur-3xl" />
+    <div className="min-h-screen bg-cream-50">
+      <section className="relative overflow-hidden bg-moss-950 py-20 md:py-28 text-white">
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{
+            backgroundImage: 'url("/img/hero/hero-nature.jpg")',
+          }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/65 to-black/45" />
+          <div className="absolute inset-0 bg-gradient-to-t from-cream-50 via-transparent to-black/30" />
         </div>
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28 text-center">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 mb-6">
-              <Store className="w-4 h-4 text-sand-300" />
-              <span className="text-white/80 text-sm font-medium">Negocios turísticos</span>
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center z-10">
+          <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55 }}>
+            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 mb-4 border border-white/15">
+              <Store className="w-4 h-4 text-moss-300" />
+              <span className="text-white/90 text-xs sm:text-sm font-semibold tracking-wide">NEGOCIOS Y OPERADORES LOCALES</span>
             </div>
             <h1
-              className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4"
-              style={{ fontFamily: 'var(--font-display)' }}
+              className="font-[family-name:var(--font-display)] text-4xl sm:text-5xl md:text-6xl font-bold text-white mb-4 tracking-tight"
             >
-              Explora negocios
+              Explora Negocios de Córdoba
             </h1>
-            <p className="text-lg md:text-xl text-white/70 max-w-2xl mx-auto mb-10">
-              Hoteles, restaurantes, tours y experiencias verificadas en Córdoba por Cordalia.
+            <p className="text-base sm:text-lg text-stone-200 max-w-2xl mx-auto mb-8 leading-relaxed">
+              Alojamientos ecológicos, restaurantes típicos, transporte y experiencias verificadas por Cordalia.
             </p>
             <div className="max-w-xl mx-auto relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-dark-400" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-moss-700 pointer-events-none" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar por nombre, categoría o ubicación..."
-                className="w-full pl-12 pr-4 py-4 rounded-2xl bg-white text-dark-900 placeholder:text-dark-400 shadow-xl border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent text-base"
+                placeholder="Buscar por nombre, categoría o municipio..."
+                className="w-full pl-12 pr-6 py-4 rounded-full bg-white text-dark-900 placeholder:text-dark-400 shadow-xl border border-cream-200 focus:outline-none focus:ring-2 focus:ring-moss-400 text-sm"
               />
             </div>
           </motion.div>

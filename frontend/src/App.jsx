@@ -1,4 +1,5 @@
 import { Routes, Route } from 'react-router-dom'
+import { MotionConfig } from 'framer-motion'
 import { AuthProvider } from './context/AuthContext'
 import AppErrorBoundary from './components/AppErrorBoundary'
 import ScrollToTop from './components/ScrollToTop'
@@ -33,8 +34,9 @@ import PlanDetalle from './pages/planes/PlanDetalle'
 export default function App() {
   return (
     <AuthProvider>
-      <ScrollToTop />
-      <AppErrorBoundary>
+      <MotionConfig reducedMotion="user">
+        <ScrollToTop />
+        <AppErrorBoundary>
         <Routes>
           <Route element={<PublicLayout />}>
           <Route path="/" element={<Home />} />
@@ -78,7 +80,8 @@ export default function App() {
 
         <Route path="*" element={<NotFound />} />
         </Routes>
-      </AppErrorBoundary>
+        </AppErrorBoundary>
+      </MotionConfig>
     </AuthProvider>
   )
 }

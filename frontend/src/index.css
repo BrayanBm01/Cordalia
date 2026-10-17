@@ -1,41 +1,75 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary-50: #ecfdf5;
-  --color-primary-100: #d1fae5;
-  --color-primary-200: #a7f3d0;
-  --color-primary-300: #6ee7b7;
-  --color-primary-400: #34d399;
-  --color-primary-500: #10b981;
-  --color-primary-600: #059669;
-  --color-primary-700: #047857;
-  --color-primary-800: #065f46;
-  --color-primary-900: #064e3b;
-  --color-primary-950: #022c22;
+  /* TerraGo & Córdoba inspired: Verde Musgo Profundo y Orgánico */
+  --color-moss-50: #f2f7f4;
+  --color-moss-100: #e2ede6;
+  --color-moss-200: #c6dcce;
+  --color-moss-300: #9fc3ab;
+  --color-moss-400: #71a382;
+  --color-moss-500: #4e8561;
+  --color-moss-600: #3b6b4c;
+  --color-moss-700: #2f553d;
+  --color-moss-800: #244331;
+  --color-moss-900: #1c3d2f;
+  --color-moss-950: #11261d;
 
-  --color-ocean-50: #eff8ff;
-  --color-ocean-100: #dbeffe;
-  --color-ocean-200: #bfe3fe;
-  --color-ocean-300: #93d3fd;
-  --color-ocean-400: #60bafa;
-  --color-ocean-500: #3b9af6;
-  --color-ocean-600: #2579eb;
-  --color-ocean-700: #1d64d8;
-  --color-ocean-800: #1e51af;
-  --color-ocean-900: #1e468a;
-  --color-ocean-950: #172c54;
+  /* Primary aliases */
+  --color-primary-50: #f2f7f4;
+  --color-primary-100: #e2ede6;
+  --color-primary-200: #c6dcce;
+  --color-primary-300: #9fc3ab;
+  --color-primary-400: #71a382;
+  --color-primary-500: #3b6b4c;
+  --color-primary-600: #2f553d;
+  --color-primary-700: #244331;
+  --color-primary-800: #1c3d2f;
+  --color-primary-900: #163226;
+  --color-primary-950: #0e1e17;
 
-  --color-sand-50: #fefce8;
-  --color-sand-100: #fef9c3;
-  --color-sand-200: #fef08a;
-  --color-sand-300: #fde047;
-  --color-sand-400: #facc15;
-  --color-sand-500: #eab308;
-  --color-sand-600: #ca8a04;
-  --color-sand-700: #a16207;
-  --color-sand-800: #854d0e;
-  --color-sand-900: #713f12;
-  --color-sand-950: #422006;
+  /* Aguas del Sinú, ciénagas y Caribe cordobés: teal natural */
+  --color-ocean-50: #f0fdfa;
+  --color-ocean-100: #ccfbf1;
+  --color-ocean-200: #99f6e4;
+  --color-ocean-300: #5eead4;
+  --color-ocean-400: #2dd4bf;
+  --color-ocean-500: #14b8a6;
+  --color-ocean-600: #0d9488;
+  --color-ocean-700: #0f766e;
+  --color-ocean-800: #115e59;
+  --color-ocean-900: #134e4a;
+  --color-ocean-950: #042f2e;
+
+  /* Tonos arena y fibras Zenú (caña flecha) */
+  --color-sand-50: #faf7f0;
+  --color-sand-100: #f5efe3;
+  --color-sand-200: #eae0c9;
+  --color-sand-300: #dccca8;
+  --color-sand-400: #c7b083;
+  --color-sand-500: #b39a6a;
+  --color-sand-600: #a08d5d;
+  --color-sand-700: #86744b;
+  --color-sand-800: #6d5e3e;
+  --color-sand-900: #574a31;
+  --color-sand-950: #2f2518;
+
+  --color-earth-50: #f8f5f0;
+  --color-earth-100: #f0e9da;
+  --color-earth-200: #e2d4b5;
+  --color-earth-300: #d2b892;
+  --color-earth-400: #c29f72;
+  --color-earth-500: #b28b5c;
+  --color-earth-600: #9d7851;
+  --color-earth-700: #815e44;
+  --color-earth-800: #6a4f3b;
+  --color-earth-900: #594335;
+  --color-earth-950: #2f231b;
+
+  /* Blanco cálido / crema para el lienzo editorial */
+  --color-cream-50: #fbf9f4;
+  --color-cream-100: #f4efe4;
+  --color-cream-200: #eae2d1;
+  --color-cream-300: #ded3bd;
 
   --color-dark-50: #f8fafc;
   --color-dark-100: #f1f5f9;
@@ -46,11 +80,16 @@
   --color-dark-600: #475569;
   --color-dark-700: #334155;
   --color-dark-800: #1e293b;
-  --color-dark-900: #0f172a;
-  --color-dark-950: #020617;
+  --color-dark-900: #14221b;
+  --color-dark-950: #0a1410;
 
-  --font-display: 'Playfair Display', Georgia, serif;
-  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --font-body: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-script: 'Caveat', cursive, sans-serif;
+
+  --shadow-card: 0 4px 20px -2px rgba(20, 38, 28, 0.06), 0 2px 6px -1px rgba(20, 38, 28, 0.04);
+  --shadow-card-hover: 0 16px 36px -4px rgba(20, 38, 28, 0.12), 0 6px 12px -2px rgba(20, 38, 28, 0.06);
+  --shadow-pill: 0 8px 24px -4px rgba(28, 61, 47, 0.28);
 }
 
 @layer base {
@@ -59,19 +98,50 @@
   }
   html {
     scroll-behavior: smooth;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-padding-top: 5rem;
+    color-scheme: light;
   }
   body {
     font-family: var(--font-body);
     color: var(--color-dark-900);
-    background: white;
+    background: var(--color-cream-50);
+    line-height: 1.6;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+  img, video {
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+  ::selection {
+    background-color: var(--color-moss-700);
+    color: white;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+  .font-script {
+    font-family: var(--font-script);
+  }
+  .font-display {
+    font-family: var(--font-display);
   }
   .line-clamp-2 {
     display: -webkit-box;
