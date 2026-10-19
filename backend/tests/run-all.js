@@ -1,16 +1,6 @@
-require("./00-admin-unit.test");
-require("./01-regresion.test");
-require("./02-negocios.test");
-require("./03-destinos.test");
-require("./04-favoritos.test");
-require("./05-reviews.test");
-require("./06-planes.test");
-require("./07-perfil.test");
-require("./08-grupales.test");
-require("./09-datos-cordoba.test");
-require("./10-precio.test");
-require("./11-pagos.test");
-require("./12-contenido-destinos.test");
-require("./13-promos-vigencia.test");
-require("./14-google-auth.test");
+// Ejecuta TODA la batería de pruebas del backend.
+//
+// `helpers.main()` descubre y carga las suites `NN-*.test.js` en orden
+// (00 → 14) antes de correrlas. No se requieren aquí para evitar que las
+// pruebas se registren dos veces.
 require("./helpers").main();

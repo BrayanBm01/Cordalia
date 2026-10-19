@@ -43,7 +43,7 @@ function Sidebar({ collapsed, onToggle }) {
 
   const handleLogout = async () => {
     await logout()
-    navigate('/')
+    navigate('/', { replace: true })
   }
 
   return (
@@ -134,7 +134,7 @@ function MobileDrawer({ open, onClose }) {
   const handleLogout = async () => {
     onClose()
     await logout()
-    navigate('/')
+    navigate('/', { replace: true })
   }
 
   useEffect(() => {

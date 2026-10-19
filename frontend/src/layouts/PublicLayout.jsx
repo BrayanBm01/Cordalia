@@ -37,7 +37,7 @@ function MobileDrawer({ open, onClose }) {
   const handleLogout = async () => {
     onClose()
     await logout()
-    navigate('/')
+    navigate('/', { replace: true })
   }
 
   const drawerNavClass = ({ isActive }) =>
@@ -266,7 +266,7 @@ function Navbar({ mobileOpen, setMobileOpen }) {
     setDropdownOpen(false)
     setMobileOpen(false)
     await logout()
-    navigate('/')
+    navigate('/', { replace: true })
   }
 
   return (

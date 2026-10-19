@@ -7,7 +7,7 @@ import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { Mail, Lock, Eye, EyeOff, Loader2, Sprout, ShieldCheck, Compass, CheckCircle2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { SESION_INACTIVIDAD_FLAG } from '../utils/session'
+import { consumirAvisoSesion, suscribirAvisoSesion, SESION_INACTIVIDAD_MS } from '../utils/session'
 import GoogleButton from '../components/GoogleButton'
 
 const loginSchema = z.object({
@@ -22,12 +22,16 @@ export default function Login() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    if (sessionStorage.getItem(SESION_INACTIVIDAD_FLAG)) {
-      sessionStorage.removeItem(SESION_INACTIVIDAD_FLAG)
-      toast.info('Sesión cerrada por inactividad', {
-        description: 'Por seguridad, tu sesión se cerró tras 2 minutos sin actividad. Vuelve a iniciar sesión para continuar.',
+    const mostrarAviso = () => {
+      const minutos = Math.round(SESION_INACTIVIDAD_MS / 60000)
+      toast.info('Tu sesión se cerró por inactividad', {
+        description: `Por seguridad, tu sesión se cerró tras ${minutos} minutos sin actividad. Inicia sesión nuevamente para continuar.`,
       })
     }
+    // Aviso pendiente (llegada desde otra vista) o expiración en vivo (401 /
+    // inactividad con la vista abierta): siempre una única notificación.
+    if (consumirAvisoSesion()) mostrarAviso()
+    return suscribirAvisoSesion(mostrarAviso)
   }, [])
 
   const {
@@ -43,7 +47,7 @@ export default function Login() {
     try {
       await login(data.email, data.password)
       toast.success('Bienvenido de vuelta a Cordalia')
-      navigate('/')
+      navigate('/', { replace: true })
     } catch (err) {
       const msg = err.message || 'Error al iniciar sesión'
       if (msg.includes('sesión activa')) {

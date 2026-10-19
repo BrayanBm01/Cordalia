@@ -1,4 +1,5 @@
 const path = require("path");
+const fs = require("fs");
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 const { Pool } = require("pg");
 
@@ -89,6 +90,27 @@ function test(name, fn) {
 }
 
 async function main() {
+  // Carga TODAS las suites ANTES de ejecutarlas: cada archivo registra sus
+  // pruebas al requerirlo, por lo que requerir una suite después de llamar a
+  // main() no ejecutaba nada. Se hace aquí para que `node tests/run-all.js` y
+  // las ejecuciones individuales compartan el mismo runner.
+  const suiteDir = __dirname;
+  const suites = fs
+    .readdirSync(suiteDir)
+    .filter((f) => /^\d+-.*\.test\.js$/.test(f))
+    .sort();
+  const requireCacheAntes = new Set(Object.keys(require.cache));
+  for (const suite of suites) {
+    require(path.join(suiteDir, suite));
+  }
+  const suitesRequeridas = new Set();
+  for (const clave of Object.keys(require.cache)) {
+    if (requireCacheAntes.has(clave)) continue;
+    const m = /[\\/](\d+-[^\\/]*\.test\.js)$/.exec(clave);
+    if (m) suitesRequeridas.add(m[1]);
+  }
+
+  console.log(`\n  === Ejecutando ${tests.length} pruebas de ${suitesRequeridas.size} suites ===\n`);
   let pass = 0;
   let fail = 0;
   const failures = [];

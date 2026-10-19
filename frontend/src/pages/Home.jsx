@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { toast } from 'sonner'
 import {
   Sprout,
   Trees,
@@ -18,6 +19,7 @@ import {
 } from 'lucide-react'
 import { lugaresAPI, planesAPI } from '../services/api'
 import { getDestinoImagen, getPlanImagen } from '../utils/media'
+import { consumirAvisoSesion, suscribirAvisoSesion, SESION_INACTIVIDAD_MS } from '../utils/session'
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
@@ -133,6 +135,21 @@ export default function Home() {
   const [destinos, setDestinos] = useState(defaultDestinos)
   const [planes, setPlanes] = useState(defaultPlanes)
   const [activeTestimonial, setActiveTestimonial] = useState(0)
+
+  // Aviso de sesión expirada (inactividad, token vencido o 401 del backend).
+  // Se atiende el aviso pendiente al montar Y el que ocurra mientras la vista
+  // sigue abierta (p. ej. el usuario se queda inactivo en el inicio), siempre
+  // una sola vez por evento.
+  useEffect(() => {
+    const mostrarAviso = () => {
+      const minutos = Math.round(SESION_INACTIVIDAD_MS / 60000)
+      toast.info('Tu sesión se cerró por inactividad', {
+        description: `Por seguridad, tu sesión se cerró tras ${minutos} minutos sin actividad. Inicia sesión nuevamente para continuar.`,
+      })
+    }
+    if (consumirAvisoSesion()) mostrarAviso()
+    return suscribirAvisoSesion(mostrarAviso)
+  }, [])
 
   useEffect(() => {
     lugaresAPI

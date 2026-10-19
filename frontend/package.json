@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "node tests/formatMoney.test.mjs && node tests/googleAuth.test.mjs"
+    "test": "node tests/formatMoney.test.mjs && node tests/googleAuth.test.mjs && node tests/session.test.mjs && node tests/apiInterceptor.test.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

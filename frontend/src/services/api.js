@@ -1,3 +1,5 @@
+import { EVENTO_SESION_INVALIDA } from '../utils/session.js'
+
 const BASE_URL = '/api'
 
 /**
@@ -45,6 +47,10 @@ async function request(endpoint, options = {}) {
   if (token) {
     headers['Authorization'] = `Bearer ${token}`
   }
+  // Un logout deliberado no debe interpretarse como "sesión expirada": si el
+  // token ya no vale, el backend responde 401 y no queremos mostrar el aviso
+  // de inactividad cuando el usuario pulsó "Cerrar sesión".
+  const esLogoutManual = endpoint.startsWith('/auth/logout')
 
   let res
   try {
@@ -62,14 +68,24 @@ async function request(endpoint, options = {}) {
   const { data, json, mensaje } = await leerCuerpo(res)
 
   // Sesión inválida/expirada: se limpia el estado local, salvo en el propio
-  // intento de login de Google (para poder mostrar el motivo real en pantalla).
+  // intento de login (para poder mostrar el motivo real en pantalla) y en el
+  // logout (manual o por inactividad), donde el cierre lo gestiona AuthContext.
+  //
+  // SOLO el 401 significa "sesión no válida". Un 403 es falta de permisos
+  // (p. ej. el contrato de "ya hay una sesión activa") y NO debe cerrar una
+  // sesión válida; 400/429/5xx tampoco. Aquí no se navega con
+  // `window.location.href` porque en Vercel una recarga a una ruta client-side
+  // devuelve 404; se emite un evento y el AuthContext decide el cierre único.
   if (res.status === 401) {
     const esIntentoDeLogin = endpoint.startsWith('/auth/google') || endpoint.startsWith('/auth/login')
-    if (!esIntentoDeLogin) {
+    const llevabaToken = Boolean(token)
+    if (!esIntentoDeLogin && !esLogoutManual && llevabaToken) {
       localStorage.removeItem('token')
       localStorage.removeItem('user')
-      if (!window.location.pathname.includes('/login')) {
-        window.location.href = '/login'
+      // Solo se avisa a nivel bajo; el AuthContext es quien decide el cierre
+      // único y quien emite el aviso visible (así no se duplica).
+      if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+        window.dispatchEvent(new CustomEvent(EVENTO_SESION_INVALIDA))
       }
     }
     throw new ApiError(
@@ -105,7 +121,7 @@ export const authAPI = {
   updateProfile: (id, data) => api.put(`/auth/me`, data),
 }
 
-export const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
+export const GOOGLE_CLIENT_ID = import.meta.env?.VITE_GOOGLE_CLIENT_ID || ''
 
 export const lugaresAPI = {
   getAll: (search) => api.get(`/lugares${search ? `?search=${encodeURIComponent(search)}` : ''}`),

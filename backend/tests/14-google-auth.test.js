@@ -483,10 +483,20 @@ async function main() {
   });
 
   console.log(`\n  Resultado: ${pass} PASS, ${fail} FAIL\n`);
-  process.exit(fail ? 1 : 0);
+  return fail;
 }
 
-main().catch((e) => {
-  console.error("Fallo inesperado en la suite:", e);
-  process.exit(1);
-});
+// Solo se auto-ejecuta si es el módulo principal (`node tests/14-...test.js`).
+// Al requerirlo desde `helpers.main()` NO debe lanzar su propio runner ni
+// llamar a `process.exit()`: antes lo hacía y mataba al runner global a mitad
+// de la ejecución (solo corrían ~17 pruebas de 119).
+if (require.main === module) {
+  main()
+    .then((fail) => process.exit(fail ? 1 : 0))
+    .catch((e) => {
+      console.error("Fallo inesperado en la suite:", e);
+      process.exit(1);
+    });
+}
+
+module.exports = { main };
