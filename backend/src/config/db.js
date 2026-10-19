@@ -1,24 +1,21 @@
 const { Pool } = require("pg");
 require("dotenv").config();
 
-const isProduction = process.env.DATABASE_URL && process.env.DATABASE_URL.includes("render.com");
+const useSSL = process.env.DB_SSL === "true";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: isProduction ? { rejectUnauthorized: false } : false
+  ssl: useSSL ? { rejectUnauthorized: false } : false,
 });
 
-// Conexión de prueba
-pool.connect()
-  .then(client => {
+// Comprobar la conexión sin dejar un cliente ocupado
+pool.query("SELECT NOW()")
+  .then((res) => {
     console.log("✅ Conectado a PostgreSQL");
-    return client.query("SELECT NOW()");
-  })
-  .then(res => {
     console.log("🕒 Hora del servidor:", res.rows[0]);
   })
-  .catch(err => {
-    console.error("❌ Error de conexión:", err);
+  .catch((err) => {
+    console.error("❌ Error de conexión:", err.message);
   });
 
 module.exports = pool;
