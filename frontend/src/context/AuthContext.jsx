@@ -37,20 +37,31 @@ export function AuthProvider({ children }) {
     return () => { active = false }
   }, [])
 
+  /**
+   * Guarda la sesión devuelta por el backend validando primero el formato,
+   * de modo que NUNCA se persista una sesión incompleta (por ejemplo si el
+   * backend o un proxy devolviera una estructura inesperada).
+   */
+  const guardarSesion = (res) => {
+    const token = res?.data?.token
+    const usuario = res?.data?.usuario
+    if (!token || !usuario) {
+      throw new Error('Respuesta de autenticación incompleta del servidor')
+    }
+    localStorage.setItem('token', token)
+    localStorage.setItem('user', JSON.stringify(usuario))
+    setUser(usuario)
+    return res
+  }
+
   const login = async (email, password) => {
     const res = await authAPI.login(email, password)
-    localStorage.setItem('token', res.data.token)
-    localStorage.setItem('user', JSON.stringify(res.data.usuario))
-    setUser(res.data.usuario)
-    return res
+    return guardarSesion(res)
   }
 
   const googleLogin = async (idToken, rol) => {
     const res = await authAPI.google(idToken, rol)
-    localStorage.setItem('token', res.data.token)
-    localStorage.setItem('user', JSON.stringify(res.data.usuario))
-    setUser(res.data.usuario)
-    return res
+    return guardarSesion(res)
   }
 
   const register = async (nombre, email, password, rol) => {

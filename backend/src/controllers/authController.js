@@ -1,9 +1,10 @@
 const UsuarioModel = require("../models/usuarioModel");
 const LoginModel = require("../models/loginModel");
 const { hashPassword, comparePassword } = require("../utils/password");
-const { generarToken } = require("../utils/jwt");
+const { generarToken, verificarToken } = require("../utils/jwt");
 const { isEmail, isNonEmptyString, sanitizeString } = require("../utils/validators");
-const { verifyGoogleIdToken } = require("../services/googleAuth");
+const { GoogleAuthError } = require("../services/googleAuth");
+const googleAuth = require("../services/googleAuth");
 
 const ROLES = { ADMIN: 0, TOURIST: 1, BUSINESS: 2 };
 const ROLES_PUBLICOS = [ROLES.TOURIST, ROLES.BUSINESS];
@@ -99,6 +100,30 @@ async function iniciarSesion(usuario, req) {
   return { token, usuario, rolNombre };
 }
 
+/**
+ * Politica de sesion unica: un usuario con sesion activa no puede iniciar otra.
+ *
+ * Un `token_activo` cuyo JWT ya expiro (o es invalido) NO es una sesion
+ * utilizable: el middleware tambien lo rechazaria. Dejarlo bloqueando la cuenta
+ * impide para siempre que el usuario vuelva a entrar (ni con contrasena ni con
+ * Google) hasta que un administrador revoque la sesion. Por eso se limpia y se
+ * permite el ingreso. No se relaja ninguna validacion de seguridad: solo se
+ * descarta una credencial que ya no sirve.
+ *
+ * @returns {Promise<boolean>} true si existe una sesion VIGENTE que debe bloquear.
+ */
+async function tieneSesionVigente(usuario) {
+  if (!usuario || !usuario.token_activo) return false;
+  try {
+    verificarToken(usuario.token_activo);
+    return true;
+  } catch {
+    await UsuarioModel.clearToken(usuario.id);
+    usuario.token_activo = null;
+    return false;
+  }
+}
+
 exports.register = async (req, res) => {
   try {
     let { nombre, email, password, rol } = req.body;
@@ -179,7 +204,7 @@ exports.login = async (req, res) => {
       return res.status(401).json({ success: false, message: "Credenciales incorrectas" });
     }
 
-    if (usuario.token_activo) {
+    if (await tieneSesionVigente(usuario)) {
       return res.status(403).json({ success: false, message: "Ya hay una sesión activa" });
     }
 
@@ -208,17 +233,31 @@ exports.login = async (req, res) => {
  * Para cuentas existentes, el rol SIEMPRE se conserva desde la BD.
  */
 exports.google = async (req, res) => {
-  let verified = null;
   try {
     const { idToken, rol } = req.body || {};
-    if (!idToken) {
+    if (!idToken || typeof idToken !== "string") {
       return res.status(400).json({ success: false, message: "Token de Google requerido" });
     }
 
-    verified = await verifyGoogleIdToken(idToken);
-    if (!verified) {
-      await LoginModel.registrar(null, false, getClientIp(req), getUserAgent(req));
-      return res.status(401).json({ success: false, message: "Credenciales de Google inválidas" });
+    let verified;
+    try {
+      verified = await googleAuth.verifyGoogleIdToken(idToken);
+    } catch (error) {
+      if (error instanceof GoogleAuthError) {
+        // Motivo tecnico en los logs de Railway (sin el token ni datos sensibles).
+        console.error(
+          `[auth/google] credencial rechazada (${error.motivo})` +
+            (error.detalle ? `: ${error.detalle}` : "")
+        );
+        // Solo los intentos con credencial presente se auditan como fallidos.
+        if (error.motivo !== "token_ausente") {
+          await LoginModel.registrar(null, false, getClientIp(req), getUserAgent(req));
+        }
+        return res
+          .status(error.status || 401)
+          .json({ success: false, message: error.message });
+      }
+      throw error;
     }
 
     const { googleId, email, nombre, avatarUrl } = verified;
@@ -257,7 +296,7 @@ exports.google = async (req, res) => {
       }
     }
 
-    if (usuario.token_activo) {
+    if (await tieneSesionVigente(usuario)) {
       return res.status(403).json({ success: false, message: "Ya hay una sesión activa" });
     }
     if (usuario.rol_id === null || usuario.rol_id === undefined) {
@@ -272,14 +311,16 @@ exports.google = async (req, res) => {
       data: buildSessionResponse(usuario, token, rolNombre),
     });
   } catch (error) {
-    await LoginModel.registrar(null, false, getClientIp(req), getUserAgent(req));
-    if (error && error.message === "GOOGLE_CLIENT_ID no configurado") {
-      return res.status(503).json({
-        success: false,
-        message: "El inicio de sesión con Google no está configurado",
-      });
+    if (error instanceof GoogleAuthError) {
+      console.error(
+        `[auth/google] credencial rechazada (${error.motivo})` +
+          (error.detalle ? `: ${error.detalle}` : "")
+      );
+      return res
+        .status(error.status || 401)
+        .json({ success: false, message: error.message });
     }
-    console.error("Error en google:", error);
+    console.error("[auth/google] error inesperado:", error);
     return res.status(500).json({ success: false, message: "Error al iniciar sesión con Google" });
   }
 };

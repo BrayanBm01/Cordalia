@@ -1,5 +1,41 @@
 const BASE_URL = '/api'
 
+/**
+ * Error de API con el status HTTP real, para que la interfaz pueda distinguir
+ * entre credenciales inválidas (401), sesión ya activa (403), rate limit (429),
+ * servidor caído (500/502/503) o backend no disponible (sin status).
+ */
+export class ApiError extends Error {
+  constructor(message, status = null) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
+/**
+ * Lee el cuerpo de la respuesta sin asumir que siempre es JSON.
+ * Si el backend (o un rewrite/proxy) devuelve HTML o texto plano, se produce
+ * un mensaje diagnóstico en lugar de un críptico "Unexpected token <".
+ */
+async function leerCuerpo(res) {
+  const texto = await res.text()
+  if (!texto) return { data: null, json: true }
+
+  try {
+    return { data: JSON.parse(texto), json: true }
+  } catch {
+    const esHtml = /^\s*</.test(texto)
+    return {
+      data: null,
+      json: false,
+      mensaje: esHtml
+        ? `El servidor respondió con HTML (${res.status}). Verifica que el backend esté disponible y que el proxy /api esté configurado.`
+        : texto.slice(0, 200),
+    }
+  }
+}
+
 async function request(endpoint, options = {}) {
   const token = localStorage.getItem('token')
   const headers = {
@@ -10,24 +46,44 @@ async function request(endpoint, options = {}) {
     headers['Authorization'] = `Bearer ${token}`
   }
 
-  const res = await fetch(`${BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  })
+  let res
+  try {
+    res = await fetch(`${BASE_URL}${endpoint}`, {
+      ...options,
+      headers,
+    })
+  } catch {
+    throw new ApiError(
+      'No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.',
+      null
+    )
+  }
 
-  const data = await res.json()
+  const { data, json, mensaje } = await leerCuerpo(res)
 
+  // Sesión inválida/expirada: se limpia el estado local, salvo en el propio
+  // intento de login de Google (para poder mostrar el motivo real en pantalla).
   if (res.status === 401) {
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
-    if (!window.location.pathname.includes('/login')) {
-      window.location.href = '/login'
+    const esIntentoDeLogin = endpoint.startsWith('/auth/google') || endpoint.startsWith('/auth/login')
+    if (!esIntentoDeLogin) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/login'
+      }
     }
-    throw new Error(data.message || 'Sesión expirada')
+    throw new ApiError(
+      json ? data.message || 'Sesión expirada' : mensaje || 'Sesión expirada',
+      401
+    )
   }
 
   if (!res.ok) {
-    throw new Error(data.message || 'Error del servidor')
+    throw new ApiError(json ? data.message || 'Error del servidor' : mensaje || 'Error del servidor', res.status)
+  }
+
+  if (!json) {
+    throw new ApiError(mensaje || 'Respuesta del servidor no reconocida', res.status)
   }
 
   return data

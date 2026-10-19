@@ -102,7 +102,9 @@ export default function Registro() {
   }
 
   function handleGoogleSuccess() {
-    toast.success('Cuenta creada con éxito')
+    toast.success('Cuenta verificada con Google', {
+      description: 'Ya puedes comenzar tu viaje por Córdoba.',
+    })
     navigate('/')
   }
 
@@ -461,9 +463,9 @@ export default function Registro() {
             </div>
 
             <GoogleButton
-              rol="TOURIST"
+              rol={tipo}
               onSuccess={handleGoogleSuccess}
-              label="Registrarme con Google"
+              label={tipo === 'BUSINESS' ? 'Registrarme como vendedor con Google' : 'Registrarme con Google'}
             />
 
             <div className="mt-8 text-center pt-6 border-t border-cream-200">

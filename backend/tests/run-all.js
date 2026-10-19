@@ -12,4 +12,5 @@ require("./10-precio.test");
 require("./11-pagos.test");
 require("./12-contenido-destinos.test");
 require("./13-promos-vigencia.test");
+require("./14-google-auth.test");
 require("./helpers").main();

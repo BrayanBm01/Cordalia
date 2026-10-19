@@ -24,18 +24,44 @@ app.use(
   })
 );
 
+/**
+ * Normaliza un origen configurado (p. ej. FRONTEND_URL) para compararlo con
+ * el header `Origin` del navegador: quita espacios, barra final y pasa a
+ * minusculas. Un `FRONTEND_URL` con barra final (error tipico al pegar la URL
+ * en Railway/Vercel) rompia CORS de forma silenciosa en produccion.
+ * NO amplia la lista de permitidos: solo tolera diferencias de formato.
+ */
+function normalizarOrigen(valor) {
+  if (!valor) return null;
+  const limpio = String(valor).trim().replace(/\/+$/, "").toLowerCase();
+  return limpio || null;
+}
+
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:3000",
   process.env.FRONTEND_URL,
   process.env.BACKEND_URL,
-].filter(Boolean);
+]
+  .map(normalizarOrigen)
+  .filter(Boolean);
+
+// Admite varios origenes separados por coma en FRONTEND_URL (previews).
+const allowedOriginsExpandidos = new Set();
+for (const entrada of allowedOrigins) {
+  for (const parte of entrada.split(",")) {
+    const o = normalizarOrigen(parte);
+    if (o) allowedOriginsExpandidos.add(o);
+  }
+}
 
 app.use(
   cors({
     origin: (origin, callback) => {
       // Permite peticiones sin origen (curl, postman, health checks) y origenes permitidos.
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin) return callback(null, true);
+      const normalizado = normalizarOrigen(origin);
+      if (normalizado && allowedOriginsExpandidos.has(normalizado)) {
         callback(null, true);
       } else {
         callback(new Error("Origen no permitido por CORS"));
