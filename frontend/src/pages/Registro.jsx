@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -26,6 +26,8 @@ import { useAuth } from '../context/AuthContext'
 import GoogleButton from '../components/GoogleButton'
 import { VENDOR_MEMBERSHIP_PLAN } from '../services/mercadoPago'
 import { rutaInicioPorRol } from '../utils/roles'
+import { vendedorAPI } from '../services/api'
+import { formatMoney } from './negocios/businessUtils'
 
 const registerSchema = z
   .object({
@@ -61,7 +63,30 @@ export default function Registro() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  // Precio REAL de la membresía: lo devuelve el backend (tabla `plans`),
+  // no un valor escrito a mano. Si no se puede cargar, se usa el valor
+  // documentado en el frontend como respaldo.
+  const [precioMembresia, setPrecioMembresia] = useState(null)
   const { register: registerUser, user } = useAuth()
+
+  useEffect(() => {
+    let activo = true
+    vendedorAPI
+      .planesPublicos()
+      .then((res) => {
+        if (!activo) return
+        const lista = Array.isArray(res.data) ? res.data : []
+        // El plan de pago: el primero con precio > 0 (Profesional).
+        const dePago = lista.find((p) => Number(p.precio) > 0)
+        if (dePago) setPrecioMembresia(dePago)
+      })
+      .catch(() => {
+        // Sin catálogo no se rompe el registro: se usa el respaldo.
+      })
+    return () => {
+      activo = false
+    }
+  }, [])
   const navigate = useNavigate()
 
   const {
@@ -313,18 +338,22 @@ export default function Registro() {
                         <div className="flex items-center justify-between flex-wrap gap-1 mb-1">
                           <h4 className="font-bold text-sm text-moss-950 flex items-center gap-1.5">
                             <span>{VENDOR_MEMBERSHIP_PLAN.nombre}</span>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
-                              Mercado Pago
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                              7 días gratis
                             </span>
                           </h4>
                           <span className="text-xs font-bold text-moss-900">
-                            $49.900 COP / mes
+                            {precioMembresia
+                              ? `${formatMoney(precioMembresia.precio)} ${precioMembresia.moneda} / mes`
+                              : `${formatMoney(VENDOR_MEMBERSHIP_PLAN.precioCOP)} / mes`}
                           </span>
                         </div>
                         <p className="text-xs text-dark-600 leading-relaxed mb-3">
-                          Tu cuenta de vendedor se activa con una <strong>prueba gratuita de 7 días</strong>.
-                          Durante la prueba puedes publicar tus planes turísticos, tours y experiencias.
-                          Después podrás contratar la membresía mensual con Mercado Pago.
+                          Tu cuenta de vendedor se activa <strong>de inmediato</strong> con una{' '}
+                          <strong>prueba gratuita de 7 días</strong>. Durante la prueba puedes
+                          publicar tus planes turísticos, tours y experiencias.{' '}
+                          <strong>No necesitas pagar nada para empezar</strong>: al terminar la
+                          prueba podrás contratar la membresía mensual.
                         </p>
 
                         <div className="p-2.5 rounded-xl bg-white/80 border border-cream-300/80 text-[11px] text-dark-700 flex items-start gap-2">
@@ -332,7 +361,10 @@ export default function Registro() {
                           <span>
                             <strong>Sin tarjeta ahora:</strong> la prueba se activa sola al crear la
                             cuenta y <strong>no se reinicia</strong> al volver a iniciar sesión. Tu
-                            perfil y tus datos se conservan aunque decidas no contratar.
+                            perfil y tus datos se conservan aunque decidas no contratar.{' '}
+                            <strong>Mercado Pago</strong> se usa únicamente para activar la{' '}
+                            <strong>membresía de pago</strong> al terminar la prueba: no hace falta
+                            para empezar.
                           </span>
                         </div>
                       </div>

@@ -123,6 +123,51 @@ h.test("REGV: un cliente NO puede registrarse como administrador", async () => {
   h.assert(Number(rows[0].rol_id) === 1, "rol_id = 1 (turista) en la BD");
 });
 
+// --- 6. El vendedor NO necesita Mercado Pago para iniciar la prueba ----
+h.test("REGV: el vendedor no necesita Mercado Pago para iniciar la prueba", async () => {
+  const email = h.repo("f21test.regv.sinmp");
+  // Se registra un vendedor con el proveedor de pagos SIMULADO y SIN
+  // credenciales de Mercado Pago: la prueba debe activarse igual.
+  const r = await h.api("/api/auth/register", {
+    method: "POST",
+    body: { nombre: "Vendedor Sin MP", email, password: pass, rol: "BUSINESS" },
+  });
+  h.assertStatus(r.status, 201, "registro sin credenciales de Mercado Pago");
+  h.assert(r.json.data.usuario.rol === "BUSINESS", "rol BUSINESS");
+  h.assert(typeof r.json.data.token === "string", "sesión iniciada");
+
+  const { rows } = await h.q(
+    "SELECT trial_inicio, trial_fin, estado_cuenta FROM usuarios WHERE email = $1",
+    [email]
+  );
+  h.assert(rows[0].trial_inicio !== null, "la prueba se activó SIN Mercado Pago");
+  h.assert(rows[0].estado_cuenta === "TRIALING", "estado TRIALING");
+
+  // No se creó ninguna suscripción de pago (la prueba no es una compra).
+  const { rows: subs } = await h.q(
+    "SELECT count(*)::int AS c FROM subscriptions WHERE usuario_id = (SELECT id FROM usuarios WHERE email = $1)",
+    [email]
+  );
+  h.assert(subs[0].c === 0, "no se creó ninguna suscripción de pago");
+});
+
+// --- 6b. El catálogo de planes es público y muestra el precio real -----
+h.test("REGV: el catálogo de planes es público y refleja el precio del sistema", async () => {
+  const r = await h.api("/api/planes-comerciales");
+  h.assertStatus(r.status, 200, "catálogo público de planes");
+  h.assert(Array.isArray(r.json.data) && r.json.data.length > 0, "hay planes");
+
+  const dePago = r.json.data.find((p) => Number(p.precio) > 0);
+  h.assert(dePago !== undefined, "hay al menos un plan de pago");
+  h.assert(Number(dePago.precio) === 49000, `precio vigente 49.000 (fue ${dePago.precio})`);
+  h.assert(dePago.moneda === "COP", "moneda COP");
+  h.assert(Number(dePago.meses) === 1, "duración de un mes");
+  h.assert(Array.isArray(dePago.features) && dePago.features.length > 0, "beneficios listados");
+
+  // No expone datos de ningún usuario.
+  h.assert(!("owner_id" in dePago) && !("usuario_id" in dePago), "no filtra datos de usuario");
+});
+
 // --- 7. Logout y nuevo login como vendedor ------------------------------
 h.test("REGV: cierre de sesión y nuevo login como vendedor", async () => {
   const out = await h.api("/api/auth/logout", { method: "POST", token: h.test.tokenVendedor });

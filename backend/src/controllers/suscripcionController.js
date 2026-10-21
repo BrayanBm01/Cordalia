@@ -22,6 +22,34 @@ function serverError(res, error, context) {
   return res.status(500).json({ success: false, message: "Error interno del servidor" });
 }
 
+// ---------- GET /api/planes-comerciales (PÚBLICO) ----------
+// Catálogo de planes comerciales: nombre, precio y beneficios.
+//
+// Es información de marketing (no datos de ningún usuario), por lo que es
+// PÚBLICO: la página de registro debe poder mostrar el precio REAL que
+// cobra el sistema (tabla `plans`), no un valor escrito a mano en el
+// frontend. El panel del vendedor usa su propia ruta autenticada
+// (/api/vendedor/planes) para lo mismo.
+exports.planesPublicos = async (req, res) => {
+  try {
+    const planes = await SuscripcionModel.listPlanesComerciales({ soloActivos: true });
+    return res.json({
+      success: true,
+      data: planes.map((p) => ({
+        id: p.id,
+        nombre: p.nombre,
+        descripcion: p.descripcion,
+        precio: Number(p.precio),
+        moneda: p.moneda,
+        meses: p.meses,
+        features: p.features || [],
+      })),
+    });
+  } catch (error) {
+    return serverError(res, error, "planes publicos");
+  }
+};
+
 // ---------- GET /api/vendedor/estado ----------
 // Estado comercial del vendedor: prueba, dias restantes, plan actual,
 // vigencia e historial de pagos. Disponible SIEMPRE (tambien con la

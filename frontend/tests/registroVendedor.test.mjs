@@ -283,6 +283,35 @@ async function main() {
     }
   })
 
+  await check('el catálogo de planes es público y devuelve el precio real del sistema', async () => {
+    const env = crearEntorno()
+    try {
+      let url = null
+      let headers = null
+      globalThis.fetch = async (u, opts) => {
+        url = u
+        headers = opts.headers
+        return respuesta(200, {
+          success: true,
+          data: [
+            { id: 1, nombre: 'Gratis', precio: 0, moneda: 'COP', meses: 1, features: [] },
+            { id: 2, nombre: 'Profesional', precio: 49000, moneda: 'COP', meses: 1, features: ['Soporte'] },
+          ],
+        })
+      }
+      const { vendedorAPI } = await importarApi()
+      const res = await vendedorAPI.planesPublicos()
+      assert.ok(String(url).endsWith('/planes-comerciales'), `url inesperada: ${url}`)
+      // Es público: no debe exigir token.
+      assert.equal(headers.Authorization, undefined, 'no debe exigir sesión')
+      const dePago = res.data.find((p) => Number(p.precio) > 0)
+      assert.equal(Number(dePago.precio), 49000, 'precio vigente del sistema')
+      assert.equal(dePago.moneda, 'COP', 'moneda COP')
+    } finally {
+      env.restaurar()
+    }
+  })
+
   await check('el panel permite contratar el plan mensual sin enviar el importe', async () => {
     const env = crearEntorno()
     try {

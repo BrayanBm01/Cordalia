@@ -21,8 +21,13 @@ const suscripcionController = require("../controllers/suscripcionController");
 
 const router = express.Router();
 
-// El panel comercial es EXCLUSIVO del vendedor (y del administrador).
-// Un turista autenticado recibe 403: no es su panel.
+// Catálogo de planes comerciales: PÚBLICO (solo marketing: nombre, precio
+// y beneficios). Permite que la página de registro muestre el precio real
+// que cobra el sistema, sin exponer datos de ningún usuario.
+router.get("/planes-comerciales", suscripcionController.planesPublicos);
+
+// El panel comercial (estado, historial, contratación) es EXCLUSIVO del
+// vendedor (y del administrador). Un turista autenticado recibe 403.
 router.get("/vendedor/planes", requireAuth, requireBusinessRole, suscripcionController.planes);
 router.get("/vendedor/estado", requireAuth, requireBusinessRole, suscripcionController.estado);
 router.post("/vendedor/suscripciones", requireAuth, requireBusinessRole, suscripcionController.contratar);

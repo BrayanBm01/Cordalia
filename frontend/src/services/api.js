@@ -132,9 +132,12 @@ export const GOOGLE_CLIENT_ID = import.meta.env?.VITE_GOOGLE_CLIENT_ID || ''
 // VENDEDOR: estado comercial, prueba gratuita y suscripciones
 // ============================================================
 export const vendedorAPI = {
+  // Catálogo de planes comerciales. Es PÚBLICO (información de marketing):
+  // la página de registro lo usa para mostrar el precio REAL del sistema.
+  planesPublicos: () => api.get('/planes-comerciales'),
   // Estado comercial: prueba, días restantes, plan actual, historial.
   estado: () => api.get('/vendedor/estado'),
-  // Catálogo de planes comerciales (disponible aunque la prueba venció).
+  // Catálogo de planes (ruta autenticada del panel).
   planes: () => api.get('/vendedor/planes'),
   // Contratar/renovar un plan. El importe lo fija el servidor.
   contratar: (plan_id) => api.post('/vendedor/suscripciones', { plan_id }),
