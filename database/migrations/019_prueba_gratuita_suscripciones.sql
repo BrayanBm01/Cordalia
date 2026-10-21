@@ -113,24 +113,22 @@ ALTER TABLE subscriptions ALTER COLUMN business_id DROP NOT NULL;
 
 -- Estados: pago pendiente, aprobado, rechazado, vigente, vencido,
 -- cancelado.
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'chk_subscriptions_estado'
-  ) THEN
-    ALTER TABLE subscriptions
-      DROP CONSTRAINT IF EXISTS chk_subscriptions_estado;
-    ALTER TABLE subscriptions
-      ADD CONSTRAINT chk_subscriptions_estado
-      CHECK (estado IN (
-        'pending',   -- pago creado, pendiente de confirmacion
-        'active',    -- suscripcion vigente
-        'expired',   -- vigencia terminada
-        'cancelled', -- cancelada por el vendedor o el admin
-        'rejected'   -- pago rechazado por el proveedor
-      ));
-  END IF;
-END $$;
+--
+-- IMPORTANTE: la constraint puede existir con la lista ANTIGUA (la del
+-- schema original: active/expired/cancelled/pending). Por eso se
+-- ELIMINA y se vuelve a crear siempre: un "IF NOT EXISTS" sobre la
+-- constraint NO la reemplazaria y 'rejected' quedaria sin permitirse.
+ALTER TABLE subscriptions DROP CONSTRAINT IF EXISTS chk_subscriptions_estado;
+
+ALTER TABLE subscriptions
+  ADD CONSTRAINT chk_subscriptions_estado
+  CHECK (estado IN (
+    'pending',   -- pago creado, pendiente de confirmacion
+    'active',    -- suscripcion vigente
+    'expired',   -- vigencia terminada
+    'cancelled', -- cancelada por el vendedor o el admin
+    'rejected'   -- pago rechazado por el proveedor
+  ));
 
 -- Idempotencia: una misma clave de evento no se procesa dos veces.
 CREATE UNIQUE INDEX IF NOT EXISTS uq_subscriptions_idempotency

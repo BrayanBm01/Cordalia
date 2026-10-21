@@ -402,13 +402,28 @@ async function main() {
   })
 
   check('las rutas privadas siguen protegidas al perder la sesión', () => {
+    // La decisión se toma en utils/roles.js (compartida por ProtectedRoute
+    // y AdminRoute) y las rutas la consumen con <Navigate replace>.
+    const roles = leer('utils/roles.js')
+    assert.ok(
+      roles.includes("destino: '/login'"),
+      'utils/roles.js debe enviar a /login cuando no hay sesión'
+    )
+    assert.ok(
+      roles.includes('autenticado'),
+      'utils/roles.js debe comprobar que la sesión está autenticada'
+    )
+
     for (const comp of ['components/ProtectedRoute.jsx', 'components/AdminRoute.jsx']) {
       const src = leer(comp)
-      assert.ok(src.includes('if (!user)'), `${comp} debe comprobar el usuario`)
       assert.ok(src.includes('loading'), `${comp} debe esperar la validación de sesión`)
       assert.ok(
-        /<Navigate to="\/login" replace/.test(src),
-        `${comp} debe redirigir con replace cuando no hay sesión`
+        src.includes('destinoRutaProtegida'),
+        `${comp} debe usar la decisión compartida de utils/roles.js`
+      )
+      assert.ok(
+        /<Navigate to=\{destino\} replace/.test(src),
+        `${comp} debe redirigir con replace cuando no hay sesión o falta permiso`
       )
     }
   })

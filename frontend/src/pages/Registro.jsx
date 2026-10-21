@@ -25,6 +25,7 @@ import {
 import { useAuth } from '../context/AuthContext'
 import GoogleButton from '../components/GoogleButton'
 import { VENDOR_MEMBERSHIP_PLAN } from '../services/mercadoPago'
+import { rutaInicioPorRol } from '../utils/roles'
 
 const registerSchema = z
   .object({
@@ -60,7 +61,7 @@ export default function Registro() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const { register: registerUser } = useAuth()
+  const { register: registerUser, user } = useAuth()
   const navigate = useNavigate()
 
   const {
@@ -79,22 +80,25 @@ export default function Registro() {
       // 7 días (calculada en el servidor).
       const rolRegistro = tipo === 'BUSINESS' ? 'BUSINESS' : 'TOURIST'
 
-      await registerUser(data.nombre, data.email, data.password, rolRegistro)
+      // El registro devuelve la sesión (token + usuario): el usuario
+      // queda autenticado y entra directo a su panel.
+      const res = await registerUser(data.nombre, data.email, data.password, rolRegistro)
+      const rol = res?.data?.usuario?.rol || rolRegistro
 
-      if (tipo === 'BUSINESS') {
+      if (rol === 'BUSINESS') {
         toast.success('¡Bienvenido a Cordalia!', {
           description:
-            'Tu cuenta de vendedor se creó con una prueba gratuita de 7 días. Inicia sesión para publicar tus planes.',
+            'Tu cuenta de vendedor está lista con una prueba gratuita de 7 días. Ya puedes publicar tus planes.',
         })
       } else {
         toast.success('Cuenta creada correctamente', {
-          description: 'Inicia sesión con tus credenciales para comenzar tu viaje.',
+          description: '¡Listo! Ya puedes explorar los destinos de Córdoba.',
         })
       }
 
-      // El registro no inicia sesión: el backend no devuelve token en este
-      // endpoint, por lo que el usuario entra con sus credenciales.
-      navigate('/login', { replace: true })
+      // El vendedor entra a SU panel comercial (prueba gratuita, planes
+      // y pagos); el turista, a la home.
+      navigate(rutaInicioPorRol(rol), { replace: true })
     } catch (err) {
       toast.error(err.message || 'Error al crear la cuenta')
     } finally {
@@ -102,11 +106,21 @@ export default function Registro() {
     }
   }
 
-  function handleGoogleSuccess() {
-    toast.success('Cuenta verificada con Google', {
-      description: 'Ya puedes comenzar tu viaje por Córdoba.',
-    })
-    navigate('/')
+  function handleGoogleSuccess(res) {
+    // GoogleButton ya inició la sesión y devuelve la respuesta: el rol
+    // lo decide el backend. El vendedor debe llegar a su panel
+    // comercial, no a la home pública.
+    const rol = res?.data?.usuario?.rol || user?.rol || tipo
+    if (rol === 'BUSINESS') {
+      toast.success('¡Bienvenido a Cordalia!', {
+        description: 'Tu cuenta de vendedor está lista con una prueba gratuita de 7 días.',
+      })
+    } else {
+      toast.success('Cuenta verificada con Google', {
+        description: 'Ya puedes comenzar tu viaje por Córdoba.',
+      })
+    }
+    navigate(rutaInicioPorRol(rol), { replace: true })
   }
 
   return (

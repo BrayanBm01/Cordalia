@@ -9,6 +9,7 @@ import {
   marcarSesionExpirada,
   EVENTO_SESION_INVALIDA,
 } from '../utils/session'
+import { normalizarUsuario } from '../utils/roles'
 
 const AuthContext = createContext(null)
 
@@ -21,7 +22,9 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('user')
     try {
-      return saved ? JSON.parse(saved) : null
+      // Se normaliza el rol: una sesión guardada por una versión
+      // anterior puede traer una variante ('VENDEDOR', 'SELLER'...).
+      return saved ? normalizarUsuario(JSON.parse(saved)) : null
     } catch {
       limpiarSesionLocal()
       return null
@@ -93,8 +96,15 @@ export function AuthProvider({ children }) {
       try {
         const res = await authAPI.me()
         if (!active) return
-        setUser(res.data)
-        localStorage.setItem('user', JSON.stringify(res.data))
+        // El perfil puede venir incompleto: se normaliza y se conserva
+        // el rol ya conocido para no perder el acceso del vendedor.
+        const restaurado = normalizarUsuario(res.data)
+        if (!restaurado) {
+          if (active) setLoading(false)
+          return
+        }
+        setUser(restaurado)
+        localStorage.setItem('user', JSON.stringify(restaurado))
       } catch {
         if (!active) return
         limpiarSesionLocal()
@@ -113,7 +123,7 @@ export function AuthProvider({ children }) {
    */
   const guardarSesion = (res) => {
     const token = res?.data?.token
-    const usuario = res?.data?.usuario
+    const usuario = normalizarUsuario(res?.data?.usuario)
     if (!token || !usuario) {
       throw new Error('Respuesta de autenticación incompleta del servidor')
     }
@@ -126,7 +136,7 @@ export function AuthProvider({ children }) {
       redireccionPendienteRef.current = null
     }
     setUser(usuario)
-    return res
+    return { ...res, data: { ...res.data, usuario } }
   }
 
   const login = async (email, password) => {
@@ -139,8 +149,15 @@ export function AuthProvider({ children }) {
     return guardarSesion(res)
   }
 
+  /**
+   * Registro. El backend devuelve la misma estructura que /auth/login
+   * (token + usuario), por lo que la sesión queda INICIADA aquí mismo:
+   * el usuario no tiene que volver a escribir su contraseña y el
+   * vendedor llega directamente a su panel.
+   */
   const register = async (nombre, email, password, rol) => {
-    return await authAPI.register(nombre, email, password, rol)
+    const res = await authAPI.register(nombre, email, password, rol)
+    return guardarSesion(res)
   }
 
   const logout = async () => {
@@ -173,7 +190,9 @@ export function AuthProvider({ children }) {
 
   const updateUser = (newData) => {
     setUser(prev => {
-      const updated = { ...prev, ...newData }
+      // Se normaliza el rol: el perfil guardado nunca debe quedar con
+      // una variante que rompa las comparaciones de las rutas protegidas.
+      const updated = normalizarUsuario({ ...prev, ...newData })
       localStorage.setItem('user', JSON.stringify(updated))
       return updated
     })

@@ -170,10 +170,26 @@ exports.register = async (req, res) => {
       await SuscripcionModel.asignarPruebaGratuita(usuario.id);
     }
 
+    // El registro devuelve la MISMA estructura que /auth/login y
+    // /auth/google (token + usuario). Asi el frontend puede guardar la
+    // sesion con su unico helper (guardarSesion) y el vendedor entra
+    // directo a su panel, sin pasar por el formulario de inicio de
+    // sesion. La sesion unica no bloquea aqui: la cuenta es nueva.
+    const { token, rolNombre } = await iniciarSesion(usuario, req);
+
     return res.status(201).json({
       success: true,
       message: "Usuario registrado correctamente",
-      data: { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol: mapRolId(usuario.rol_id) },
+      data: {
+        token,
+        usuario: mapPublicUser(usuario, rolNombre),
+        // Se mantienen estos campos por compatibilidad con consumidores
+        // que usaban la respuesta anterior.
+        id: usuario.id,
+        nombre: usuario.nombre,
+        email: usuario.email,
+        rol: rolNombre,
+      },
     });
   } catch (error) {
     if (error && error.code === "23505") {

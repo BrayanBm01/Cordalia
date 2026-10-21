@@ -9,6 +9,7 @@ import { Mail, Lock, Eye, EyeOff, Loader2, Sprout, ShieldCheck, Compass, CheckCi
 import { useAuth } from '../context/AuthContext'
 import { consumirAvisoSesion, suscribirAvisoSesion, SESION_INACTIVIDAD_MS } from '../utils/session'
 import GoogleButton from '../components/GoogleButton'
+import { rutaInicioPorRol } from '../utils/roles'
 
 const loginSchema = z.object({
   email: z.string().min(1, 'El email es requerido').email('Ingresa un email válido'),
@@ -18,7 +19,7 @@ const loginSchema = z.object({
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const { login } = useAuth()
+  const { login, user } = useAuth()
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -45,9 +46,12 @@ export default function Login() {
   const onSubmit = async (data) => {
     setIsSubmitting(true)
     try {
-      await login(data.email, data.password)
+      const res = await login(data.email, data.password)
+      const rol = res?.data?.usuario?.rol || user?.rol
       toast.success('Bienvenido de vuelta a Cordalia')
-      navigate('/', { replace: true })
+      // Cada rol entra a SU panel: el vendedor a su panel comercial
+      // (prueba gratuita, planes y pagos), el administrador al suyo.
+      navigate(rutaInicioPorRol(rol), { replace: true })
     } catch (err) {
       const msg = err.message || 'Error al iniciar sesión'
       if (msg.includes('sesión activa')) {
@@ -273,7 +277,16 @@ export default function Login() {
               <div className="flex-1 h-px bg-cream-300" />
             </div>
 
-            <GoogleButton label="Continuar con Google" redirectTo="/" />
+            {/* Google: el rol se conoce DESPUÉS de autenticarse, así que
+                la redirección se decide en onSuccess. */}
+            <GoogleButton
+              label="Continuar con Google"
+              onSuccess={(res) => {
+                const rol = res?.data?.usuario?.rol
+                toast.success('Bienvenido a Cordalia')
+                navigate(rutaInicioPorRol(rol), { replace: true })
+              }}
+            />
 
             <div className="mt-8 text-center pt-6 border-t border-cream-200">
               <p className="text-xs sm:text-sm text-dark-600">

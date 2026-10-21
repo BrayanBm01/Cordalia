@@ -134,7 +134,13 @@ h.test("INSCR: no se crean registros de pago ni de suscripción al inscribirse",
   );
   h.assert(conPago[0].c === 0, "ninguna inscripción gratuita tiene datos de pago");
 
-  const { rows: subs } = await h.q("SELECT count(*)::int AS c FROM subscriptions");
+  // Inscribirse NO crea una suscripción comercial (son flujos separados).
+  // Se comprueba SOLO para este usuario: el resto de vendedores del
+  // entorno pueden tener sus propias suscripciones.
+  const { rows: subs } = await h.q(
+    "SELECT count(*)::int AS c FROM subscriptions WHERE usuario_id = $1",
+    [h.test.T1.usuario.id]
+  );
   h.assert(subs[0].c === 0, "inscribirse no crea suscripciones comerciales");
 
   // El estado de la inscripción sigue siendo gratuito tras releerla.

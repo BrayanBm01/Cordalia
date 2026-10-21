@@ -1,5 +1,6 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { destinoRutaProtegida } from '../utils/roles'
 
 export default function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth()
@@ -12,12 +13,18 @@ export default function ProtectedRoute({ children, roles }) {
     )
   }
 
-  if (!user) {
-    return <Navigate to="/login" replace />
-  }
+  // La decisión (incluida la normalización del rol) vive en utils/roles
+  // para poder probarse sin montar React.
+  const { destino, permitido } = destinoRutaProtegida({
+    rol: user?.rol,
+    rolesPermitidos: roles,
+    autenticado: Boolean(user),
+  })
 
-  if (roles && !roles.includes(user.rol)) {
-    return <Navigate to="/" replace />
+  if (!permitido) {
+    // Sin sesión -> /login. Con sesión pero sin permiso -> SU panel
+    // (no a una página de error).
+    return <Navigate to={destino} replace />
   }
 
   return children

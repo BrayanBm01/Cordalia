@@ -16,20 +16,17 @@
 // ============================================================
 const express = require("express");
 const requireAuth = require("../middlewares/authMiddleware");
+const { requireBusinessRole } = require("../middlewares/businessMiddleware");
 const suscripcionController = require("../controllers/suscripcionController");
 
 const router = express.Router();
 
-// Catálogo de planes: accesible con sesión (el vendedor necesita ver
-// los planes para contratar, incluso con la prueba vencida).
-router.get("/vendedor/planes", requireAuth, suscripcionController.planes);
-
-// Estado comercial + historial de pagos.
-router.get("/vendedor/estado", requireAuth, suscripcionController.estado);
-
-// Contratar / cancelar.
-router.post("/vendedor/suscripciones", requireAuth, suscripcionController.contratar);
-router.put("/vendedor/suscripciones/:suscripcionId/cancelar", requireAuth, suscripcionController.cancelar);
+// El panel comercial es EXCLUSIVO del vendedor (y del administrador).
+// Un turista autenticado recibe 403: no es su panel.
+router.get("/vendedor/planes", requireAuth, requireBusinessRole, suscripcionController.planes);
+router.get("/vendedor/estado", requireAuth, requireBusinessRole, suscripcionController.estado);
+router.post("/vendedor/suscripciones", requireAuth, requireBusinessRole, suscripcionController.contratar);
+router.put("/vendedor/suscripciones/:suscripcionId/cancelar", requireAuth, requireBusinessRole, suscripcionController.cancelar);
 
 module.exports = router;
 

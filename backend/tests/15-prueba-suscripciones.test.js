@@ -357,6 +357,125 @@ h.test("SUSCR: en modo simulado la webhook no procesa pagos", async () => {
   }
 });
 
+h.test("SUSCR: la suscripción se localiza por la referencia que devuelve el proveedor", async () => {
+  // Regresión: la suscripción guarda la referencia INTERNA (la que viaja
+  // como external_reference y devuelve el proveedor al notificar) y el
+  // identificador del proveedor va aparte, en pago_id. Si se mezclaran,
+  // la webhook de Mercado Pago no encontraría la suscripción y el cobro
+  // real nunca activaría el plan.
+  const creada = await SuscripcionModel.crearSuscripcion({
+    usuarioId: h.test.V.usuario.id,
+    planId: 2,
+    proveedor: "mercadopago",
+    referenciaExterna: "CORD-SUB-123456-ABCDEF",
+    pagoId: "9876543210", // id de la preferencia del proveedor
+    monto: 49000,
+    moneda: "COP",
+    idempotencyKey: `k-ref-${Date.now()}`,
+  });
+
+  const { rows } = await h.q(
+    "SELECT referencia_externa, pago_id FROM subscriptions WHERE id = $1",
+    [creada.id]
+  );
+  h.assert(rows[0].referencia_externa === "CORD-SUB-123456-ABCDEF", "guarda la referencia interna");
+  h.assert(rows[0].pago_id === "9876543210", "guarda el id del proveedor aparte");
+
+  // Búsqueda como la hace la webhook: por la referencia interna...
+  const porInterna = await h.q(
+    "SELECT id FROM subscriptions WHERE referencia_externa = $1 OR pago_id = $2 LIMIT 1",
+    ["CORD-SUB-123456-ABCDEF", "9876543210"]
+  );
+  h.assert(porInterna.rows.length === 1, "la webhook encuentra la suscripción por la referencia interna");
+  h.assert(Number(porInterna.rows[0].id) === creada.id, "es la suscripción correcta");
+
+  // ...y también por el id del proveedor.
+  const porProveedor = await h.q(
+    "SELECT id FROM subscriptions WHERE referencia_externa = $1 OR pago_id = $2 LIMIT 1",
+    ["otra-cosa", "9876543210"]
+  );
+  h.assert(porProveedor.rows.length === 1, "también la encuentra por el id del proveedor");
+});
+
+h.test("SUSCR: en producción el modo simulado NO puede habilitar una suscripción", async () => {
+  const paymentService = require("../src/services/paymentService");
+  const nodeEnvOriginal = process.env.NODE_ENV;
+  try {
+    // Se simula el entorno de PRODUCCIÓN con el proveedor simulado.
+    process.env.NODE_ENV = "production";
+    // El servicio lee el proveedor al cargar el módulo: se fuerza 'mock'
+    // recargándolo con el entorno de producción.
+    delete require.cache[require.resolve("../src/services/paymentService")];
+    const svcProd = require("../src/services/paymentService");
+    h.assert(svcProd.PROVEEDOR === "mock", "el proveedor del entorno es 'mock'");
+
+    const estado = svcProd.estadoProveedor();
+    h.assert(estado.bloqueadoEnProduccion === true, "el modo simulado aparece bloqueado en producción");
+    h.assert(estado.real === false, "no se presenta como proveedor real");
+
+    // Intentar contratar en producción con el simulador debe FALLAR:
+    // no se crea ni se activa ninguna suscripción.
+    const antes = await h.q(
+      "SELECT count(*)::int AS c FROM subscriptions WHERE usuario_id = $1",
+      [h.test.V.usuario.id]
+    );
+    let error = null;
+    try {
+      await svcProd.crearPago({
+        planId: 2, nombrePlan: "Profesional", monto: 49000,
+        referencia: "ref-prod-mock", idUsuario: h.test.V.usuario.id,
+      });
+    } catch (e) {
+      error = e;
+    }
+    h.assert(error !== null, "crearPago debe fallar en producción con el simulador");
+    h.assert(error.status === 503, `error 503 (fue ${error && error.status})`);
+    h.assert(error.code === "PAYMENT_PROVIDER_NOT_CONFIGURED", "código de error correcto");
+
+    const despues = await h.q(
+      "SELECT count(*)::int AS c FROM subscriptions WHERE usuario_id = $1",
+      [h.test.V.usuario.id]
+    );
+    h.assert(despues.rows[0].c === antes.rows[0].c, "no se creó ninguna suscripción");
+  } finally {
+    process.env.NODE_ENV = nodeEnvOriginal;
+    // Se restaura el módulo con el entorno original.
+    delete require.cache[require.resolve("../src/services/paymentService")];
+  }
+});
+
+h.test("SUSCR: la webhook de Mercado Pago exige firma y consulta el pago real", async () => {
+  const paymentService = require("../src/services/paymentService");
+
+  // La firma se valida SIEMPRE, incluso con el proveedor simulado.
+  const sinFirma = paymentService.validarFirmaWebhook({
+    headers: {}, bodyRaw: "{}", query: {},
+  });
+  h.assert(sinFirma.valido === false, "sin cabecera x-signature la firma es inválida");
+
+  const firmaFalsa = paymentService.validarFirmaWebhook({
+    headers: { "x-signature": `ts=${Date.now()},v1=deadbeef` },
+    bodyRaw: "{}", query: { "data.id": "1" },
+  });
+  h.assert(firmaFalsa.valido === false, "una firma incorrecta se rechaza");
+
+  // Sin secreto configurado la validación falla (fail closed).
+  const secretoOriginal = process.env.MERCADOPAGO_WEBHOOK_SECRET;
+  try {
+    delete process.env.MERCADOPAGO_WEBHOOK_SECRET;
+    delete require.cache[require.resolve("../src/services/paymentService")];
+    const svcSinSecreto = require("../src/services/paymentService");
+    const res = svcSinSecreto.validarFirmaWebhook({
+      headers: { "x-signature": `ts=${Date.now()},v1=abc` },
+      bodyRaw: "{}", query: { "data.id": "1" },
+    });
+    h.assert(res.valido === false, "sin secreto configurado la webhook no se valida");
+  } finally {
+    if (secretoOriginal !== undefined) process.env.MERCADOPAGO_WEBHOOK_SECRET = secretoOriginal;
+    delete require.cache[require.resolve("../src/services/paymentService")];
+  }
+});
+
 h.test("SUSCR: el historial de pagos y suscripciones queda registrado", async () => {
   const r = await h.api("/api/vendedor/estado", { token: h.test.V.token });
   h.assertStatus(r.status, 200, "estado con historial");

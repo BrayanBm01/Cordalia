@@ -124,11 +124,15 @@ exports.contratar = async (req, res) => {
       usuarioId,
       planId,
       proveedor: pago.proveedor,
-      referenciaExterna: pago.externo || referencia,
+      // Referencia INTERNA (la que viaja como external_reference y la
+      // que el proveedor devuelve al notificar). El id del proveedor
+      // (p. ej. la preferencia de Mercado Pago) va aparte, en pago_id.
+      referenciaExterna: referencia,
+      pagoId: pago.externo || null,
       monto,
       moneda: pago.moneda,
       idempotencyKey,
-      payload: { sandbox: pago.sandbox, url: pago.url },
+      payload: { sandbox: pago.sandbox, url: pago.url, externo: pago.externo || null },
     });
 
     await SuscripcionModel.registrarPago({
@@ -138,7 +142,8 @@ exports.contratar = async (req, res) => {
       proveedor: pago.proveedor,
       evento: "creacion",
       estado: "pending",
-      referenciaExterna: pago.externo || referencia,
+      referenciaExterna: referencia,
+      pagoId: pago.externo || null,
       monto,
       moneda: pago.moneda,
       idempotencyKey,
@@ -244,14 +249,20 @@ exports.webhookMercadopago = async (req, res) => {
       });
     }
 
-    // 4) Localizar la suscripcion por la referencia externa.
-    const referencia = verificado.referencia;
+    // 4) Localizar la suscripcion. Se busca por la referencia interna
+    //    (external_reference) y, como alternativa, por el identificador
+    //    del proveedor (pago_id): segun como el proveedor notifique, el
+    //    dato puede venir en uno u otro campo.
+    const referenciaInterna = verificado.referencia;
+    const idProveedor = verificado.pago_id || id;
     const { rows: subs } = await pool.query(
-      `SELECT id, usuario_id, plan_id FROM subscriptions WHERE referencia_externa = $1 LIMIT 1`,
-      [referencia]
+      `SELECT id, usuario_id, plan_id FROM subscriptions
+        WHERE referencia_externa = $1 OR pago_id = $2
+        ORDER BY id DESC LIMIT 1`,
+      [referenciaInterna, idProveedor]
     );
     if (subs.length === 0) {
-      console.error("[webhook mp] suscripción no encontrada para la referencia externa");
+      console.error("[webhook mp] suscripción no encontrada para la referencia notificada");
       return res.status(404).json({ success: false, message: "Suscripción no encontrada" });
     }
     const sub = subs[0];
@@ -265,7 +276,7 @@ exports.webhookMercadopago = async (req, res) => {
       proveedor: "mercadopago",
       evento: "payment",
       estado: "approved",
-      referenciaExterna: referencia,
+      referenciaExterna: referenciaInterna,
       pagoId: verificado.pago_id || id,
       monto: verificado.monto ?? null,
       moneda: "COP",

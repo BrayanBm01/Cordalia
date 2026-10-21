@@ -19,6 +19,7 @@ import {
   ArrowRight,
   Sprout,
   MapPin,
+  Crown,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
@@ -164,10 +165,16 @@ function MobileDrawer({ open, onClose }) {
                         <span>Mis favoritos</span>
                       </Link>
                       {user.rol === 'BUSINESS' && (
-                        <Link to="/mis-negocios" onClick={onClose} className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-dark-700 hover:bg-cream-200/60 rounded-xl transition-colors">
-                          <Store className="w-4 h-4 text-moss-700" />
-                          <span>Mis negocios</span>
-                        </Link>
+                        <>
+                          <Link to="/panel-vendedor" onClick={onClose} className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-dark-700 hover:bg-cream-200/60 rounded-xl transition-colors">
+                            <Crown className="w-4 h-4 text-moss-700" />
+                            <span>Mi plan y pagos</span>
+                          </Link>
+                          <Link to="/mis-negocios" onClick={onClose} className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-dark-700 hover:bg-cream-200/60 rounded-xl transition-colors">
+                            <Store className="w-4 h-4 text-moss-700" />
+                            <span>Mis negocios</span>
+                          </Link>
+                        </>
                       )}
                       {user.rol === 'ADMIN' && (
                         <Link to="/admin" onClick={onClose} className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-dark-700 hover:bg-cream-200/60 rounded-xl transition-colors">
@@ -521,11 +528,18 @@ function Footer() {
                     </Link>
                   </li>
                   {user.rol === 'BUSINESS' && (
-                    <li>
-                      <Link to="/mis-negocios" className="hover:text-white transition-colors">
-                        Panel de Negocios
-                      </Link>
-                    </li>
+                    <>
+                      <li>
+                        <Link to="/panel-vendedor" className="hover:text-white transition-colors">
+                          Mi plan y pagos
+                        </Link>
+                      </li>
+                      <li>
+                        <Link to="/mis-negocios" className="hover:text-white transition-colors">
+                          Panel de Negocios
+                        </Link>
+                      </li>
+                    </>
                   )}
                   {user.rol === 'ADMIN' && (
                     <li>

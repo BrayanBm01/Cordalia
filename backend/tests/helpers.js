@@ -62,8 +62,15 @@ async function clearSession(email) {
   await q("UPDATE usuarios SET token_activo = NULL WHERE email = $1", [email]);
 }
 
+// Prefijos de correo usados por TODAS las suites para sus datos de
+// prueba. La limpieza los borra al terminar para no dejar residuos
+// que afecten a otras ejecuciones.
+const PREFIJOS_PRUEBA = ["f21test", "f21ext", "f21fix", "f13vig", "f12cont", "f04fav", "f05rev", "f06plan"];
+
 async function cleanupTestData() {
-  await q("DELETE FROM usuarios WHERE email LIKE $1", ["f21test.%"]);
+  for (const prefijo of PREFIJOS_PRUEBA) {
+    await q("DELETE FROM usuarios WHERE email LIKE $1", [`${prefijo}.%`]);
+  }
 }
 
 function assert(cond, msg) {

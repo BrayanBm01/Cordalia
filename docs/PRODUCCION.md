@@ -259,9 +259,12 @@ curl -s -o /dev/null -w "%{http_code}\n" https://cordalia.vercel.app/planes/1
 2. **Inscripción gratuita** → abrir un plan → elegir fecha → *Inscribirme*
    → debe aparecer *¡Inscripción confirmada!* con **Costo: Gratis** y sin
    ningún botón de pago. El cupo disponible baja en 1.
-3. **Prueba del vendedor** → registrarse como *Vendedor* → entrar a
-   `/panel-vendedor` → debe mostrar *Prueba gratuita activa* y **7 días
-   restantes**.
+3. **Registro de vendedor** → registrarse como *Vendedor* → el registro
+   **inicia la sesión** y el usuario entra **directo a
+   `/panel-vendedor`** (sin volver a escribir su contraseña) → debe
+   mostrar el bloque *Tu prueba gratuita está activa*, **7 días
+   restantes**, la fecha real de inicio y la de finalización, y el
+   catálogo de planes con su precio mensual.
 4. **Expiración de la prueba** → en la base de datos:
    ```sql
    UPDATE usuarios SET trial_fin = NOW() - interval '1 minute'
@@ -269,19 +272,23 @@ curl -s -o /dev/null -w "%{http_code}\n" https://cordalia.vercel.app/planes/1
    ```
    → recargar `/panel-vendedor` → *Tu prueba gratuita de 7 días terminó*;
    → al intentar crear un plan: **403** con el mensaje de la prueba vencida;
-   → el perfil y el catálogo de planes siguen accesibles.
+   → el perfil, el panel y el catálogo de planes siguen accesibles;
+   → el botón *Contratar* sigue disponible.
 5. **Contratar plan** → *Contratar* → en sandbox la suscripción queda
    `active` y aparece en el historial; el plan actual y la fecha de fin se
    muestran en el panel.
-6. **Administración** → `/admin/vendedores` → ver el estado comercial de
+6. **Cerrar sesión y volver a entrar** → el vendedor vuelve a
+   `/panel-vendedor` y **la prueba no se reinicia** (mismas fechas).
+7. **Administración** → `/admin/vendedores` → ver el estado comercial de
    cada vendedor → *Suspender cuenta* → el vendedor recibe **403** en las
    escrituras comerciales → *Reactivar cuenta* → recupera el acceso.
-7. **Google** → *Continuar con Google* → debe entrar y, si es una cuenta
-   nueva de vendedor, arrancar con la prueba de 7 días.
-8. **Expiración de sesión** → dejar 8 minutos sin actividad → la app
+8. **Google** → *Continuar con Google* → debe entrar y, si es una cuenta
+   nueva de vendedor, arrancar con la prueba de 7 días (y llegar a
+   `/panel-vendedor`).
+9. **Expiración de sesión** → dejar 8 minutos sin actividad → la app
    vuelve a `/` (no a una página 404) con el aviso *Tu sesión se cerró por
    inactividad*.
-9. **Contraseña de una cuenta de Google** → *Establece tu contraseña* (en
+10. **Contraseña de una cuenta de Google** → *Establece tu contraseña* (en
    `/login`) → se recibe el enlace (en `MAIL_PROVIDER=log` aparece en el
    log del backend) → al abrirlo, la contraseña nueva funciona y el enlace
    no sirve por segunda vez.

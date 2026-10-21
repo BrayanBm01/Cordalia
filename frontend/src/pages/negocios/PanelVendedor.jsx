@@ -170,10 +170,46 @@ export default function PanelVendedor() {
                 </p>
                 {estado.trial_fin && (
                   <p className="text-xs text-dark-500 mt-2">
-                    Fin de la prueba: <strong>{fecha(estado.trial_fin)}</strong>
+                    Fin de la prueba: <strong>{fechaHora(estado.trial_fin)}</strong>
                   </p>
                 )}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Resumen de la prueba gratuita (datos reales del backend) */}
+        {estado?.estado === 'TRIALING' && (
+          <div className="mb-8 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 md:p-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <Hourglass className="w-6 h-6 shrink-0 text-emerald-700 mt-0.5" />
+                <div>
+                  <h2 className="text-lg font-bold text-emerald-900">
+                    Tu prueba gratuita está activa
+                  </h2>
+                  <p className="text-sm text-emerald-900/80 mt-1">
+                    Te quedan <strong>{estado.dias_restantes}</strong>{' '}
+                    {Number(estado.dias_restantes) === 1 ? 'día' : 'días'} de prueba gratuita.
+                  </p>
+                  <dl className="mt-3 grid gap-x-6 gap-y-1 text-xs text-emerald-900/80 sm:grid-cols-2">
+                    <div className="flex gap-2">
+                      <dt className="font-semibold">Inicio:</dt>
+                      <dd>{fechaHora(estado.trial_inicio)}</dd>
+                    </div>
+                    <div className="flex gap-2">
+                      <dt className="font-semibold">Fecha de finalización:</dt>
+                      <dd>{fechaHora(estado.trial_fin)}</dd>
+                    </div>
+                  </dl>
+                </div>
+              </div>
+              <a
+                href="#planes-comerciales"
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-emerald-700 text-white text-sm font-bold hover:bg-emerald-800 transition-colors shrink-0"
+              >
+                <CreditCard className="w-4 h-4" /> Ver planes y contratar
+              </a>
             </div>
           </div>
         )}
@@ -218,7 +254,7 @@ export default function PanelVendedor() {
                   </span>
                 </p>
                 <p className="text-xs text-dark-500 mt-1">
-                  Inicio: {fecha(estado?.trial_inicio)} · Fin: {fecha(estado?.trial_fin)}
+                  Inicio: {fechaHora(estado?.trial_inicio)} · Fin: {fechaHora(estado?.trial_fin)}
                 </p>
               </>
             )}
@@ -244,7 +280,7 @@ export default function PanelVendedor() {
         </div>
 
         {/* Planes disponibles */}
-        <section className="bg-white rounded-2xl border border-dark-100 p-6 md:p-8 mb-8">
+        <section id="planes-comerciales" className="bg-white rounded-2xl border border-dark-100 p-6 md:p-8 mb-8 scroll-mt-6">
           <h2 className="text-xl font-bold text-dark-900 mb-1 flex items-center gap-2" style={{ fontFamily: 'var(--font-display)' }}>
             <Sparkles className="w-5 h-5 text-primary-600" /> Planes comerciales
           </h2>

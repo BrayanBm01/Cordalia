@@ -36,6 +36,15 @@ const ESTADOS_PROVEEDOR = {
 const MONEDA = "COP";
 
 /**
+ * El modo simulado ('mock') es SOLO de desarrollo. En produccion debe
+ * usarse un proveedor real: el mock no mueve dinero y no puede (no debe)
+ * habilitar suscripciones de pago.
+ */
+function esProduccion() {
+  return (process.env.NODE_ENV || "development") === "production";
+}
+
+/**
  * Genera una referencia de transaccion unica y legible.
  */
 function generarReferencia(prefix = "CORD") {
@@ -59,6 +68,8 @@ function estadoProveedor() {
       ? Boolean(process.env.MERCADOPAGO_ACCESS_TOKEN)
       : false,
     sandbox: PROVEEDOR === "mock",
+    // En produccion el modo simulado queda bloqueado: no habilita cobros.
+    bloqueadoEnProduccion: PROVEEDOR === "mock" && esProduccion(),
     pagosTuristicos: false, // los planes turisticos no tienen pagos
   };
 }
@@ -163,6 +174,22 @@ async function crearPago({ planId, nombrePlan, monto, referencia, usuarioEmail, 
   }
 
   // Modo sandbox: el backend decide (simula al proveedor confirmando).
+  //
+  // SEGURIDAD: el modo simulado NUNCA debe habilitar una suscripcion
+  // real. Por eso, en PRODUCCION el proveedor 'mock' queda bloqueado:
+  // si alguien dejara PAYMENT_PROVIDER=mock por error, ningun vendedor
+  // obtendria acceso comercial de pago. Para cobrar de verdad hay que
+  // configurar PAYMENT_PROVIDER=mercadopago con sus credenciales.
+  if (esProduccion()) {
+    throw Object.assign(
+      new Error(
+        "El proveedor de pagos no está configurado en producción (PAYMENT_PROVIDER=mock). " +
+          "Configura PAYMENT_PROVIDER=mercadopago con MERCADOPAGO_ACCESS_TOKEN para cobrar de verdad."
+      ),
+      { status: 503, code: "PAYMENT_PROVIDER_NOT_CONFIGURED" }
+    );
+  }
+
   const failTest = process.env.PAYMENT_MOCK_FAIL === "1";
   return {
     proveedor: "mock",

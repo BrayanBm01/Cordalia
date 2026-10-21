@@ -63,6 +63,28 @@ const SuscripcionModel = {
   },
 
   /**
+   * Marca la prueba como VENCIDA en la base de datos cuando ya paso su
+   * fecha de fin. Es una operacion perezosa e idempotente: el estado se
+   * detecta en el servidor aunque el vendedor no vuelva a iniciar sesion
+   * (los permisos ya se calculan al vuelo; esto mantiene la BD y los
+   * listados del administrador coherentes).
+   *
+   * @returns {Promise<boolean>} true si se actualizó el estado.
+   */
+  async marcarPruebaVencida(usuarioId) {
+    const { rowCount } = await pool.query(
+      `UPDATE usuarios
+          SET estado_cuenta = 'EXPIRED', updated_at = NOW()
+        WHERE id = $1
+          AND estado_cuenta = 'TRIALING'
+          AND trial_fin IS NOT NULL
+          AND trial_fin <= NOW()`,
+      [usuarioId]
+    );
+    return rowCount > 0;
+  },
+
+  /**
    * Estado comercial vigente de un vendedor.
    *
    * Prioridad (la mas restrictiva manda):
@@ -77,6 +99,9 @@ const SuscripcionModel = {
    * iniciar sesion.
    */
   async estadoComercial(usuarioId) {
+    // Si la prueba ya vencio, se refleja en la BD (perezoso, idempotente).
+    await this.marcarPruebaVencida(usuarioId);
+
     const { rows } = await pool.query(
       `SELECT u.id, u.rol_id, u.estado_cuenta, u.trial_inicio, u.trial_fin,
               u.suspension_motivo, u.suspension_fecha,
@@ -178,20 +203,27 @@ const SuscripcionModel = {
   /**
    * Crea una suscripcion en estado 'pending' (pago iniciado, NO activa).
    * La activacion solo ocurre con un evento de pago verificado.
+   *
+   * `referenciaExterna` es SIEMPRE la referencia interna que nosotros
+   * controlamos (la que viaja como external_reference y la que devuelve
+   * el proveedor al notificar). El identificador del proveedor (por
+   * ejemplo el id de la preferencia de Mercado Pago) va en `pagoId`.
+   * Mezclarlos haria que la webhook no encontraba la suscripcion.
    */
-  async crearSuscripcion({ usuarioId, planId, proveedor, referenciaExterna, monto, moneda, idempotencyKey, payload }) {
+  async crearSuscripcion({ usuarioId, planId, proveedor, referenciaExterna, pagoId, monto, moneda, idempotencyKey, payload }) {
     const { rows } = await pool.query(
       `INSERT INTO subscriptions
-         (usuario_id, plan_id, estado, proveedor, referencia_externa, monto, moneda,
+         (usuario_id, plan_id, estado, proveedor, referencia_externa, pago_id, monto, moneda,
           idempotency_key, datos_pago, starts_at)
-       VALUES ($1, $2, 'pending', $3, $4, $5, $6, $7, $8, NOW())
+       VALUES ($1, $2, 'pending', $3, $4, $5, $6, $7, $8, $9, NOW())
        RETURNING id, usuario_id, plan_id, estado, proveedor, referencia_externa,
-                 monto, moneda, starts_at, ends_at, created_at`,
+                 pago_id, monto, moneda, starts_at, ends_at, created_at`,
       [
         usuarioId,
         planId,
         proveedor || "mock",
         referenciaExterna || null,
+        pagoId || null,
         monto ?? null,
         moneda || "COP",
         idempotencyKey || null,
