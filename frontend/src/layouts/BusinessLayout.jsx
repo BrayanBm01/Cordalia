@@ -10,11 +10,13 @@ import {
   X,
   ChevronLeft,
   Mountain,
+  Crown,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 const principalLinks = [
   { to: '/mis-negocios/resumen', icon: LayoutDashboard, label: 'Dashboard', end: true },
+  { to: '/panel-vendedor', icon: Crown, label: 'Mi plan y pagos' },
 ]
 
 const gestionLinks = [

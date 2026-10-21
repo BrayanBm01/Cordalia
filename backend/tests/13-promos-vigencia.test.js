@@ -13,9 +13,13 @@
 //   5. Durante el rango           -> $80.000
 //   6. Despues de fecha_fin       -> $100.000
 //   7. Nueva promo 30%            -> $70.000 (y al vencer -> $100.000)
-//   8. Pago DURANTE la promo      -> cobra $80.000
-//   9. Pago DESPUES de vencer      -> cobra $100.000 (recalcula backend)
+//   8. Inscripcion DURANTE la promo -> snapshot informativo $80.000
+//   9. Promo vencida DESPUES      -> el snapshot no cambia; una inscripcion
+//                                    nueva ya vencida usa $100.000
 //  10. Cliente manipula el precio -> el backend lo ignora
+//
+// Las inscripciones a planes turisticos son GRATUITAS (sin pago): el
+// precio es solo informativo y se congela como snapshot al insularse.
 // Las fechas se mueven con SQL relativo a CURRENT_DATE para que los
 // rangos "antes / durante / despues" sean deterministas.
 // ============================================================
@@ -169,8 +173,11 @@ h.test("VIG 7: nueva promo 30% -> 70.000 y al vencer -> 100.000", async () => {
 
   h.test.promoB = B.json.data;
 });
-// --- Caso 8: pago DURANTE la promo -> snapshot $80.000 ----------
-h.test("VIG 8: pago durante la promo cobra $80.000", async () => {
+// --- Caso 8: inscripción DURANTE la promo -> snapshot $80.000 -------
+// Las inscripciones a planes turísticos son GRATUITAS: no hay pago.
+// El precio es INFORMATIVO y se congela como snapshot al inscribirse;
+// la promoción vigente en ese momento es la que se refleja.
+h.test("VIG 8: inscripcion durante la promo registra $80.000 (precio informativo)", async () => {
   const pid = h.test.plan.id;
   const idA = h.test.neg.id;
   const sid = h.test.salida.id;
@@ -182,7 +189,7 @@ h.test("VIG 8: pago durante la promo cobra $80.000", async () => {
 
   const C = await h.api(`/api/businesses/${idA}/promociones`, {
     method: "POST", token: h.test.O.token,
-    body: { nombre: "Vig pago durante", plan_id: pid, tipo_descuento: "porcentaje", valor_descuento: 20, fecha_inicio: "2000-01-01", fecha_fin: "2099-12-31" },
+    body: { nombre: "Vig promo durante", plan_id: pid, tipo_descuento: "porcentaje", valor_descuento: 20, fecha_inicio: "2000-01-01", fecha_fin: "2099-12-31" },
   });
   h.assertStatus(C.status, 201, "crear promo 20% vigente");
   await moverFechas(C.json.data.id, HOY_MENOS_1, HOY_MAS_3);
@@ -192,65 +199,92 @@ h.test("VIG 8: pago durante la promo cobra $80.000", async () => {
   });
   h.assertStatus(insc.status, 201, "inscribirse durante la promo");
   h.assert(Number(insc.json.data.precio_total) === 80000, `8: snapshot 80.000 (fue ${insc.json.data.precio_total})`);
-
-  const pago = await h.api(`/api/inscripciones/${insc.json.data.id}/pagar`, {
-    method: "POST", token: h.test.T.token, body: { metodo_pago: "nequi", monto: 1 },
-  });
-  h.assertStatus(pago.status, 200, "pagar durante la promo");
-  h.assert(Number(pago.json.data.pago.monto) === 80000, `8: cobra 80.000 (fue ${pago.json.data.pago.monto})`);
-  h.assert(pago.json.data.inscripcion.tipo_descuento === "promocion", "8: descuento de promocion registrado");
+  h.assert(insc.json.data.tipo_descuento === "promocion", "8: descuento de promocion registrado");
+  h.assert(insc.json.data.estado === "confirmada", "8: inscripcion gratuita confirmada");
+  // Sin pago: la inscripcion no tiene datos de cobro.
+  h.assert(!insc.json.data.fecha_pago && !insc.json.data.pago_proveedor, "8: sin datos de pago");
 
   h.test.promoC = C.json.data;
   const offC = await h.api(`/api/businesses/${idA}/promociones/${h.test.promoC.id}/estado`, {
     method: "PUT", token: h.test.O.token, body: { estado: "inactivo" },
   });
-  h.assertStatus(offC.status, 200, "desactivar promo pago-durante");
+  h.assertStatus(offC.status, 200, "desactivar promo inscripcion-durante");
 });
 
-// --- Caso 9: pago DESPUES de vencer -> cobra $100.000 -----------
-h.test("VIG 9: pago despues de que la promo vencio cobra $100.000", async () => {
+// --- Caso 9: la promo vence DESPUES de la inscripción ---------------
+// El precio es informativo y se congela al inscribirse: la inscripcion
+// existente conserva su snapshot. Una inscripcion NUEVA posterior a la
+// vencimiento usa el precio normal.
+h.test("VIG 9: promo vencida tras la inscripcion no altera el snapshot ya registrado", async () => {
   const pid = h.test.plan.id;
   const idA = h.test.neg.id;
-  const sid = h.test.salida.id;
 
   const D = await h.api(`/api/businesses/${idA}/promociones`, {
     method: "POST", token: h.test.O.token,
-    body: { nombre: "Vig pago despues", plan_id: pid, tipo_descuento: "porcentaje", valor_descuento: 20, fecha_inicio: "2000-01-01", fecha_fin: "2099-12-31" },
+    body: { nombre: "Vig promo vence despues", plan_id: pid, tipo_descuento: "porcentaje", valor_descuento: 20, fecha_inicio: "2000-01-01", fecha_fin: "2099-12-31" },
   });
-  h.assertStatus(D.status, 201, "crear promo que vence antes del pago");
+  h.assertStatus(D.status, 201, "crear promo que vence despues");
   await moverFechas(D.json.data.id, HOY_MENOS_1, HOY_MAS_3);
 
-  const insc = await h.api(`/api/businesses/${idA}/planes/${pid}/salidas/${sid}/inscripciones`, {
-    method: "POST", token: h.test.T.token, body: { personas: 2 },
+  // Salida aparte para no chocar con la inscripcion del caso 8.
+  const salida2 = await h.api(`/api/businesses/${idA}/planes/${pid}/salidas`, {
+    method: "POST", token: h.test.O.token,
+    body: { fecha: "2027-07-17", hora: "07:00", cupo_maximo: 20 },
+  });
+  h.assertStatus(salida2.status, 201, "crear salida para el caso 9");
+  const sid2 = salida2.json.data.id;
+
+  const emailT2 = h.repo("f13vig.turista2");
+  h.assertStatus((await h.createUser(h.test.adminToken, {
+    nombre: "Turista Vigencia 2", email: emailT2, password: "Test1234x!", rol_id: 1,
+  })).status, 201, "crear turista 2");
+  const T2 = await h.login(emailT2, "Test1234x!");
+  h.assertStatus(T2.status, 200, "login turista 2");
+
+  const insc = await h.api(`/api/businesses/${idA}/planes/${pid}/salidas/${sid2}/inscripciones`, {
+    method: "POST", token: T2.token, body: { personas: 2 },
   });
   h.assertStatus(insc.status, 201, "inscribirse con promo vigente");
   h.assert(Number(insc.json.data.precio_total) === 160000, `9: snapshot 160.000 (fue ${insc.json.data.precio_total})`);
 
-  // La promo vence entre la inscripcion y el pago.
+  // La promo vence despues de la inscripcion.
   await moverFechas(D.json.data.id, HOY_MENOS_10, HOY_MENOS_8);
 
-  const pago = await h.api(`/api/inscripciones/${insc.json.data.id}/pagar`, {
-    method: "POST", token: h.test.T.token, body: { metodo_pago: "nequi", monto: 1 },
-  });
-  h.assertStatus(pago.status, 200, "pagar tras vencer la promo");
-  h.assert(Number(pago.json.data.pago.monto) === 200000, `9: cobra 200.000 (2x100.000, fue ${pago.json.data.pago.monto})`);
-  h.assert(pago.json.data.inscripcion.tipo_descuento === "ninguno", "9: sin descuento efectivo al pagar");
+  // La inscripcion existente conserva su snapshot informativo.
+  const comp = await h.api(`/api/inscripciones/${insc.json.data.id}/comprobante`, { token: T2.token });
+  h.assert(Number(comp.json.data.precio_total) === 160000, "9: el snapshot registrado no se altera");
 
-  const comp = await h.api(`/api/inscripciones/${insc.json.data.id}/comprobante`, { token: h.test.T.token });
-  h.assert(Number(comp.json.data.precio_total) === 200000, "9: comprobante con precio normal");
+  // Una inscripcion nueva, ya vencida la promo, usa el precio normal.
+  const salida3 = await h.api(`/api/businesses/${idA}/planes/${pid}/salidas`, {
+    method: "POST", token: h.test.O.token,
+    body: { fecha: "2027-07-24", hora: "07:00", cupo_maximo: 20 },
+  });
+  h.assertStatus(salida3.status, 201, "crear salida para la inscripcion posterior");
+  const emailT3 = h.repo("f13vig.turista3");
+  h.assertStatus((await h.createUser(h.test.adminToken, {
+    nombre: "Turista Vigencia 3", email: emailT3, password: "Test1234x!", rol_id: 1,
+  })).status, 201, "crear turista 3");
+  const T3 = await h.login(emailT3, "Test1234x!");
+  h.assertStatus(T3.status, 200, "login turista 3");
+
+  const inscPosterior = await h.api(`/api/businesses/${idA}/planes/${pid}/salidas/${salida3.json.data.id}/inscripciones`, {
+    method: "POST", token: T3.token, body: { personas: 2 },
+  });
+  h.assertStatus(inscPosterior.status, 201, "inscribirse con promo vencida");
+  h.assert(Number(inscPosterior.json.data.precio_total) === 200000, `9: precio normal 200.000 (fue ${inscPosterior.json.data.precio_total})`);
+  h.assert(inscPosterior.json.data.tipo_descuento === "ninguno", "9: sin descuento con promo vencida");
 
   h.test.promoD = D.json.data;
   const offD = await h.api(`/api/businesses/${idA}/promociones/${h.test.promoD.id}/estado`, {
     method: "PUT", token: h.test.O.token, body: { estado: "inactivo" },
   });
-  h.assertStatus(offD.status, 200, "desactivar promo pago-despues");
+  h.assertStatus(offD.status, 200, "desactivar promo vencida");
 });
 
 // --- Caso 10: el cliente no puede manipular el precio -----------
 h.test("VIG 10: el cliente manipula precio y el backend lo ignora", async () => {
   const pid = h.test.plan.id;
   const idA = h.test.neg.id;
-  const sid = h.test.salida.id;
 
   const E = await h.api(`/api/businesses/${idA}/promociones`, {
     method: "POST", token: h.test.O.token,
@@ -259,17 +293,25 @@ h.test("VIG 10: el cliente manipula precio y el backend lo ignora", async () => 
   h.assertStatus(E.status, 201, "crear promo vigente");
   await moverFechas(E.json.data.id, HOY_MENOS_1, HOY_MAS_3);
 
-  // El turista envia precios a medida al inscribirse: el backend los ignora.
+  // Salida propia: una persona no puede duplicar su reserva para la misma
+  // salida (regla de negocio), asi que este caso usa otra fecha.
+  const salida10 = await h.api(`/api/businesses/${idA}/planes/${pid}/salidas`, {
+    method: "POST", token: h.test.O.token,
+    body: { fecha: "2027-07-31", hora: "07:00", cupo_maximo: 20 },
+  });
+  h.assertStatus(salida10.status, 201, "crear salida para el caso 10");
+  const sid = salida10.json.data.id;
+
+  // El turista envia precios a medida al conectarse: el backend los ignora.
   const insc = await h.api(`/api/businesses/${idA}/planes/${pid}/salidas/${sid}/inscripciones`, {
     method: "POST", token: h.test.T.token, body: { personas: 1, precio: 1, precio_total: 1, precio_persona: 1 },
   });
   h.assertStatus(insc.status, 201, "inscribirse con precios hackeados");
   h.assert(Number(insc.json.data.precio_total) === 80000, `10: snapshot ignora precio enviado (fue ${insc.json.data.precio_total})`);
 
-  // Al pagar tambien envia monto/pago falso -> el backend cobra 80.000.
-  const pago = await h.api(`/api/inscripciones/${insc.json.data.id}/pagar`, {
+  // No existe endpoint de pago: el cliente no puede "activar" nada con flags.
+  const pagar = await h.api(`/api/inscripciones/${insc.json.data.id}/pagar`, {
     method: "POST", token: h.test.T.token, body: { metodo_pago: "nequi", monto: 1, paymentSuccess: true, marca: "hack" },
   });
-  h.assertStatus(pago.status, 200, "pagar con flags falsos");
-  h.assert(Number(pago.json.data.pago.monto) === 80000, `10: cobra 80.000 (fue ${pago.json.data.pago.monto})`);
+  h.assertStatus(pagar.status, 404, "10: no existe endpoint de pago para una inscripcion gratuita");
 });

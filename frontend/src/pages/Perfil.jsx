@@ -52,6 +52,7 @@ function formatoSalida(i) {
 }
 
 const ESTADO_BADGE = {
+  confirmada: 'bg-emerald-100 text-emerald-700',
   pagada: 'bg-emerald-100 text-emerald-700',
   pendiente: 'bg-amber-100 text-amber-700',
   fallida: 'bg-orange-100 text-orange-700',
@@ -61,6 +62,7 @@ const ESTADO_BADGE = {
 }
 
 const ESTADO_LABEL = {
+  confirmada: 'Inscrita',
   pagada: 'Pagada',
   pendiente: 'Pendiente de pago',
   fallida: 'Pago fallido',
@@ -69,12 +71,13 @@ const ESTADO_LABEL = {
   vencida: 'Viaje vencido',
 }
 
-function InscripcionCard({ insc }) {
+function InscripcionCard({ insc, onCancelar }) {
   const estado = insc.estado
+  const esGratuita = estado === 'confirmada'
   return (
     <div className="rounded-xl border border-dark-100 bg-white p-4 flex flex-col sm:flex-row sm:items-center gap-3">
       <div className="w-10 h-10 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center shrink-0">
-        {estado === 'pagada' ? <CheckCircle2 className="w-5 h-5" /> : <Ticket className="w-5 h-5" />}
+        {estado === 'pagada' || esGratuita ? <CheckCircle2 className="w-5 h-5" /> : <Ticket className="w-5 h-5" />}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
@@ -89,7 +92,11 @@ function InscripcionCard({ insc }) {
         <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-dark-600 mt-1">
           <span className="inline-flex items-center gap-1"><CalendarDays className="w-3 h-3 text-primary-500" /> {formatoSalida(insc)}</span>
           <span className="inline-flex items-center gap-1"><User className="w-3 h-3 text-primary-500" /> {insc.personas} {Number(insc.personas) === 1 ? 'persona' : 'personas'}</span>
-          <span className="font-semibold">{formatMoney(insc.precio_total)}</span>
+          {esGratuita ? (
+            <span className="font-semibold text-emerald-700">Gratis</span>
+          ) : (
+            <span className="font-semibold">{formatMoney(insc.precio_total)}</span>
+          )}
         </div>
         {insc.pago_referencia && (
           <p className="text-[11px] text-dark-400 mt-0.5">Ref: <span className="font-mono">{insc.pago_referencia}</span></p>
@@ -105,6 +112,15 @@ function InscripcionCard({ insc }) {
           <span className="text-[11px] text-orange-700 bg-orange-50 border border-orange-200 rounded-lg px-2 py-1">
             Puedes reintentar el pago
           </span>
+        )}
+        {esGratuita && onCancelar && (
+          <button
+            type="button"
+            onClick={() => onCancelar(insc)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer bg-dark-50 text-dark-600 border border-dark-100 hover:border-red-300 hover:text-red-600"
+          >
+            Cancelar inscripción
+          </button>
         )}
         <Link
           to={`/planes/${insc.plan_id}`}
@@ -144,11 +160,12 @@ export default function Perfil() {
     bio: user?.bio || '',
     intereses_turisticos: user?.intereses_turisticos || '',
     preferencias_viaje: user?.preferencias_viaje || '',
-    password: '',
   })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
-  const [insc, setInsc] = useState({ pendientes: [], pagadas: [], vencidas: [], historial: [], cargando: true })
+  const [pwd, setPwd] = useState({ actual: '', nueva: '', confirmar: '' })
+  const [pwdSaving, setPwdSaving] = useState(false)
+  const [insc, setInsc] = useState({ confirmadas: [], pendientes: [], pagadas: [], vencidas: [], historial: [], cargando: true })
 
   useEffect(() => {
     let activo = true
@@ -158,6 +175,7 @@ export default function Perfil() {
         if (!activo) return
         const d = res.data || {}
         setInsc({
+          confirmadas: d.confirmadas || [],
           pendientes: d.pendientes || [],
           pagadas: d.pagadas || [],
           vencidas: d.vencidas || [],
@@ -175,6 +193,22 @@ export default function Perfil() {
 
   const interesesSel = toArray(form.intereses_turisticos)
   const preferenciasSel = toArray(form.preferencias_viaje)
+
+  // Cancelar una inscripción gratuita libera el cupo reservado.
+  const handleCancelarInscripcion = async (item) => {
+    if (!window.confirm('¿Cancelar tu inscripción? Se liberará tu cupo.')) return
+    try {
+      const res = await inscripcionesAPI.cancelar(item.id)
+      toast.success(res.message || 'Inscripción cancelada')
+      setInsc((s) => ({
+        ...s,
+        confirmadas: s.confirmadas.filter((i) => i.id !== item.id),
+        historial: [item, ...s.historial],
+      }))
+    } catch (err) {
+      toast.error(err.message || 'No se pudo cancelar la inscripción')
+    }
+  }
 
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
@@ -225,6 +259,10 @@ export default function Perfil() {
 
   const nombreCompleto = `${form.nombre} ${form.apellido}`.trim() || user?.nombre || ''
 
+  // ¿La cuenta ya tiene contraseña local? Las cuentas creadas con Google no
+  // la tienen, por lo que pueden establecerla sin aportar la actual.
+  const tienePasswordLocal = user?.proveedor !== 'google'
+
   // Indicador de completitud del perfil
   const camposCompletos = [
     form.nombre, form.apellido, form.telefono, form.ciudad,
@@ -239,9 +277,6 @@ export default function Perfil() {
 
     const body = { ...form }
     delete body.password
-    if (form.password.trim()) {
-      body.password = form.password
-    }
 
     try {
       const res = await authAPI.updateProfile(user._id || user.id, body)
@@ -251,13 +286,38 @@ export default function Perfil() {
       } else {
         updateUser({ ...body })
       }
-      setForm((prev) => ({ ...prev, password: '' }))
       setSaved(true)
       toast.success('Perfil actualizado correctamente')
     } catch (err) {
       toast.error(err.message || 'Error al actualizar el perfil')
     } finally {
       setSaving(false)
+    }
+  }
+
+  // --- Contraseña local (sección independiente) -------------------------
+  // Una cuenta creada con Google no tiene contraseña local: puede
+  // ESTABLECER una. Una cuenta con contraseña debe enviar la actual para
+  // cambiarla. Todo se valida en el backend (POST /auth/password).
+  async function handlePasswordSubmit(e) {
+    e.preventDefault()
+    if (pwd.nueva.length < 6) {
+      toast.error('La contraseña debe tener al menos 6 caracteres')
+      return
+    }
+    if (pwd.nueva !== pwd.confirmar) {
+      toast.error('Las contraseñas no coinciden')
+      return
+    }
+    setPwdSaving(true)
+    try {
+      const res = await authAPI.setPassword(pwd.nueva, tienePasswordLocal ? pwd.actual : undefined)
+      toast.success(res.message || 'Contraseña actualizada')
+      setPwd({ actual: '', nueva: '', confirmar: '' })
+    } catch (err) {
+      toast.error(err.message || 'No se pudo actualizar la contraseña')
+    } finally {
+      setPwdSaving(false)
     }
   }
 
@@ -497,16 +557,6 @@ export default function Perfil() {
                 </div>
               </div>
 
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-dark-700 mb-1.5">
-                  Nueva contraseña <span className="text-dark-400 font-normal">(opcional)</span>
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" />
-                  <input id="password" name="password" type="password" value={form.password} onChange={handleChange} className={inputBase} placeholder="Dejar en blanco para no cambiar" />
-                </div>
-              </div>
-
               <div className="flex items-center gap-4 pt-2">
                 <button
                   type="submit"
@@ -533,6 +583,67 @@ export default function Perfil() {
               </div>
             </form>
 
+            {/* Sección Seguridad: contraseña local */}
+            <div className="bg-white rounded-2xl border border-dark-100 p-6 md:p-8">
+              <h2 className="text-xl font-bold text-dark-900 mb-2 flex items-center gap-2" style={{ fontFamily: 'var(--font-display)' }}>
+                <Lock className="w-5 h-5 text-primary-600" />
+                {tienePasswordLocal ? 'Cambiar contraseña' : 'Establecer contraseña'}
+              </h2>
+              {!tienePasswordLocal && (
+                <p className="text-sm text-dark-500 mb-6">
+                  Tu cuenta se creó con Google. Puedes establecer una contraseña propia para
+                  iniciar sesión también con tu correo y contraseña.
+                </p>
+              )}
+              <form onSubmit={handlePasswordSubmit} className="space-y-4 max-w-md">
+                {tienePasswordLocal && (
+                  <div>
+                    <label htmlFor="pwd-actual" className="block text-sm font-medium text-dark-700 mb-1.5">Contraseña actual</label>
+                    <input
+                      id="pwd-actual"
+                      type="password"
+                      autoComplete="current-password"
+                      value={pwd.actual}
+                      onChange={(e) => setPwd((p) => ({ ...p, actual: e.target.value }))}
+                      className={inputBase}
+                      placeholder="Tu contraseña actual"
+                    />
+                  </div>
+                )}
+                <div>
+                  <label htmlFor="pwd-nueva" className="block text-sm font-medium text-dark-700 mb-1.5">Nueva contraseña</label>
+                  <input
+                    id="pwd-nueva"
+                    type="password"
+                    autoComplete="new-password"
+                    value={pwd.nueva}
+                    onChange={(e) => setPwd((p) => ({ ...p, nueva: e.target.value }))}
+                    className={inputBase}
+                    placeholder="Mínimo 6 caracteres"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="pwd-confirmar" className="block text-sm font-medium text-dark-700 mb-1.5">Confirmar contraseña</label>
+                  <input
+                    id="pwd-confirmar"
+                    type="password"
+                    autoComplete="new-password"
+                    value={pwd.confirmar}
+                    onChange={(e) => setPwd((p) => ({ ...p, confirmar: e.target.value }))}
+                    className={inputBase}
+                    placeholder="Repite la contraseña"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={pwdSaving}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-xl font-medium hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                >
+                  {pwdSaving ? (<><Loader2 className="w-4 h-4 animate-spin" /> Guardando...</>) : (<><Lock className="w-4 h-4" /> {tienePasswordLocal ? 'Cambiar contraseña' : 'Establecer contraseña'}</>)}
+                </button>
+              </form>
+            </div>
+
             {/* Sección Mis Inscripciones */}
             <div className="bg-white rounded-2xl border border-dark-100 p-6 md:p-8">
               <h2 className="text-xl font-bold text-dark-900 mb-6 flex items-center gap-2" style={{ fontFamily: 'var(--font-display)' }}>
@@ -546,6 +657,19 @@ export default function Perfil() {
                 </div>
               ) : (
                 <div className="space-y-8">
+                  {insc.confirmadas.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-emerald-700 mb-3 flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4" /> Mis viajes (inscripciones gratuitas)
+                      </h3>
+                      <div className="space-y-3">
+                        {insc.confirmadas.map(i => (
+                          <InscripcionCard key={i.id} insc={i} onCancelar={handleCancelarInscripcion} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {insc.pendientes.length > 0 && (
                     <div>
                       <h3 className="text-sm font-semibold text-amber-700 mb-3 flex items-center gap-2">
@@ -590,11 +714,11 @@ export default function Perfil() {
                     </div>
                   )}
 
-                  {insc.pendientes.length === 0 && insc.pagadas.length === 0 && insc.vencidas.length === 0 && insc.historial.length === 0 && (
+                  {insc.confirmadas.length === 0 && insc.pendientes.length === 0 && insc.pagadas.length === 0 && insc.vencidas.length === 0 && insc.historial.length === 0 && (
                     <div className="text-center py-8 rounded-xl bg-dark-50 border border-dark-100">
                       <Ticket className="w-10 h-10 text-dark-300 mx-auto mb-3" />
                       <p className="text-sm text-dark-600 font-medium">Aún no tienes inscripciones.</p>
-                      <p className="text-xs text-dark-400 mt-1">Explora nuestros planes y reserva tu lugar.</p>
+                      <p className="text-xs text-dark-400 mt-1">Explora nuestros planes y reserva tu lugar gratis.</p>
                       <Link to="/planes" className="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 transition-colors">
                         Explorar planes
                       </Link>

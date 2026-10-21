@@ -2,6 +2,7 @@ const express = require("express");
 const promotionController = require("../controllers/promotionController");
 const requireAuth = require("../middlewares/authMiddleware");
 const { optionalAuth } = require("../middlewares/authMiddleware");
+const { requireVendorActive } = require("../middlewares/vendorMiddleware");
 const {
   loadVisibleBusiness,
   requireOwnedBusiness,
@@ -19,9 +20,9 @@ businessRouter.get("/:promoId", optionalAuth, loadVisibleBusiness, promotionCont
 
 businessRouter.use(requireAuth);
 
-businessRouter.post("/", requireOwnedBusiness, promotionController.create);
-businessRouter.put("/:promoId", requireOwnedBusiness, promotionController.update);
-businessRouter.delete("/:promoId", requireOwnedBusiness, promotionController.remove);
-businessRouter.put("/:promoId/estado", requireOwnedBusiness, promotionController.setEstado);
+businessRouter.post("/", requireOwnedBusiness, requireVendorActive, promotionController.create);
+businessRouter.put("/:promoId", requireOwnedBusiness, requireVendorActive, promotionController.update);
+businessRouter.delete("/:promoId", requireOwnedBusiness, requireVendorActive, promotionController.remove);
+businessRouter.put("/:promoId/estado", requireOwnedBusiness, requireVendorActive, promotionController.setEstado);
 
 module.exports = { businessRouter };

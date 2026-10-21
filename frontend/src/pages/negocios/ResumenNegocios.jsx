@@ -251,7 +251,7 @@ export default function ResumenNegocios() {
                         />
                       )}
                       <p className="text-xs text-dark-400 mt-2">
-                        Personas con cupo reservado: {stats.ocupados}. Coordina el pago por WhatsApp; la inscripción es solo logística.
+                        Personas con cupo reservado: {stats.ocupados}. Las inscripciones son gratuitas; coordina la logística por WhatsApp.
                       </p>
                     </div>
                   </div>

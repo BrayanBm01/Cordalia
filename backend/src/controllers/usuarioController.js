@@ -1,4 +1,5 @@
 const UsuarioModel = require("../models/usuarioModel");
+const SuscripcionModel = require("../models/suscripcionModel");
 const { hashPassword } = require("../utils/password");
 const { isEmail, isNonEmptyString, sanitizeString } = require("../utils/validators");
 
@@ -58,6 +59,12 @@ exports.create = async (req, res) => {
     const rolFinal = rolesValidos.includes(rolNum) ? rolNum : 1;
     const hashed = await hashPassword(password);
     const usuario = await UsuarioModel.create(nombre, email, hashed, rolFinal);
+
+    // Vendedor nuevo -> prueba gratuita de 7 dias (misma regla que el
+    // registro publico). Se asigna una sola vez y no se reinicia.
+    if (rolFinal === 2) {
+      await SuscripcionModel.asignarPruebaGratuita(usuario.id);
+    }
 
     return res.status(201).json({
       success: true,

@@ -24,7 +24,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import GoogleButton from '../components/GoogleButton'
-import { VENDOR_MEMBERSHIP_PLAN, isMercadoPagoConfigured } from '../services/mercadoPago'
+import { VENDOR_MEMBERSHIP_PLAN } from '../services/mercadoPago'
 
 const registerSchema = z
   .object({
@@ -49,7 +49,7 @@ const TIPOS_CUENTA = [
   {
     id: 'BUSINESS',
     title: 'Vendedor / Negocio',
-    badge: 'Membresía Mercado Pago',
+    badge: 'Prueba gratuita 7 días',
     subtitle: 'Publica tus planes turísticos, tours y experiencias verificadas.',
     icon: Store,
   },
@@ -74,18 +74,17 @@ export default function Registro() {
   const onSubmit = async (data) => {
     setIsSubmitting(true)
     try {
-      // Regla de negocio solicitada por el usuario:
-      // Para crear la cuenta de vendedor se requerirá pago por Mercado Pago.
-      // Como aún no se han pasado las variables de Mercado Pago, todos los registros
-      // se procesan como usuario normal (TOURIST), dejando lista la arquitectura.
-      const rolRegistro = 'TOURIST'
+      // El backend es la autoridad sobre el rol: solo admite TOURIST o
+      // BUSINESS. Una cuenta de vendedor recibe la prueba gratuita de
+      // 7 días (calculada en el servidor).
+      const rolRegistro = tipo === 'BUSINESS' ? 'BUSINESS' : 'TOURIST'
 
       await registerUser(data.nombre, data.email, data.password, rolRegistro)
 
       if (tipo === 'BUSINESS') {
-        toast.success('Cuenta registrada correctamente', {
+        toast.success('¡Bienvenido a Cordalia!', {
           description:
-            'Te has registrado como usuario. La activación de vendedor vía Mercado Pago estará disponible próximamente sin perder tus datos.',
+            'Tu cuenta de vendedor se creó con una prueba gratuita de 7 días. Inicia sesión para publicar tus planes.',
         })
       } else {
         toast.success('Cuenta creada correctamente', {
@@ -93,7 +92,9 @@ export default function Registro() {
         })
       }
 
-      navigate('/login')
+      // El registro no inicia sesión: el backend no devuelve token en este
+      // endpoint, por lo que el usuario entra con sus credenciales.
+      navigate('/login', { replace: true })
     } catch (err) {
       toast.error(err.message || 'Error al crear la cuenta')
     } finally {
@@ -307,17 +308,17 @@ export default function Registro() {
                           </span>
                         </div>
                         <p className="text-xs text-dark-600 leading-relaxed mb-3">
-                          La publicación comercial requiere una membresía activa procesada por{' '}
-                          <strong>Mercado Pago</strong> (actualmente en fase de integración).
+                          Tu cuenta de vendedor se activa con una <strong>prueba gratuita de 7 días</strong>.
+                          Durante la prueba puedes publicar tus planes turísticos, tours y experiencias.
+                          Después podrás contratar la membresía mensual con Mercado Pago.
                         </p>
 
                         <div className="p-2.5 rounded-xl bg-white/80 border border-cream-300/80 text-[11px] text-dark-700 flex items-start gap-2">
                           <Info className="w-4 h-4 text-moss-700 shrink-0 mt-0.5" />
                           <span>
-                            <strong>Nota importante:</strong> Tu cuenta se registrará inicialmente
-                            como <strong>Usuario Normal</strong>. En cuanto se activen las
-                            credenciales de Mercado Pago, podrás activar tu Membresía Comercial
-                            desde tu panel sin perder ningún dato.
+                            <strong>Sin tarjeta ahora:</strong> la prueba se activa sola al crear la
+                            cuenta y <strong>no se reinicia</strong> al volver a iniciar sesión. Tu
+                            perfil y tus datos se conservan aunque decidas no contratar.
                           </span>
                         </div>
                       </div>

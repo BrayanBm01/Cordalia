@@ -119,9 +119,34 @@ export const authAPI = {
   logout: () => api.post('/auth/logout'),
   me: () => api.get('/auth/me'),
   updateProfile: (id, data) => api.put(`/auth/me`, data),
+  setPassword: (password_nueva, password_actual) =>
+    api.post('/auth/password', { password_nueva, password_actual }),
+  // Recuperación de contraseña (enlace de un solo uso).
+  recuperarPassword: (email) => api.post('/auth/recuperar-password', { email }),
+  resetearPassword: (token, password) => api.post('/auth/resetear-password', { token, password }),
 }
 
 export const GOOGLE_CLIENT_ID = import.meta.env?.VITE_GOOGLE_CLIENT_ID || ''
+
+// ============================================================
+// VENDEDOR: estado comercial, prueba gratuita y suscripciones
+// ============================================================
+export const vendedorAPI = {
+  // Estado comercial: prueba, días restantes, plan actual, historial.
+  estado: () => api.get('/vendedor/estado'),
+  // Catálogo de planes comerciales (disponible aunque la prueba venció).
+  planes: () => api.get('/vendedor/planes'),
+  // Contratar/renovar un plan. El importe lo fija el servidor.
+  contratar: (plan_id) => api.post('/vendedor/suscripciones', { plan_id }),
+  // Cancelar la suscripción vigente.
+  cancelar: (suscripcionId) => api.put(`/vendedor/suscripciones/${suscripcionId}/cancelar`),
+}
+
+export const adminVendedoresAPI = {
+  listar: () => api.get('/admin/vendedores'),
+  setEstado: (id, suspendido, motivo) =>
+    api.put(`/admin/vendedores/${id}/estado`, { suspendido, motivo }),
+}
 
 export const lugaresAPI = {
   getAll: (search) => api.get(`/lugares${search ? `?search=${encodeURIComponent(search)}` : ''}`),
@@ -267,8 +292,9 @@ export const planesAPI = {
 export const inscripcionesAPI = {
   misInscripciones: () => api.get('/mis-inscripciones'),
   comprobante: (id) => api.get(`/inscripciones/${id}/comprobante`),
-  pagar: (id, metodoPago) => api.post(`/inscripciones/${id}/pagar`, { metodo_pago: metodoPago }),
-  estadoPagos: () => api.get('/pagos/estado'),
+  // Las inscripciones a planes turisticos son GRATUITAS: no existe
+  // 'pagar'. El usuario reserva su cupo sin realizar ningun cobro.
+  cancelar: (id) => api.put(`/inscripciones/${id}/cancelar`),
 }
 
 export const businessPlanesAPI = {

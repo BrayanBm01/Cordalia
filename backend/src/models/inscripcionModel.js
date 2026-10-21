@@ -130,14 +130,15 @@ const InscripcionModel = {
           );
         }
       }
-      // Viajes pagados cuya fecha de salida ya pasó: el viaje se
-      // consideró realizado. No libera cupo y queda en el historial.
+      // Viajes ya realizados: las inscripciones (gratuitas 'confirmada' o
+      // historicas 'pagada') pasan a 'vencida' y quedan en el historial.
+      // No liberan cupo y no se borra ningun registro.
       await client.query(
         `UPDATE inscripciones AS i
          SET estado = 'vencida', updated_at = NOW()
          FROM tour_plan_salidas AS s
          WHERE s.id = i.salida_id
-           AND i.estado = 'pagada'
+           AND i.estado IN ('confirmada', 'pagada')
            AND s.fecha::date < CURRENT_DATE`,
         []
       );

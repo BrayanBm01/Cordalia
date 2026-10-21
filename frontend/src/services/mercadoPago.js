@@ -1,34 +1,35 @@
 /**
- * Arquitectura de Integración con Mercado Pago — Cordalia
- * 
- * Este módulo centraliza la configuración, estado y métodos para la pasarela de pagos
- * de Mercado Pago, específicamente para:
- * 1. Suscripción y activación de Cuentas de Vendedor (Negocios Turísticos).
- * 2. Pago de reservas e inscripciones a planes turísticos.
- * 
- * Cuando proporciones las variables de entorno:
- * - VITE_MERCADOPAGO_PUBLIC_KEY (frontend)
- * - MERCADOPAGO_ACCESS_TOKEN (backend)
- * El flujo de pago se activará automáticamente sin requerir cambios estructurales.
+ * Mercado Pago — Cordalia (frontend)
+ *
+ * ARQUITECTURA ACTUAL
+ * ------------------------------------------------------------
+ * Los planes TURISTICOS de Cordalia NO tienen pagos: la inscripción es
+ * gratuita. Mercado Pago se usa EXCLUSIVAMENTE para el plan COMERCIAL
+ * mensual del vendedor (suscripción).
+ *
+ * El cobro lo maneja el BACKEND:
+ *   1. El navegador llama `POST /api/vendedor/suscripciones` con el
+ *      `plan_id`.
+ *   2. El backend valida el plan y su importe, crea la preferencia de
+ *      Mercado Pago y devuelve la URL de checkout.
+ *   3. El navegador redirige a esa URL.
+ *   4. La suscripción se activa SOLO cuando el proveedor notifica el
+ *      pago y el backend verifica la firma y consulta el estado real.
+ *
+ * Por eso el frontend NO necesita la public key ni el access token:
+ * nunca se usa el SDK de Mercado Pago en el navegador y nunca se
+ * exponen credenciales. Este módulo queda como catálogo informative.
  */
 
-export const MERCADO_PAGO_PUBLIC_KEY = import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY || ''
-
 /**
- * Verifica si las credenciales públicas de Mercado Pago están cargadas
- * @returns {boolean}
- */
-export function isMercadoPagoConfigured() {
-  return Boolean(MERCADO_PAGO_PUBLIC_KEY && MERCADO_PAGO_PUBLIC_KEY !== 'tu_public_key_aqui')
-}
-
-/**
- * Especificación del plan de suscripción de Vendedor
+ * Catálogo informativo de la membresía de vendedor.
+ * El precio y la vigencia REALES los fija el backend (tabla `plans`):
+ * esta lista es solo para textos informativos de la interfaz.
  */
 export const VENDOR_MEMBERSHIP_PLAN = {
   id: 'plan_vendedor_cordalia',
   nombre: 'Membresía Vendedor Cordalia',
-  precioCOP: 49900,
+  precioCOP: 49000,
   moneda: 'COP',
   intervalo: 'mensual',
   caracteristicas: [
@@ -38,35 +39,18 @@ export const VENDOR_MEMBERSHIP_PLAN = {
     'Panel de gestión de salidas grupales y cupos en tiempo real',
     'Visibilidad preferencial en el buscador de destinos de Córdoba',
   ],
-  estado: isMercadoPagoConfigured() ? 'activo' : 'pendiente_credenciales',
 }
 
 /**
- * Placeholder / Arquitectura para iniciar el checkout de Mercado Pago
- * Cuando se pasen las variables de entorno, este método invoca el SDK oficial
- * @param {Object} params
- * @param {string} params.userId
- * @param {string} params.email
- * @returns {Promise<{ preferenceId: string, initPoint: string }>}
+ * El proveedor se decide en el BACKEND (PAYMENT_PROVIDER).
+ * El frontend no lo conoce: pregunta al endpoint de estado.
+ * @returns {Promise<{proveedor: string, real: boolean, sandbox: boolean}>}
  */
-export async function iniciarSuscripcionVendedor({ userId, email }) {
-  if (!isMercadoPagoConfigured()) {
-    throw new Error(
-      'Mercado Pago aún no tiene las variables de entorno configuradas (VITE_MERCADOPAGO_PUBLIC_KEY).'
-    )
-  }
-
-  // Flujo listo para invocar backend: POST /api/pagos/vendedor/preferencia
-  const response = await fetch('/api/pagos/vendedor/preferencia', {
-    method: 'POST',
+export async function estadoProveedor() {
+  const res = await fetch('/api/vendedor/estado', {
+    method: 'GET',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, email, planId: VENDOR_MEMBERSHIP_PLAN.id }),
   })
-
-  const data = await response.json()
-  if (!data.success) {
-    throw new Error(data.message || 'No se pudo generar la preferencia de Mercado Pago')
-  }
-
-  return data
+  const data = await res.json().catch(() => ({}))
+  return data?.data?.proveedor || { proveedor: 'mock', real: false, sandbox: true }
 }

@@ -172,14 +172,36 @@ h.test("PRECIO: datos de ocupación para 0/20, 6%(1/16), 50%(10/20), 75%(15/20) 
     return t.json.data.find((s) => String(s.id) === String(sid));
   }
 
+  // Cada inscripción corresponde a un TURISTA DISTINTO: una persona no
+  // puede duplicar su reserva para la misma salida (regla de negocio), por
+  // eso el crecimiento del cupo se simula con varios turistas.
+  const passT = "Test1234x!";
+  const tokens = [h.test.T.token];
+  for (let i = 0; i < 3; i++) {
+    const emailExtra = h.repo("f21fix.turistaOcup");
+    h.assertStatus((await h.createUser(h.test.adminToken, {
+      nombre: `Turista Ocupacion ${i + 1}`, email: emailExtra, password: passT, rol_id: 1,
+    })).status, 201, `crear turista ocupacion ${i + 1}`);
+    const loginExtra = await h.login(emailExtra, passT);
+    h.assertStatus(loginExtra.status, 200, `login turista ocupacion ${i + 1}`);
+    tokens.push(loginExtra.token);
+  }
+
+  let turno = 0;
+  async function inscribir(pax) {
+    const token = tokens[turno % tokens.length];
+    turno++;
+    return h.api(`/api/businesses/${id}/planes/${pid}/salidas/${sid}/inscripciones`, {
+      method: "POST", token, body: { personas: pax },
+    });
+  }
+
   for (const [pax, ocu, dis] of [
     [10, 10, 10],
     [5, 15, 5],
     [5, 20, 0],
   ]) {
-    const i = await h.api(`/api/businesses/${id}/planes/${pid}/salidas/${sid}/inscripciones`, {
-      method: "POST", token: h.test.T.token, body: { personas: pax },
-    });
+    const i = await inscribir(pax);
     h.assertStatus(i.status, 201, `inscribir ${pax}`);
     const s = await listar();
     h.assert(Number(s.cupo_ocupado) === ocu, `ocupado ${ocu}`);
@@ -189,7 +211,7 @@ h.test("PRECIO: datos de ocupación para 0/20, 6%(1/16), 50%(10/20), 75%(15/20) 
   h.assert(Number(llena.cupo_disponible) === 0, "llena → disponible 0 → UI 100%");
 
   const exceso = await h.api(`/api/businesses/${id}/planes/${pid}/salidas/${sid}/inscripciones`, {
-    method: "POST", token: h.test.T.token, body: { personas: 1 },
+    method: "POST", token: tokens[tokens.length - 1], body: { personas: 1 },
   });
   h.assertStatus(exceso.status, 400, "salida llena rechaza nuevas inscripciones");
 });

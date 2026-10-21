@@ -1,9 +1,15 @@
 const h = require("./helpers");
 
 const ADMIN_PASS = h.ADMIN_PASSWORD;
-const HOY = "2026-09-07";
-const INICIO = "2026-09-01";
-const FIN = "2026-09-30";
+
+// Las fechas de las promos se calculan RELATIVAS al dia de ejecucion.
+// Antes estaban fijas (2026-09-01 / 2026-09-30) y la suite dejaba de
+// ser valida al pasar esa ventana: las promos se veian vencidas.
+const _hoy = new Date();
+const _iso = (d) => d.toISOString().slice(0, 10);
+const HOY = _iso(_hoy);
+const INICIO = _iso(new Date(_hoy.getTime() - 5 * 24 * 60 * 60 * 1000));
+const FIN = _iso(new Date(_hoy.getTime() + 20 * 24 * 60 * 60 * 1000));
 
 h.test("PLN: setup (admin, negocios y turista)", async () => {
   await h.clearSession(h.ADMIN_EMAIL);

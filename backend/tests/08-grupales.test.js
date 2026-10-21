@@ -655,9 +655,28 @@ h.test("GPL-E: transporte por salida según inscritos reales", async () => {
   h.assertStatus(salida.status, 201, "salida transporte");
   const sid = salida.json.data.id;
 
+  // Cada inscripción corresponde a un TURISTA DISTINTO: las inscripciones
+  // a planes turísticos son gratuitas y una persona no puede duplicar su
+  // reserva para la misma salida (regla de negocio). Por eso el crecimiento
+  // del cupo se simula con varios turistas.
+  const passT = "Test1234x!";
+  const tokens = [h.test.T.token];
+  for (let i = 0; i < 3; i++) {
+    const emailExtra = h.repo("f21ext.grup.turistaExtra");
+    h.assertStatus((await h.createUser(h.test.adminToken, {
+      nombre: `Turista Grupal Extra ${i + 1}`, email: emailExtra, password: passT, rol_id: 1,
+    })).status, 201, `crear turista extra ${i + 1}`);
+    const loginExtra = await h.login(emailExtra, passT);
+    h.assertStatus(loginExtra.status, 200, `login turista extra ${i + 1}`);
+    tokens.push(loginExtra.token);
+  }
+
+  let turno = 0;
   async function inscribir(n) {
+    const token = tokens[turno % tokens.length];
+    turno++;
     return h.api(`/api/businesses/${id}/planes/${pid}/salidas/${sid}/inscripciones`, {
-      method: "POST", token: h.test.T.token, body: { personas: n },
+      method: "POST", token, body: { personas: n },
     });
   }
   async function recomendado() {

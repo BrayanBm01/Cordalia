@@ -1,6 +1,7 @@
 const UsuarioModel = require("../models/usuarioModel");
 const LugarModel = require("../models/lugarModel");
 const LoginModel = require("../models/loginModel");
+const SuscripcionModel = require("../models/suscripcionModel");
 const pool = require("../config/db");
 
 exports.stats = async (req, res) => {
@@ -217,5 +218,57 @@ exports.loginHistory = async (req, res) => {
   } catch (error) {
     console.error("Error loginHistory:", error);
     return res.status(500).json({ success: false, message: "Error al obtener historial" });
+  }
+};
+
+// ---------- GET /api/admin/vendedores ----------
+// Listado de vendedores con su estado comercial: prueba gratuita,
+// dias restantes, plan contratado y vigencia de la suscripcion.
+exports.vendedores = async (req, res) => {
+  try {
+    await SuscripcionModel.expirarSuscripcionesVencidas();
+    const vendedores = await SuscripcionModel.listVendedoresConEstado();
+    return res.json({ success: true, data: vendedores });
+  } catch (error) {
+    console.error("Error vendedores:", error);
+    return res.status(500).json({ success: false, message: "Error al obtener los vendedores" });
+  }
+};
+
+// ---------- PUT /api/admin/vendedores/:id/estado ----------
+// Suspender o reactivar una cuenta de vendedor.
+exports.setVendedorEstado = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ success: false, message: "ID de vendedor inválido" });
+    }
+    const { suspendido, motivo } = req.body || {};
+    if (typeof suspendido !== "boolean") {
+      return res.status(400).json({ success: false, message: "Indica 'suspendido': true o false" });
+    }
+    const usuario = await UsuarioModel.findById(id);
+    if (!usuario) {
+      return res.status(404).json({ success: false, message: "Usuario no encontrado" });
+    }
+    if (usuario.rol_id !== 2) {
+      return res.status(400).json({ success: false, message: "El usuario no es un vendedor" });
+    }
+    const actualizado = await SuscripcionModel.setSuspencion(id, {
+      suspendido,
+      motivo: motivo ? String(motivo).slice(0, 500) : null,
+    });
+    if (!actualizado) {
+      return res.status(404).json({ success: false, message: "Usuario no encontrado" });
+    }
+    const estado = await SuscripcionModel.estadoComercial(id);
+    return res.json({
+      success: true,
+      message: suspendido ? "Cuenta suspendida" : "Cuenta reactivada",
+      data: { usuario: actualizado, estado },
+    });
+  } catch (error) {
+    console.error("Error setVendedorEstado:", error);
+    return res.status(500).json({ success: false, message: "Error al actualizar el estado" });
   }
 };

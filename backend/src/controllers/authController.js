@@ -1,5 +1,8 @@
 const UsuarioModel = require("../models/usuarioModel");
 const LoginModel = require("../models/loginModel");
+const SuscripcionModel = require("../models/suscripcionModel");
+const PasswordResetModel = require("../models/passwordResetModel");
+const { enviarCorreo, correoDisponible } = require("../services/mailService");
 const { hashPassword, comparePassword } = require("../utils/password");
 const { generarToken, verificarToken } = require("../utils/jwt");
 const { isEmail, isNonEmptyString, sanitizeString } = require("../utils/validators");
@@ -160,6 +163,13 @@ exports.register = async (req, res) => {
       proveedor: "local",
     });
 
+    // Vendedor nuevo -> prueba gratuita de 7 dias. Se calcula en el
+    // servidor y se asigna UNA sola vez (no se reinicia al volver a
+    // iniciar sesion).
+    if (rolFinal === ROLES.BUSINESS) {
+      await SuscripcionModel.asignarPruebaGratuita(usuario.id);
+    }
+
     return res.status(201).json({
       success: true,
       message: "Usuario registrado correctamente",
@@ -293,6 +303,10 @@ exports.google = async (req, res) => {
           google_id: googleId,
           avatar_url: avatarUrl || null,
         });
+        // Vendedor nuevo (tambien con Google) -> prueba gratuita de 7 dias.
+        if (rolFinal === ROLES.BUSINESS) {
+          await SuscripcionModel.asignarPruebaGratuita(usuario.id);
+        }
       }
     }
 
@@ -324,6 +338,197 @@ exports.google = async (req, res) => {
     return res.status(500).json({ success: false, message: "Error al iniciar sesión con Google" });
   }
 };
+
+/**
+ * POST /auth/password
+ *
+ * Permite a un usuario AUTENTICADO establecer o cambiar su contrasena local.
+ *
+ * Casos:
+ *   * Cuenta creada solo con Google (sin contrasena local): puede
+ *     ESTABLECER una contrasena propia sin aportar la anterior (no existe).
+ *     Esto habilita el acceso tradicional sin depender de Google, sin crear
+ *     un sistema paralelo de autenticacion.
+ *   * Cuenta con contrasena local ya configurada: para CAMBIARLA debe enviar
+ *     `password_actual` y esta debe coincidir. Nunca se permite sobrescribir
+ *     una contrasena existente sin conocer la actual.
+ *
+ * La contrasena se guarda SIEMPRE con bcrypt (hashPassword). Nunca en texto
+ * plano, y nunca se registra ni se devuelve.
+ */
+exports.setPassword = async (req, res) => {
+  try {
+    const id = req.usuario.id;
+    const passwordNueva = sanitizeString(String(req.body?.password_nueva ?? ""));
+    const passwordActual = sanitizeString(String(req.body?.password_actual ?? ""));
+
+    if (passwordNueva.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "La contraseña debe tener al menos 6 caracteres",
+      });
+    }
+
+    // Necesitamos el hash actual: findByEmail no aplica, buscamos por id con
+    // password incluido a traves del modelo (findByGoogleId/findById no lo traen).
+    const conPassword = await UsuarioModel.findAuthById(id);
+    if (!conPassword) {
+      return res.status(404).json({ success: false, message: "Usuario no encontrado" });
+    }
+
+    const tienePasswordLocal = Boolean(conPassword.password);
+
+    if (tienePasswordLocal) {
+      // Cambio de contrasena: exige la actual.
+      if (!passwordActual) {
+        return res.status(400).json({
+          success: false,
+          message: "Debes ingresar tu contraseña actual para cambiarla",
+        });
+      }
+      const coincide = await comparePassword(passwordActual, conPassword.password);
+      if (!coincide) {
+        return res.status(401).json({ success: false, message: "La contraseña actual no es correcta" });
+      }
+    }
+
+    const hashed = await hashPassword(passwordNueva);
+    await UsuarioModel.update(id, { password: hashed });
+
+    return res.json({
+      success: true,
+      message: tienePasswordLocal
+        ? "Contraseña actualizada correctamente"
+        : "Contraseña establecida correctamente. Ya puedes iniciar sesión con tu correo.",
+    });
+  } catch (error) {
+    console.error("Error en setPassword:", error);
+    return res.status(500).json({ success: false, message: "Error al actualizar la contraseña" });
+  }
+};
+
+/**
+ * POST /auth/recuperar-password
+ *
+ * Inicia la recuperacion de contrasena. Envia un enlace de un solo uso
+ * al correo del usuario.
+ *
+ * Seguridad:
+ *   * SIEMPRE responde 200 con el mismo mensaje, exista o no el correo:
+ *     no se revela que correos estan registrados.
+ *   * Si el envio de correo NO esta configurado en el servidor, se
+ *     responde 503 con un mensaje claro (no se finge un envio).
+ */
+exports.recuperarPassword = async (req, res) => {
+  try {
+    const email = sanitizeString(String(req.body?.email || "")).toLowerCase();
+    if (!email || !isEmail(email)) {
+      return res.status(400).json({ success: false, message: "Email inválido" });
+    }
+
+    const usuario = await UsuarioModel.findByEmail(email);
+    const mensaje =
+      "Si el correo está registrado, te enviamos un enlace para establecer tu contraseña.";
+
+    if (!usuario) {
+      // Mismo mensaje: no revelamos si el correo existe.
+      return res.json({ success: true, message: mensaje });
+    }
+
+    if (!correoDisponible()) {
+      return res.status(503).json({
+        success: false,
+        code: "MAIL_NOT_CONFIGURED",
+        message:
+          "El envío de correos no está configurado en el servidor. Contacta al administrador de Cordalia.",
+      });
+    }
+
+    const { token, registro } = await PasswordResetModel.crearToken(usuario.id);
+    const enlace = construirEnlaceRecuperacion(token);
+
+    try {
+      await enviarCorreo({
+        para: usuario.email,
+        asunto: "Restablece tu contraseña de Cordalia",
+        texto:
+          `Hola ${usuario.nombre || ''},\n\n` +
+          `Recibimos una solicitud para restablecer tu contraseña de Cordalia.\n` +
+          `Abre el siguiente enlace (válido por 1 hora y de un solo uso):\n\n${enlace}\n\n` +
+          `Si no fuiste tú, ignora este mensaje: tu contraseña actual sigue vigente.\n`,
+      });
+    } catch (error) {
+      console.error("[auth/recuperar-password] no se pudo enviar el correo:", error.message);
+      return res.status(error.status || 502).json({
+        success: false,
+        message: "No se pudo enviar el correo de recuperación. Intenta más tarde.",
+      });
+    }
+
+    // En DESARROLLO se devuelve el enlace para poder probarlo sin correo.
+    const esProduccion = (process.env.NODE_ENV || "development") === "production";
+    return res.json({
+      success: true,
+      message: mensaje,
+      ...(esProduccion ? {} : { enlace_pruebas: enlace, expira_en: registro.expira_en }),
+    });
+  } catch (error) {
+    console.error("Error en recuperarPassword:", error);
+    return res.status(500).json({ success: false, message: "Error al procesar la solicitud" });
+  }
+};
+
+/**
+ * POST /auth/resetear-password
+ *
+ * Consume el token de recuperacion y establece la nueva contrasena.
+ * El token es de UN SOLO USO y caduca en 1 hora.
+ */
+exports.resetearPassword = async (req, res) => {
+  try {
+    const token = String(req.body?.token || "");
+    const password = sanitizeString(String(req.body?.password || ""));
+
+    if (!token) {
+      return res.status(400).json({ success: false, message: "Token requerido" });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ success: false, message: "La contraseña debe tener al menos 6 caracteres" });
+    }
+
+    const consumo = await PasswordResetModel.consumirToken(token);
+    if (!consumo) {
+      return res.status(400).json({
+        success: false,
+        message: "El enlace es inválido o ya expiró. Solicita uno nuevo.",
+      });
+    }
+
+    const hashed = await hashPassword(password);
+    await UsuarioModel.update(consumo.usuario_id, { password: hashed });
+
+    // El token es de un solo uso: se invalida el resto de la cuenta.
+    await PasswordResetModel.limpiarTokens();
+
+    return res.json({
+      success: true,
+      message: "Contraseña establecida correctamente. Ya puedes iniciar sesión con tu correo.",
+    });
+  } catch (error) {
+    console.error("Error en resetearPassword:", error);
+    return res.status(500).json({ success: false, message: "Error al restablecer la contraseña" });
+  }
+};
+
+/**
+ * Construye el enlace de recuperacion usando la URL publica del FRONTEND
+ * (no la del backend: el usuario vuelve a la web).
+ */
+function construirEnlaceRecuperacion(token) {
+  const frontend = (process.env.FRONTEND_URL || "").replace(/\/+$/, "");
+  const base = frontend || "";
+  return `${base}/restablecer-contrasena?token=${encodeURIComponent(token)}`;
+}
 
 exports.logout = async (req, res) => {
   try {

@@ -6,6 +6,33 @@ async function planId(slug) {
   return rows[0].id;
 }
 
+// Las promos sembradas tienen fechas FIJAS. Para que la suite sea
+// determinista se ajustan temporalmente a una ventana relativa a
+// CURRENT_DATE y se restauran al terminar. Sin esto, las promos quedan
+// vencidas (o activas) según la fecha en que se ejecute la prueba.
+async function ajustarPromo(planSlug, { inicio, fin, estado }) {
+  const pid = await planId(planSlug);
+  const { rows } = await h.q(
+    `SELECT id, fecha_inicio, fecha_fin, estado FROM promotions
+      WHERE plan_id = $1 ORDER BY id LIMIT 1`,
+    [pid]
+  );
+  h.assert(rows.length === 1, `promo sembrada del plan ${planSlug}`);
+  const original = rows[0];
+  await h.q(
+    `UPDATE promotions
+        SET fecha_inicio = (${inicio})::date, fecha_fin = (${fin})::date, estado = $2
+      WHERE id = $1`,
+    [original.id, estado]
+  );
+  return async () => {
+    await h.q(
+      `UPDATE promotions SET fecha_inicio = $2, fecha_fin = $3, estado = $4 WHERE id = $1`,
+      [original.id, original.fecha_inicio, original.fecha_fin, original.estado]
+    );
+  };
+}
+
 h.test("CRD: destinos demo son de Córdoba (con municipio y tipo)", async () => {
   const r = await h.api("/api/lugares");
   h.assertStatus(r.status, 200, "lista pública de destinos");
@@ -59,34 +86,48 @@ h.test("CRD: planes demo en Córdoba", async () => {
 });
 
 h.test("CRD: promo ACTIVA => descuento ÚNICO (plan Betancí, 15%)", async () => {
-  const pid = await planId("amanecer-en-la-cienaga-de-betanci");
-  for (const [personas, total, porPersona] of [[3, 216750, 72250], [4, 289000, 72250]]) {
-    const r = await h.api(`/api/planes/${pid}/precio?personas=${personas}`);
-    h.assertStatus(r.status, 200, `precio ${personas} personas`);
-    h.assert(r.json.data.tipo_descuento === "promocion", `${personas}: tipo 'promocion'`);
-    h.assert(Number(r.json.data.descuento_porcentaje) === 15, `${personas}: % efectivo 15%`);
-    h.assert(Number(r.json.data.descuento_promocion) === 15, `${personas}: descuento_promocion 15%`);
-    h.assert(r.json.data.rango_aplicado === null, `${personas}: rango NO aplica (promo activa)`);
-    h.assert(Number(r.json.data.precio_persona) === porPersona, `${personas}: por persona ${porPersona}`);
-    h.assert(Number(r.json.data.total) === total, `${personas}: total ${total}`);
+  const restaurar = await ajustarPromo("amanecer-en-la-cienaga-de-betanci", {
+    inicio: "CURRENT_DATE - 10", fin: "CURRENT_DATE + 10", estado: "activo",
+  });
+  try {
+    const pid = await planId("amanecer-en-la-cienaga-de-betanci");
+    for (const [personas, total, porPersona] of [[3, 216750, 72250], [4, 289000, 72250]]) {
+      const r = await h.api(`/api/planes/${pid}/precio?personas=${personas}`);
+      h.assertStatus(r.status, 200, `precio ${personas} personas`);
+      h.assert(r.json.data.tipo_descuento === "promocion", `${personas}: tipo 'promocion'`);
+      h.assert(Number(r.json.data.descuento_porcentaje) === 15, `${personas}: % efectivo 15%`);
+      h.assert(Number(r.json.data.descuento_promocion) === 15, `${personas}: descuento_promocion 15%`);
+      h.assert(r.json.data.rango_aplicado === null, `${personas}: rango NO aplica (promo activa)`);
+      h.assert(Number(r.json.data.precio_persona) === porPersona, `${personas}: por persona ${porPersona}`);
+      h.assert(Number(r.json.data.total) === total, `${personas}: total ${total}`);
+    }
+  } finally {
+    await restaurar();
   }
 });
 
 h.test("CRD: promo FUTURA no aplica => precio por rango (plan Cispatá)", async () => {
-  const pid = await planId("manglares-de-cispata-y-bahia");
-  const casos = [
-    [1, "ninguno", 0, 130000, 130000],
-    [5, "rango", 20, 104000, 520000],
-    [12, "rango", 35, 84500, 1014000],
-  ];
-  for (const [personas, tipo, pct, porPersona, total] of casos) {
-    const r = await h.api(`/api/planes/${pid}/precio?personas=${personas}`);
-    h.assertStatus(r.status, 200, `precio ${personas} personas`);
-    h.assert(r.json.data.tipo_descuento === tipo, `${personas}: tipo '${tipo}'`);
-    h.assert(Number(r.json.data.descuento_porcentaje) === pct, `${personas}: % ${pct}`);
-    h.assert(r.json.data.descuento_promocion === null, `${personas}: promo futura NO aplica`);
-    h.assert(Number(r.json.data.precio_persona) === porPersona, `${personas}: por persona ${porPersona}`);
-    h.assert(Number(r.json.data.total) === total, `${personas}: total ${total}`);
+  const restaurar = await ajustarPromo("manglares-de-cispata-y-bahia", {
+    inicio: "CURRENT_DATE + 10", fin: "CURRENT_DATE + 20", estado: "activo",
+  });
+  try {
+    const pid = await planId("manglares-de-cispata-y-bahia");
+    const casos = [
+      [1, "ninguno", 0, 130000, 130000],
+      [5, "rango", 20, 104000, 520000],
+      [12, "rango", 35, 84500, 1014000],
+    ];
+    for (const [personas, tipo, pct, porPersona, total] of casos) {
+      const r = await h.api(`/api/planes/${pid}/precio?personas=${personas}`);
+      h.assertStatus(r.status, 200, `precio ${personas} personas`);
+      h.assert(r.json.data.tipo_descuento === tipo, `${personas}: tipo '${tipo}'`);
+      h.assert(Number(r.json.data.descuento_porcentaje) === pct, `${personas}: % ${pct}`);
+      h.assert(r.json.data.descuento_promocion === null, `${personas}: promo futura NO aplica`);
+      h.assert(Number(r.json.data.precio_persona) === porPersona, `${personas}: por persona ${porPersona}`);
+      h.assert(Number(r.json.data.total) === total, `${personas}: total ${total}`);
+    }
+  } finally {
+    await restaurar();
   }
 });
 

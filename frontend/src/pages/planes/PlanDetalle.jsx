@@ -4,9 +4,9 @@ import { motion } from 'framer-motion'
 import {
   ArrowLeft, MapPin, Clock, Users, CheckCircle2, Phone, Mail, Globe,
   MessageCircle, CalendarDays, BadgePercent, Printer, Truck, Loader2,
-  Ticket, Wallet, Sprout, ArrowRight, Star,
+  Ticket, Sprout, ArrowRight, Star,
 } from 'lucide-react'
-import { planesAPI, inscripcionesAPI } from '../../services/api'
+import { planesAPI } from '../../services/api'
 import { getPlanImagen } from '../../utils/media'
 import { toast } from 'sonner'
 import { useAuth } from '../../context/AuthContext'
@@ -17,7 +17,7 @@ import {
   planPrecios, buildWhatsAppText, whatsappLink, whatsappNumber, telLink, diaActividades,
 } from '../negocios/planUtils'
 
-function formatFechaPago(fecha) {
+function formatFechaInscripcion(fecha) {
   if (!fecha) return null
   const d = new Date(fecha)
   if (Number.isNaN(d.getTime())) return null
@@ -26,14 +26,6 @@ function formatFechaPago(fecha) {
     hour: '2-digit', minute: '2-digit',
   })
 }
-
-const METODOS_PAGO = [
-  { value: 'nequi', label: 'Nequi' },
-  { value: 'daviplata', label: 'Daviplata' },
-  { value: 'bancolombia', label: 'Bancolombia' },
-  { value: 'pse', label: 'PSE' },
-  { value: 'tarjeta', label: 'Tarjeta' },
-]
 
 // ─── Shared label component ───────────────────────────────────────────────────
 function SectionLabel({ children }) {
@@ -65,8 +57,6 @@ export default function PlanDetalle() {
   const [mensaje, setMensaje] = useState('')
   const [inscLoading, setInscLoading] = useState(false)
   const [inscrito, setInscrito] = useState(null)
-  const [pagando, setPagando] = useState(false)
-  const [metodoPago, setMetodoPago] = useState('nequi')
   const [sugTransporte, setSugTransporte] = useState(null)
   const [sugLoading, setSugLoading] = useState(false)
   const precioTimer = useRef(null)
@@ -166,22 +156,6 @@ export default function PlanDetalle() {
       toast.error(err.message || 'No se pudo inscribir')
     } finally {
       setInscLoading(false)
-    }
-  }
-
-  async function pagarInscripcion(e) {
-    e.preventDefault()
-    if (!inscrito?.id) return
-    setPagando(true)
-    try {
-      const res = await inscripcionesAPI.pagar(inscrito.id, metodoPago)
-      toast.success(res.message || 'Pago confirmado')
-      setInscrito(res.data.inscripcion)
-      cargarSalidas()
-    } catch (err) {
-      toast.error(err.message || 'No se pudo procesar el pago')
-    } finally {
-      setPagando(false)
     }
   }
 
@@ -623,64 +597,38 @@ export default function PlanDetalle() {
 
                   {/* Inscription result / form */}
                   {inscrito ? (
-                    inscrito.estado === 'pagada' ? (
-                      <div className="mt-3 rounded-[16px] border border-moss-300 bg-moss-50 p-4 text-sm text-moss-900">
-                        <div className="flex items-center gap-2 font-bold mb-2">
-                          <CheckCircle2 className="w-4 h-4" /> ¡Pago confirmado!
-                        </div>
-                        <div className="space-y-1 text-xs">
-                          <div className="flex justify-between"><span>Total pagado</span><span className="font-bold">{formatMoney(inscrito.precio_total)}</span></div>
-                          {inscrito.pago_metodo && <div className="flex justify-between"><span>Método</span><span className="capitalize font-semibold">{inscrito.pago_metodo}</span></div>}
-                          {inscrito.fecha_pago && <div className="flex justify-between"><span>Fecha</span><span>{formatFechaPago(inscrito.fecha_pago)}</span></div>}
-                        </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <Link to="/perfil" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-moss-900 text-white text-xs font-semibold hover:bg-moss-800 cursor-pointer">
-                            Ver en mi perfil
-                          </Link>
-                          <button onClick={() => window.print()} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full border border-moss-400 text-moss-800 text-xs font-semibold hover:bg-moss-100 cursor-pointer">
-                            <Printer className="w-3.5 h-3.5" /> Imprimir
-                          </button>
-                        </div>
+                    <div className="mt-3 rounded-[16px] border border-moss-300 bg-moss-50 p-4 text-sm text-moss-900">
+                      <div className="flex items-center gap-2 font-bold mb-2">
+                        <CheckCircle2 className="w-4 h-4" /> ¡Inscripción confirmada!
                       </div>
-                    ) : (
-                      <div className="mt-3 rounded-[16px] border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-                        <div className="flex items-center gap-2 font-bold mb-2">
-                          <Wallet className="w-4 h-4" /> Cupo reservado — falta pagar
+                      <div className="space-y-1 text-xs">
+                        <div className="flex justify-between">
+                          <span>{inscrito.personas || personas} {Number(inscrito.personas) === 1 ? 'persona' : 'personas'}</span>
+                          <span className="font-bold">Cupo reservado</span>
                         </div>
-                        <div className="space-y-1 text-xs mb-3">
+                        {inscrito.created_at && (
                           <div className="flex justify-between">
-                            <span>{inscrito.personas || personas} {Number(inscrito.personas) === 1 ? 'persona' : 'personas'}</span>
-                            <span className="font-bold text-base">{formatMoney(inscrito.precio_total)}</span>
+                            <span>Fecha de inscripción</span>
+                            <span className="font-semibold">{formatFechaInscripcion(inscrito.created_at)}</span>
                           </div>
-                          {inscrito.fecha_limite_pago && (
-                            <div className="flex justify-between">
-                              <span>Paga antes de</span>
-                              <span className="font-semibold">{formatFechaPago(inscrito.fecha_limite_pago)}</span>
-                            </div>
-                          )}
+                        )}
+                        <div className="flex justify-between">
+                          <span>Costo</span>
+                          <span className="font-bold">Gratis</span>
                         </div>
-                        <form onSubmit={pagarInscripcion} className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <select
-                              value={metodoPago}
-                              onChange={(e) => setMetodoPago(e.target.value)}
-                              className="flex-1 px-3 py-2 rounded-xl border border-amber-300 bg-white text-sm text-dark-900 focus:outline-none focus:ring-2 focus:ring-amber-400/40"
-                            >
-                              {METODOS_PAGO.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-                            </select>
-                            <button
-                              type="submit"
-                              disabled={pagando}
-                              className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-amber-600 text-white text-xs font-bold hover:bg-amber-700 disabled:opacity-50 cursor-pointer"
-                            >
-                              {pagando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                              Pagar
-                            </button>
-                          </div>
-                          <p className="text-[11px] text-amber-700/80">Pago simulado (sandbox). Completa antes del vencimiento.</p>
-                        </form>
                       </div>
-                    )
+                      <p className="text-[11px] text-moss-800/80 mt-3">
+                        Tu cupo está garantizado. Te contactaremos por WhatsApp con los detalles del viaje.
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Link to="/perfil" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-moss-900 text-white text-xs font-semibold hover:bg-moss-800 cursor-pointer">
+                          Ver en mi perfil
+                        </Link>
+                        <button onClick={() => window.print()} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full border border-moss-400 text-moss-800 text-xs font-semibold hover:bg-moss-100 cursor-pointer">
+                          <Printer className="w-3.5 h-3.5" /> Imprimir
+                        </button>
+                      </div>
+                    </div>
                   ) : !confirmando ? (
                     salidas.length > 0 && !salidaBloqueada && (
                       <div className="mt-3 space-y-2">
@@ -702,11 +650,12 @@ export default function PlanDetalle() {
                   ) : (
                     <form onSubmit={inscribirse} className="mt-3 space-y-3">
                       <p className="text-xs text-dark-500">
-                        Registrándote como <strong>{user?.nombre || user?.email}</strong>. Se reserva el cupo; podrás pagar en línea.
+                        Registrándote como <strong>{user?.nombre || user?.email}</strong>. La inscripción es
+                        gratuita y tu cupo queda reservado al instante.
                       </p>
                       <div className="rounded-[14px] bg-cream-50 border border-cream-200 p-3 text-sm">
                         <div className="flex justify-between text-dark-600 mb-1">
-                          <span>Subtotal original</span>
+                          <span>Precio informativo por persona</span>
                           <span>{precioInfo.subtotalOriginal != null ? formatMoney(precioInfo.subtotalOriginal) : formatMoney((precioInfo.original ?? efectivo) * personas)}</span>
                         </div>
                         {precioInfo.totalDesc > 0 && (
@@ -716,9 +665,12 @@ export default function PlanDetalle() {
                           </div>
                         )}
                         <div className="flex justify-between font-bold text-dark-900 border-t border-cream-200 pt-2 mt-1">
-                          <span>TOTAL ({personas} {personas === 1 ? 'persona' : 'personas'})</span>
+                          <span>Total referencial ({personas} {personas === 1 ? 'persona' : 'personas'})</span>
                           <span>{precioInfo.total != null ? formatMoney(precioInfo.total) : formatMoney((precioInfo.original ?? efectivo) * personas)}</span>
                         </div>
+                        <p className="text-[11px] text-dark-500 mt-2">
+                          Este valor es informativo. En Cordalia te inscribes sin pagar.
+                        </p>
                       </div>
                       <textarea
                         value={mensaje}
@@ -798,7 +750,8 @@ export default function PlanDetalle() {
                   )}
                 </div>
                 <p className="text-[11px] text-dark-400 mt-3 leading-relaxed">
-                  El precio se cobra al pagar tu inscripción en línea. Para dudas de logística, contacta al negocio.
+                  Las inscripciones a los planes de Cordalia son gratuitas: el precio mostrado es
+                  informativo. Para dudas de logística, contacta al negocio.
                 </p>
               </div>
 

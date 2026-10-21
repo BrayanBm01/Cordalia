@@ -15,6 +15,7 @@ import {
   Mountain,
   Bell,
   CheckCheck,
+  Crown,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { adminAPI } from '../services/api'
@@ -24,6 +25,7 @@ import { es } from 'date-fns/locale'
 const sidebarLinks = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
   { to: '/admin/usuarios', icon: Users, label: 'Usuarios' },
+  { to: '/admin/vendedores', icon: Crown, label: 'Vendedores' },
   { to: '/admin/lugares', icon: MapPin, label: 'Destinos' },
   { to: '/admin/negocios', icon: Store, label: 'Negocios' },
   { to: '/admin/resenas', icon: MessageSquare, label: 'Reseñas' },
@@ -281,6 +283,7 @@ function buildNotifications(history) {
 const pageTitles = {
   '/admin': 'Dashboard',
   '/admin/usuarios': 'Gestion de Usuarios',
+  '/admin/vendedores': 'Estado comercial de vendedores',
   '/admin/lugares': 'Gestion de Destinos',
   '/admin/negocios': 'Gestion de Negocios',
   '/admin/resenas': 'Gestion de Reseñas',

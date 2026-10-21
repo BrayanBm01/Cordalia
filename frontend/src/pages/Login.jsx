@@ -58,6 +58,16 @@ export default function Login() {
         toast.info('Tu sesión fue cerrada', {
           description: 'Inicia sesión nuevamente para continuar.',
         })
+      } else if (msg.includes('usa Google')) {
+        // La cuenta se creó con Google y no tiene contraseña local.
+        toast.error('Esta cuenta usa Google', {
+          description:
+            'Entra con "Continuar con Google" o establece tu propia contraseña para entrar con correo.',
+          action: {
+            label: 'Establecer contraseña',
+            onClick: () => navigate('/restablecer-contrasena'),
+          },
+        })
       } else {
         toast.error(msg)
       }
@@ -273,6 +283,15 @@ export default function Login() {
                   className="text-moss-800 hover:text-moss-950 font-bold hover:underline transition-colors ml-1"
                 >
                   Regístrate aquí
+                </Link>
+              </p>
+              <p className="text-xs sm:text-sm text-dark-500 mt-2">
+                ¿Tu cuenta se creó con Google y quieres usar correo y contraseña?{' '}
+                <Link
+                  to="/restablecer-contrasena"
+                  className="text-moss-800 hover:text-moss-950 font-semibold hover:underline transition-colors ml-1"
+                >
+                  Establece tu contraseña
                 </Link>
               </p>
             </div>

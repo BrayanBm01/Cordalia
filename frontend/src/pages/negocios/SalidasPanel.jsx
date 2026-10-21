@@ -48,6 +48,7 @@ function CuposResumen({ ocupado, maximo, disponible }) {
 }
 
 const ESTADO_BADGE = {
+  confirmada: 'bg-emerald-100 text-emerald-700',
   pagada: 'bg-emerald-100 text-emerald-700',
   pendiente: 'bg-amber-100 text-amber-700',
   fallida: 'bg-orange-100 text-orange-700',
@@ -57,6 +58,7 @@ const ESTADO_BADGE = {
 }
 
 const ESTADO_LABEL = {
+  confirmada: 'Inscrita',
   pagada: 'Pagada',
   pendiente: 'Pendiente',
   fallida: 'Fallida',
@@ -123,7 +125,9 @@ function InscripcionesList({ businessId, planId, salida, valor }) {
                   {i.email && <span className="text-dark-500 text-xs block truncate mt-0.5">{i.email}</span>}
                   {i.mensaje && <span className="text-dark-500 text-xs block truncate mt-0.5">"{i.mensaje}"</span>}
                   {i.precio_total != null && (
-                    <span className="text-dark-500 text-xs block mt-0.5">Valor: {formatMoney(i.precio_total)} {i.pago_referencia ? `(Ref: ${i.pago_referencia})` : ''}</span>
+                    <span className="text-dark-500 text-xs block mt-0.5">
+                      Precio referencial: {formatMoney(i.precio_total)} · Inscripción gratuita
+                    </span>
                   )}
                 </div>
                 {['pagada', 'pendiente', 'confirmada'].includes(estado) && (
@@ -462,7 +466,8 @@ export default function SalidasPanel({ businessId, planId, planNombre }) {
       </div>
 
       <p className="text-xs text-dark-400 mt-3">
-        Las inscripciones reflejan las reservas de cupos. Los turistas pueden pagar en línea mediante el sistema integrado. Se muestran los estados de pago de cada inscripción.
+        Las inscripciones reflejan las reservas de cupos. En Cordalia las inscripciones a planes
+        turísticos son gratuitas: el precio mostrado es solo referencial y no se realiza ningún cobro.
       </p>
     </div>
   )

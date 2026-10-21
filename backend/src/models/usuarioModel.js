@@ -24,6 +24,20 @@ const UsuarioModel = {
     return rows[0] || null;
   },
 
+  /**
+   * Como findById pero incluye `password` (hash). Uso EXCLUSIVO del backend
+   * para verificar/establecer contrasenas. Nunca debe enviarse al frontend.
+   */
+  async findAuthById(id) {
+    const { rows } = await pool.query(
+      `SELECT id, nombre, email, password, rol_id, token_activo,
+              proveedor, google_id, created_at, updated_at
+       FROM usuarios WHERE id = $1`,
+      [id]
+    );
+    return rows[0] || null;
+  },
+
   async findByGoogleId(googleId) {
     const { rows } = await pool.query(
       `SELECT id, nombre, email, password, rol_id, token_activo,

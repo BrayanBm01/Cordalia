@@ -10,4 +10,8 @@ router.use(requireAdmin);
 router.get("/stats", adminController.stats);
 router.get("/login-history", adminController.loginHistory);
 
+// Gestión comercial de los vendedores (prueba, suscripción, suspensión).
+router.get("/vendedores", adminController.vendedores);
+router.put("/vendedores/:id/estado", adminController.setVendedorEstado);
+
 module.exports = router;

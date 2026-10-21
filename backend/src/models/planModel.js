@@ -1,5 +1,9 @@
 const pool = require("../config/db");
-const { EXPIRACION_MINUTOS } = require("../services/paymentService");
+
+// NOTA: los planes turisticos de Cordalia NO tienen pagos. Las inscripciones
+// son gratuitas (estado 'confirmada') y el precio es solo informativo.
+// El cobro comercial de los vendedores vive en `subscriptions` (flujo
+// separado, ver services/subscriptionPaymentService.js).
 
 const BASE_COLUMNS = `p.id, p.business_id, p.nombre, p.slug, p.descripcion, p.destination_id,
        p.destino, p.duracion_dias, p.duracion_noches, p.precio, p.tipo_precio,
@@ -534,13 +538,15 @@ if (promo.tipo_descuento === "porcentaje") {
     return rows;
   },
 
-  // Resumen logístico de una salida: inscritos = PENDIENTE + PAGADA
-  // (reservan cupo y aportan valor); canceladas/expiradas liberan cupo.
+  // Resumen logístico de una salida: inscritos = CONFIRMADA (inscripcion
+  // gratuita activa) + PENDIENTE + PAGADA (historicos). Las confirmadas,
+  // canceladas y expiradas liberan cupo.
   async resumenInscripciones(salidaId, planId) {
     const { rows } = await pool.query(
-      `SELECT COALESCE(SUM(CASE WHEN i.estado IN ('pendiente', 'pagada') THEN i.personas ELSE 0 END), 0)::int AS inscritos,
-              COALESCE(SUM(CASE WHEN i.estado IN ('pendiente', 'pagada') THEN i.precio_total ELSE 0 END), 0)::bigint AS valor_total,
+      `SELECT COALESCE(SUM(CASE WHEN i.estado IN ('confirmada', 'pendiente', 'pagada') THEN i.personas ELSE 0 END), 0)::int AS inscritos,
+              COALESCE(SUM(CASE WHEN i.estado IN ('confirmada', 'pendiente', 'pagada') THEN i.precio_total ELSE 0 END), 0)::bigint AS valor_total,
               COUNT(*)::int AS total_solicitudes,
+              COALESCE(SUM(CASE WHEN i.estado = 'confirmada' THEN i.personas ELSE 0 END), 0)::int AS confirmadas,
               COALESCE(SUM(CASE WHEN i.estado = 'pendiente' THEN i.personas ELSE 0 END), 0)::int AS pendientes,
               COALESCE(SUM(CASE WHEN i.estado = 'pendiente' THEN i.precio_total ELSE 0 END), 0)::bigint AS valor_pendiente,
               COALESCE(SUM(CASE WHEN i.estado = 'pagada' THEN i.personas ELSE 0 END), 0)::int AS pagados,
@@ -607,18 +613,34 @@ if (promo.tipo_descuento === "porcentaje") {
         throw { status: 400, message: `Cupo insuficiente: quedan ${cupoDisponible} de ${salida.cupo_maximo}` };
       }
 
-      // Fecha límite para pagar (backend la controla): el usuario tiene
-      // EXPIRACION_MINUTOS desde que crea la inscripción, pero nunca más allá
-      // del cierre de inscripciones de la salida (si existe).
-      let fechaLimitePago = new Date(Date.now() + EXPIRACION_MINUTOS * 60000);
-      if (salida.fecha_limite) {
-        const horaLim = salida.hora_limite ? String(salida.hora_limite).slice(0, 5) : "23:59";
-        const corte = new Date(`${fmtFecha(salida.fecha_limite)}T${horaLim}:00`);
-        if (corte < fechaLimitePago) fechaLimitePago = corte;
+      // ------------------------------------------------------------
+      // Inscripcion GRATUITA: los planes turisticos de Cordalia NO
+      // tienen pagos. El precio es solo informativo y se guarda como
+      // snapshot; no se genera ningun registro de pago.
+      // ------------------------------------------------------------
+      // Evita inscripciones duplicadas del mismo usuario a la misma salida
+      // (mismo viaje). Un mismo plan con varias fechas si admite inscripciones
+      // a fechas distintas.
+      // La fila de la salida esta bloqueada (FOR UPDATE) durante toda la
+      // transaccion, por lo que dos peticiones concurrentes del mismo
+      // usuario se serializan aqui. Ademas el indice unico parcial
+      // uq_inscripciones_usuario_salida_activa actúa como red de
+      // seguridad (se traduce a 409 mas abajo).
+      if (data.user_id) {
+        const { rows: dup } = await client.query(
+          `SELECT id FROM inscripciones
+           WHERE user_id = $1 AND salida_id = $2 AND estado = 'confirmada'
+           LIMIT 1`,
+          [data.user_id, salidaId]
+        );
+        if (dup.length > 0) {
+          throw { status: 409, message: "Ya estás inscrito en esta fecha" };
+        }
       }
 
       // Snapshot del precio calculado EN ESTE MOMENTO (la promoción puede
       // cambiar después sin afectar inscripciones pasadas).
+      // El precio es INFORMATIVO: no genera cobro ni transacción.
       let precio = null;
       try {
         precio = await this.calcularPrecio(planId, data.personas, false);
@@ -626,31 +648,41 @@ if (promo.tipo_descuento === "porcentaje") {
         precio = null;
       }
 
-      const { rows } = await client.query(
-        `INSERT INTO inscripciones (salida_id, user_id, nombre, email, personas, mensaje,
-                precio_original_persona, precio_persona, descuento_porcentaje, precio_total, tipo_descuento,
-                estado, fecha_limite_pago)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pendiente', $12)
-         RETURNING id, salida_id, user_id, nombre, email, personas, mensaje,
-                   precio_original_persona, precio_persona, descuento_porcentaje,
-                   precio_total, tipo_descuento, estado, created_at, updated_at,
-                   to_char(fecha_limite_pago, 'YYYY-MM-DD"T"HH24:MI:SS')::text AS fecha_limite_pago`,
-        [salidaId, data.user_id || null, data.nombre || null, data.email || null,
-         data.personas, data.mensaje || null,
-         precio?.precio_original_persona ?? null,
-         precio?.precio_persona ?? null,
-         precio?.descuento_porcentaje ?? (precio?.descuento_total ?? 0),
-         precio?.total ?? null,
-         precio?.tipo_descuento ?? null,
-         fechaLimitePago]
-      );
+      let inserted;
+      try {
+        const { rows } = await client.query(
+          `INSERT INTO inscripciones (salida_id, plan_id, user_id, nombre, email, personas, mensaje,
+                  precio_original_persona, precio_persona, descuento_porcentaje, precio_total, tipo_descuento,
+                  estado, fecha_limite_pago)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'confirmada', NULL)
+           RETURNING id, salida_id, plan_id, user_id, nombre, email, personas, mensaje,
+                    precio_original_persona, precio_persona, descuento_porcentaje,
+                    precio_total, tipo_descuento, estado, created_at, updated_at`,
+          [salidaId, planId, data.user_id || null, data.nombre || null, data.email || null,
+           data.personas, data.mensaje || null,
+           precio?.precio_original_persona ?? null,
+           precio?.precio_persona ?? null,
+           precio?.descuento_porcentaje ?? (precio?.descuento_total ?? 0),
+           precio?.total ?? null,
+           precio?.tipo_descuento ?? null]
+        );
+        inserted = rows[0];
+      } catch (error) {
+        // Violacion del indice unico parcial: inscripcion duplicada
+        // creada entre tanto (concurso real). Se traduce a 409.
+        if (error && error.code === "23505") {
+          throw { status: 409, message: "Ya estás inscrito en esta fecha" };
+        }
+        throw error;
+      }
+
       await client.query(
         `UPDATE tour_plan_salidas SET cupo_ocupado = cupo_ocupado + $1, updated_at = NOW()
          WHERE id = $2`,
         [data.personas, salidaId]
       );
       await client.query("COMMIT");
-      return rows[0];
+      return inserted;
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;
@@ -678,11 +710,15 @@ if (promo.tipo_descuento === "porcentaje") {
           [salidaId, planId]
         );
         if (joins.length === 0) throw { status: 404, message: "Inscripción no encontrada" };
-        // Estados de pago: solo se puede cancelar/liberar cupo lo que aún no
-        // fue pagado ('pendiente'/'fallida'). 'cancelada'/'expirada' ya no
-        // reservan cupo y 'pagada' no se cancela sin devolución.
+        // Una inscripcion gratuita ('confirmada') SIEMPRE se puede cancelar
+        // y libera su cupo (no hay pago que devolver). Los estados de pago
+        // ('pendiente'/'fallida') tambien liberan cupo. 'cancelada'/'expirada'
+        // ya no reservan cupo y 'pagada' (historico) no se cancela sin devolucion.
         if (insc.estado === "cancelada" || insc.estado === "expirada") {
           throw { status: 400, message: "La inscripción ya está cancelada o vencida" };
+        }
+        if (insc.estado === "vencida") {
+          throw { status: 400, message: "No se puede cancelar una inscripción vencida" };
         }
         if (insc.estado === "pagada") {
           throw { status: 400, message: "No se puede cancelar una inscripción ya pagada" };
@@ -697,6 +733,50 @@ if (promo.tipo_descuento === "porcentaje") {
           [insc.personas, salidaId]
         );
       }
+      await client.query("COMMIT");
+      return true;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  },
+
+  // Cancela una inscripcion PROPIA del usuario y libera su cupo.
+  // Solo aplica a inscripciones gratuitas ('confirmada'): no hay pago que
+  // devolver. El cupo se libera en la misma transaccion (atomicidad).
+  async cancelarInscripcionPropia(inscripcionId, userId) {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const { rows: inscs } = await client.query(
+        `SELECT i.id, i.salida_id, i.personas, i.estado
+           FROM inscripciones i
+          WHERE i.id = $1 AND i.user_id = $2
+          FOR UPDATE`,
+        [inscripcionId, userId]
+      );
+      const insc = inscs[0];
+      if (!insc) {
+        throw { status: 404, message: "Inscripción no encontrada" };
+      }
+      if (insc.estado !== "confirmada") {
+        throw {
+          status: 400,
+          message: `Solo puedes cancelar una inscripción activa (estado actual: ${insc.estado})`,
+        };
+      }
+      await client.query(
+        `UPDATE inscripciones SET estado = 'cancelada', updated_at = NOW() WHERE id = $1`,
+        [inscripcionId]
+      );
+      await client.query(
+        `UPDATE tour_plan_salidas
+            SET cupo_ocupado = GREATEST(cupo_ocupado - $1, 0), updated_at = NOW()
+          WHERE id = $2`,
+        [insc.personas, insc.salida_id]
+      );
       await client.query("COMMIT");
       return true;
     } catch (error) {

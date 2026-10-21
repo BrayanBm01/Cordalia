@@ -74,7 +74,22 @@ app.use(
 // El avatar de perfil se guarda como data-URL base64 (hasta ~2 MB de imagen,
 // que como JSON ocupa hasta ~2.7 MB). Elevamos el limite del body para
 // permitir ese caso manteniendo un margen seguro para el resto de endpoints.
-app.use(express.json({ limit: "4mb" }));
+//
+// `verify` conserva el CUERPO CRUDO de la peticion en `req.rawBody`:
+// es necesario para verificar la FIRMA de la webhook de Mercado Pago
+// (x-signature se calcula sobre el texto exacto recibido).
+app.use(
+  express.json({
+    limit: "4mb",
+    verify: (req, res, buf) => {
+      try {
+        req.rawBody = buf.toString("utf8");
+      } catch (_) {
+        req.rawBody = "";
+      }
+    },
+  })
+);
 app.use(express.urlencoded({ extended: true, limit: "4mb" }));
 
 app.use("/api/auth", require("./routes/authRoutes"));
@@ -91,10 +106,13 @@ app.use("/api/planes", require("./routes/planRoutes").publicRouter);
 app.use("/api/favoritos", require("./routes/favoritoRoutes"));
 app.use("/api/reviews", require("./routes/reviewRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
-// Inscripciones y pagos (turista): /api/mis-inscripciones, /api/inscripciones/:id/...
+// Inscripciones turisticas (GRATUITAS): /api/mis-inscripciones,
+// /api/inscripciones/:id/... No hay pagos turisticos.
 app.use("/api", require("./routes/inscripcionRoutes"));
-// Pagos: /api/pagos/estado y webhook del proveedor.
-app.use("/api/pagos", require("./routes/inscripcionRoutes").pagosRouter);
+// Estado comercial del vendedor y suscripciones (planes COMERCIALES).
+app.use("/api", require("./routes/suscripcionRoutes"));
+// Webhook del proveedor de pagos (firma verificada, sin sesión).
+app.use("/api", require("./routes/suscripcionRoutes").webhookRouter);
 
 app.get("/api/health", (req, res) => {
   res.json({ success: true, message: "API funcionando" });
