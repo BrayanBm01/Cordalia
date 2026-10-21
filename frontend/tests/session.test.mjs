@@ -429,18 +429,28 @@ async function main() {
   })
 
   /* ── Vercel ─────────────────────────────────────────────────────────── */
-  check('vercel.json conserva /api → Railway y añade fallback SPA', () => {
+  check('vercel.json enruta /api al backend de Render y añade fallback SPA', () => {
     const raw = fs.readFileSync(path.resolve(__dirname, '../vercel.json'), 'utf8')
     const cfg = JSON.parse(raw)
     const api = cfg.rewrites.find((r) => r.source === '/api/:path*')
     assert.ok(api, 'debe existir el rewrite de /api')
-    assert.equal(api.destination, 'https://cordalia-production.up.railway.app/api/:path*')
+    assert.equal(api.destination, 'https://cordalia.onrender.com/api/:path*')
     const spa = cfg.rewrites.find((r) => r.source === '/:path*')
     assert.ok(spa, 'debe existir el fallback SPA')
     assert.equal(spa.destination, '/index.html')
     assert.ok(
       cfg.rewrites.indexOf(api) < cfg.rewrites.indexOf(spa),
       'el rewrite de /api debe ir ANTES del fallback para no romper el backend'
+    )
+    // El prefijo /api debe aparecer UNA SOLA vez en el destino: el source
+    // /api/:path* se reemplaza completo, no se concatena.
+    const destino = api.destination
+    const ocurrencias = destino.split('/api/').length - 1
+    assert.equal(ocurrencias, 1, 'el destino debe contener /api exactamente una vez')
+    // Sin bucles: el destino debe ser un origen externo, no el propio dominio.
+    assert.ok(
+      !destino.includes('cordalia.vercel.app'),
+      'el destino no puede apuntar al propio dominio (produciría un bucle)'
     )
   })
 

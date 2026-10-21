@@ -1,7 +1,7 @@
 # Guía de despliegue y producción — Cordalia
 
 Documento de referencia para desplegar y verificar Cordalia (frontend en
-Vercel, backend en Railway, base de datos en Supabase/PostgreSQL).
+Vercel, backend en Render, base de datos en Supabase/PostgreSQL).
 
 > Nada de lo que hay aquí se aplica automáticamente. Las migraciones y el
 > despliegue se ejecutan **de forma manual y revisada**.
@@ -13,11 +13,11 @@ Vercel, backend en Railway, base de datos en Supabase/PostgreSQL).
 | Pieza | Servicio | URL |
 |---|---|---|
 | Frontend (React + Vite) | Vercel | `https://cordalia.vercel.app` |
-| Backend (Express) | Railway | `https://cordalia-production.up.railway.app` |
+| Backend (Express) | Render | `https://cordalia.onrender.com` |
 | Base de datos | Supabase / PostgreSQL | (host privado) |
 
 El frontend **no llama al backend por su propio dominio**: `frontend/vercel.json`
-reescribe `/api/*` hacia Railway y todo lo demás a `index.html` (SPA
+reescribe `/api/*` hacia Render y todo lo demás a `index.html` (SPA
 fallback). Por eso el navegador siempre habla con el mismo origen y no hay
 problemas de CORS en producción.
 
@@ -25,7 +25,7 @@ problemas de CORS en producción.
 // frontend/vercel.json
 {
   "rewrites": [
-    { "source": "/api/:path*", "destination": "https://cordalia-production.up.railway.app/api/:path*" },
+    { "source": "/api/:path*", "destination": "https://cordalia.onrender.com/api/:path*" },
     { "source": "/:path*",       "destination": "/index.html" }
   ]
 }
@@ -39,21 +39,21 @@ Vercel.
 
 ## 2. Variables de entorno
 
-### 2.1 Railway (backend) — SECRETAS
+### 2.1 Render (backend) — SECRETAS
 
-Se configuran en *Railway → Variables* del servicio del backend.
+Se configuran en *Render → Environment* del servicio web del backend.
 
 | Variable | ¿Secreto? | Valor en producción | Para qué sirve |
 |---|---|---|---|
 | `NODE_ENV` | No | `production` | Modo del servidor |
-| `PORT` | No | (lo asigna Railway) | Puerto HTTP |
+| `PORT` | No | (lo asigna Render) | Puerto HTTP |
 | `DATABASE_URL` | **Sí** | `postgresql://…` | Conexión a Supabase/Postgres |
-| `DB_SSL` | No | `true` | Railway/Supabase suelen exigir TLS |
+| `DB_SSL` | No | `true` | Render/Supabase suelen exigir TLS |
 | `JWT_SECRET` | **Sí** | clave aleatoria larga | Firma de los JWT |
 | `JWT_EXPIRES_IN` | No | `2h` | Vigencia de la sesión |
 | `AUTH_RATE_LIMIT_MAX` | No | `30` | Intentos de login por IP cada 15 min |
 | `FRONTEND_URL` | No | `https://cordalia.vercel.app` | CORS + enlaces de retorno |
-| `BACKEND_URL` | No | `https://cordalia-production.up.railway.app` | CORS + base de la webhook |
+| `BACKEND_URL` | No | `https://cordalia.onrender.com` | CORS + base de la webhook |
 | `APP_URL` | No | igual que `BACKEND_URL` | Alternativa a `BACKEND_URL` |
 | `GOOGLE_CLIENT_ID` | No (es público) | `…apps.googleusercontent.com` | Audiencia del ID token de Google |
 | `PAYMENT_PROVIDER` | No | `mercadopago` | `mock` = sandbox, `mercadopago` = cobros reales |
@@ -84,9 +84,9 @@ key de Mercado Pago (la preferencia se crea en el backend).
 
 | Dato | Dónde |
 |---|---|
-| `DATABASE_URL` | Railway (secreto) + `.env` local |
-| `DB_SSL=true` | Railway |
-| Contraseña del usuario de la app | Solo en Supabase y en Railway |
+| `DATABASE_URL` | Render (secreto) + `.env` local |
+| `DB_SSL=true` | Render |
+| Contraseña del usuario de la app | Solo en Supabase y en Render |
 
 ---
 
@@ -145,7 +145,7 @@ Qué hace cada una (resumen, sin datos destructivos):
 4. El flujo usado es el **botón oficial de Google Identity Services + ID
    token**, por lo que **no se agrega URI de redireccion**.
 5. Copiar el *Client ID*:
-   - `GOOGLE_CLIENT_ID` en Railway,
+   - `GOOGLE_CLIENT_ID` en Render,
    - `VITE_GOOGLE_CLIENT_ID` en Vercel.
    - Deben ser **exactamente el mismo** valor: el backend valida la
      audiencia del ID token contra `GOOGLE_CLIENT_ID`.
@@ -162,14 +162,14 @@ Qué hace cada una (resumen, sin datos destructivos):
 1. Panel de Mercado Pago → **Aplicaciones** → **Crear aplicación**.
 2. Tipo: **Checkout Pro** (o **Preferencias**).
 3. Copiar el **Access Token** de producción → `MERCADOPAGO_ACCESS_TOKEN`
-   en Railway.
+   en Render.
 4. Copiar el **secreto de la firma (signing secret)** de la sección
-   *Notificaciones* → `MERCADOPAGO_WEBHOOK_SECRET` en Railway.
+   *Notificaciones* → `MERCADOPAGO_WEBHOOK_SECRET` en Render.
 
 ### 5.2 Configurar la webhook
 
 - **URL de notificación**:
-  `https://cordalia-production.up.railway.app/api/suscripciones/webhook/mercadopago`
+  `https://cordalia.onrender.com/api/suscripciones/webhook/mercadopago`
 - **Eventos**: *Pagos* (y *Suscripciones* si se activan en el futuro).
 - El backend **verifica la firma `x-signature`** (HMAC-SHA256 de
   `id:timestamp:body`) y **rechaza** la petición si la firma no es válida,
@@ -179,11 +179,11 @@ Qué hace cada una (resumen, sin datos destructivos):
 
 ### 5.3 Activar los cobros reales
 
-1. En Railway: `PAYMENT_PROVIDER=mercadopago` y las credenciales de arriba.
+1. En Render: `PAYMENT_PROVIDER=mercadopago` y las credenciales de arriba.
 2. Reiniciar el servicio.
 3. Verificar:
    ```bash
-   curl -s https://cordalia-production.up.railway.app/api/health
+   curl -s https://cordalia.onrender.com/api/health
    ```
 4. Probar con **credenciales de prueba** de Mercado Pago antes de usar
    dinero real. El backend no expone el estado del proveedor en un
@@ -238,7 +238,7 @@ mayúsculas se normalizan (`https://x.com/` ≡ `https://x.com`).
 ### 7.1 Backend
 
 ```bash
-curl -s https://cordalia-production.up.railway.app/api/health
+curl -s https://cordalia.onrender.com/api/health
 # {"success":true,"message":"API funcionando"}
 ```
 
