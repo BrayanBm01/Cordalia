@@ -3,6 +3,8 @@ const LoginModel = require("../models/loginModel");
 const SuscripcionModel = require("../models/suscripcionModel");
 const PasswordResetModel = require("../models/passwordResetModel");
 const { enviarCorreo, correoDisponible } = require("../services/mailService");
+const { esErrorDeEsquema } = require("../utils/sqlErrors");
+const pool = require("../config/db");
 const { hashPassword, comparePassword } = require("../utils/password");
 const { generarToken, verificarToken } = require("../utils/jwt");
 const { isEmail, isNonEmptyString, sanitizeString } = require("../utils/validators");
@@ -127,6 +129,10 @@ async function tieneSesionVigente(usuario) {
   }
 }
 
+/**
+ * ¿El error es por esquema incompleto en la base de datos (faltan las
+ * migraciones 018/019/020)? Ver utils/sqlErrors.js.
+ */
 exports.register = async (req, res) => {
   try {
     let { nombre, email, password, rol } = req.body;
@@ -159,23 +165,54 @@ exports.register = async (req, res) => {
     const rolFinal = resolvePublicRol(rol);
 
     const hashed = await hashPassword(password);
-    const usuario = await UsuarioModel.create(nombre, email, hashed, rolFinal, {
-      proveedor: "local",
-    });
 
-    // Vendedor nuevo -> prueba gratuita de 7 dias. Se calcula en el
-    // servidor y se asigna UNA sola vez (no se reinicia al volver a
-    // iniciar sesion).
-    if (rolFinal === ROLES.BUSINESS) {
-      await SuscripcionModel.asignarPruebaGratuita(usuario.id);
+    // ------------------------------------------------------------
+    // Creacion ATOMICA de la cuenta.
+    //
+    // La cuenta y (si es vendedor) su prueba gratuita de 7 dias se
+    // escriben en UNA sola transaccion: si la segunda parte falla
+    // (p. ej. porque la base de datos no tiene las columnas de la
+    // migracion 019), NO queda ninguna cuenta creada a medias. Antes
+    // el INSERT se hacia fuera de transaccion y un fallo dejaba al
+    // usuario creado sin prueba ni sesion, y el siguiente intento
+    // respondia 409 "el email ya esta registrado".
+    // ------------------------------------------------------------
+    const client = await pool.connect();
+    let usuario;
+    let rolNombre;
+    let token;
+    try {
+      await client.query("BEGIN");
+
+      usuario = await UsuarioModel.create(nombre, email, hashed, rolFinal, {
+        proveedor: "local",
+      }, client);
+
+      // Vendedor nuevo -> prueba gratuita de 7 dias. Se calcula en el
+      // servidor y se asigna UNA sola vez (no se reinicia al volver a
+      // iniciar sesion). NO se crea ninguna suscripcion de pago ni se
+      // inicia ningun cobro: la prueba es gratuita.
+      if (rolFinal === ROLES.BUSINESS) {
+        await SuscripcionModel.asignarPruebaGratuita(usuario.id, client);
+      }
+
+      // Sesion iniciada en la misma transaccion: el registro devuelve la
+      // MISMA estructura que /auth/login (token + usuario).
+      rolNombre = mapRolId(usuario.rol_id);
+      token = generarToken(usuario.id, rolNombre);
+      await UsuarioModel.setToken(usuario.id, token, client);
+
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
     }
 
-    // El registro devuelve la MISMA estructura que /auth/login y
-    // /auth/google (token + usuario). Asi el frontend puede guardar la
-    // sesion con su unico helper (guardarSesion) y el vendedor entra
-    // directo a su panel, sin pasar por el formulario de inicio de
-    // sesion. La sesion unica no bloquea aqui: la cuenta es nueva.
-    const { token, rolNombre } = await iniciarSesion(usuario, req);
+    // Historial de acceso (fuera de la transaccion: es un registro de
+    // auditoria, no afecta a la consistencia de la cuenta).
+    await LoginModel.registrar(usuario.id, true, getClientIp(req), getUserAgent(req)).catch(() => {});
 
     return res.status(201).json({
       success: true,
@@ -194,6 +231,22 @@ exports.register = async (req, res) => {
   } catch (error) {
     if (error && error.code === "23505") {
       return res.status(409).json({ success: false, message: "El email ya está registrado" });
+    }
+    // El esquema de la base de datos no tiene lo que el codigo necesita
+    // (migraciones pendientes). No es un fallo del usuario: se responde
+    // 503 con un mensaje comprensible, y el error real queda en el log.
+    if (esErrorDeEsquema(error)) {
+      console.error(
+        "[auth/register] El esquema de la base de datos esta incompleto. " +
+          "Aplica las migraciones 018, 019 y 020.",
+        error
+      );
+      return res.status(503).json({
+        success: false,
+        code: "ESQUEMA_INCOMPLETO",
+        message:
+          "El servicio no está disponible en este momento. Intenta de nuevo en unos minutos.",
+      });
     }
     console.error("Error en register:", error);
     return res.status(500).json({ success: false, message: "Error en el servidor" });
@@ -313,15 +366,29 @@ exports.google = async (req, res) => {
         };
       } else {
         // Crear usuario nuevo. Rol restringido a TOURIST (default) o BUSINESS.
+        // La cuenta y su prueba gratuita se crean en UNA sola transaccion
+        // (igual que en /auth/register): si algo falla, no queda ninguna
+        // cuenta a medias.
         const rolFinal = resolvePublicRol(rol);
-        usuario = await UsuarioModel.create(nombre || email.split("@")[0], email, null, rolFinal, {
-          proveedor: "google",
-          google_id: googleId,
-          avatar_url: avatarUrl || null,
-        });
-        // Vendedor nuevo (tambien con Google) -> prueba gratuita de 7 dias.
-        if (rolFinal === ROLES.BUSINESS) {
-          await SuscripcionModel.asignarPruebaGratuita(usuario.id);
+        const client = await pool.connect();
+        try {
+          await client.query("BEGIN");
+          usuario = await UsuarioModel.create(nombre || email.split("@")[0], email, null, rolFinal, {
+            proveedor: "google",
+            google_id: googleId,
+            avatar_url: avatarUrl || null,
+          }, client);
+          // Vendedor nuevo (tambien con Google) -> prueba gratuita de 7 dias.
+          // NO se crea ninguna suscripcion de pago ni se inicia ningun cobro.
+          if (rolFinal === ROLES.BUSINESS) {
+            await SuscripcionModel.asignarPruebaGratuita(usuario.id, client);
+          }
+          await client.query("COMMIT");
+        } catch (error) {
+          await client.query("ROLLBACK");
+          throw error;
+        } finally {
+          client.release();
         }
       }
     }
@@ -349,6 +416,19 @@ exports.google = async (req, res) => {
       return res
         .status(error.status || 401)
         .json({ success: false, message: error.message });
+    }
+    if (esErrorDeEsquema(error)) {
+      console.error(
+        "[auth/google] El esquema de la base de datos esta incompleto. " +
+          "Aplica las migraciones 018, 019 y 020.",
+        error
+      );
+      return res.status(503).json({
+        success: false,
+        code: "ESQUEMA_INCOMPLETO",
+        message:
+          "El servicio no está disponible en este momento. Intenta de nuevo en unos minutos.",
+      });
     }
     console.error("[auth/google] error inesperado:", error);
     return res.status(500).json({ success: false, message: "Error al iniciar sesión con Google" });

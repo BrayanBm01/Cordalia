@@ -66,6 +66,86 @@ h.test("REGV: registro de un vendedor con el rol BUSINESS", async () => {
   h.test.idVendedor = r.json.data.usuario.id;
 });
 
+// --- 2b. Atomicidad: si la persistencia falla, no queda cuenta a medias --
+h.test("REGV: si falla la persistencia no queda ninguna cuenta creada", async () => {
+  const email = h.repo("f21test.regv.atomico");
+  const antes = await h.q("SELECT count(*)::int AS c FROM usuarios WHERE email = $1", [email]);
+
+  // Se reproduce un fallo de persistencia de forma REVERSIBLE y sin
+  // tocar datos: se impose una restriccion temporal que impide guardar
+  // el estado 'TRIALING', de modo que la asignacion de la prueba falla
+  // (como ocurre en produccion si falta la migracion 019) y se
+  // comprueba que el registro no deja la cuenta a medias.
+  await h.q(
+    "ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS chk_test_prueba_falla"
+  );
+  // NOT VALID: no valida las filas existentes (puede haber velas de otras
+  // pruebas) pero SI se exige en las escrituras nuevas.
+  await h.q(
+    "ALTER TABLE usuarios ADD CONSTRAINT chk_test_prueba_falla " +
+      "CHECK (estado_cuenta IS DISTINCT FROM 'TRIALING') NOT VALID"
+  );
+  try {
+    const r = await h.api("/api/auth/register", {
+      method: "POST",
+      body: { nombre: "Vendedor Atomico", email, password: pass, rol: "BUSINESS" },
+    });
+    // El servidor responde un ERROR (no un exito: no se ocultan fallos
+    // internos) y no deja cuentas a medias.
+    h.assert(r.status >= 500, `debe fallar (fue ${r.status})`);
+    h.assert(r.json.success === false, "la respuesta debe ser de error");
+    h.assert(typeof r.json.message === "string" && r.json.message.length > 0, "mensaje de error");
+
+    // Lo esencial: NO queda ninguna cuenta creada.
+    const despues = await h.q("SELECT count(*)::int AS c FROM usuarios WHERE email = $1", [email]);
+    h.assert(despues.rows[0].c === antes.rows[0].c, "no queda ninguna cuenta a medias");
+    h.assert(despues.rows[0].c === 0, "0 cuentas con ese correo");
+
+    // Un segundo intento NO devuelve 409 por un duplicado fantasma.
+    const r2 = await h.api("/api/auth/register", {
+      method: "POST",
+      body: { nombre: "Vendedor Atomico", email, password: pass, rol: "BUSINESS" },
+    });
+    h.assert(r2.status >= 500, `el 2o intento tambien falla (fue ${r2.status})`);
+    h.assert(r2.status !== 409, "no es un 409 por duplicado (no hay cuenta fantasma)");
+  } finally {
+    // Se retira la restriccion temporal (todo vuelve a su estado).
+    await h.q("ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS chk_test_prueba_falla");
+  }
+});
+
+// --- 2b-bis. El clasificador de errores de esquema (migraciones) ---------
+h.test("REGV: se distinguen los errores de esquema incompleto de los demás", async () => {
+  const { esErrorDeEsquema } = require("../src/utils/sqlErrors");
+  // Errores tipicos de "migracion pendiente" en PostgreSQL.
+  h.assert(esErrorDeEsquema({ code: "42703" }) === true, "42703 (columna no existe) -> esquema");
+  h.assert(esErrorDeEsquema({ code: "42P01" }) === true, "42P01 (tabla no existe) -> esquema");
+  h.assert(esErrorDeEsquema({ code: "3F000" }) === true, "3F000 (esquema no existe) -> esquema");
+  // Errores que NO son de esquema.
+  h.assert(esErrorDeEsquema({ code: "23505" }) === false, "23505 (clave duplicada) no es de esquema");
+  h.assert(esErrorDeEsquema({ code: "23514" }) === false, "23514 (check violado) no es de esquema");
+  h.assert(esErrorDeEsquema({ code: "23503" }) === false, "23503 (FK) no es de esquema");
+  h.assert(esErrorDeEsquema(new Error("sin codigo")) === false, "un error sin codigo no es de esquema");
+  h.assert(esErrorDeEsquema(null) === false, "null no es de esquema");
+});
+
+// --- 2c. El email duplicado sigue devolviendo 409 con mensaje claro ------
+h.test("REGV: el email duplicado devuelve 409 con un mensaje comprensible", async () => {
+  const email = h.repo("f21test.regv.duplicado");
+  const primero = await h.api("/api/auth/register", {
+    method: "POST",
+    body: { nombre: "Vendedor Dup", email, password: pass, rol: "BUSINESS" },
+  });
+  h.assertStatus(primero.status, 201, "primer registro");
+
+  const segundo = await h.api("/api/auth/register", {
+    method: "POST",
+    body: { nombre: "Vendedor Dup", email, password: pass, rol: "BUSINESS" },
+  });
+  h.assertStatus(segundo.status, 409, "el duplicado devuelve 409");
+  h.assertMsg(segundo.json, "ya está registrado");
+});
+
 // --- 3. La prueba gratuita de 7 días -------------------------------------
 h.test("REGV: el vendedor recibe la prueba gratuita de 7 días", async () => {
   const { rows } = await h.q(
@@ -308,6 +388,37 @@ h.test("REGV: un vendedor NO puede acceder al panel de administración", async (
     const r = await h.api(ruta, { method: metodo, token: h.test.tokenVendedor });
     h.assertStatus(r.status, 403, `${ruta} con vendedor → 403`);
   }
+});
+
+// --- 13b. El ADMIN conserva su sesion y sus permisos tras entrar ---------
+h.test("REGV: el administrador conserva su sesión y sus permisos", async () => {
+  // El login del admin es un login normal: devuelve token y rol ADMIN.
+  // Se libera antes su sesion (politica de sesion unica).
+  await h.clearSession(h.ADMIN_EMAIL);
+  const login = await h.api("/api/auth/login", {
+    method: "POST", body: { email: h.ADMIN_EMAIL, password: ADMIN_PASS },
+  });
+  h.assertStatus(login.status, 200, "login del administrador");
+  h.assert(login.json.data.usuario.rol === "ADMIN", `rol ADMIN (fue ${login.json.data.usuario.rol})`);
+  h.assert(typeof login.json.data.token === "string" && login.json.data.token.length > 0, "devuelve token");
+
+  // La sesion es valida: /auth/me responde con el administrador.
+  const me = await h.api("/api/auth/me", { token: login.json.data.token });
+  h.assertStatus(me.status, 200, "sesion del admin valida");
+  h.assert(me.json.data.rol === "ADMIN", "el rol se conserva en la sesion");
+
+  // Sus PERMISOS se conservan: el panel administrativo sigue accesible.
+  const stats = await h.api("/api/admin/stats", { token: login.json.data.token });
+  h.assertStatus(stats.status, 200, "el admin conserva el acceso al panel");
+  const usuarios = await h.api("/api/usuarios", { token: login.json.data.token });
+  h.assertStatus(usuarios.status, 200, "el admin conserva la gestion de usuarios");
+
+  // Y NO se modifica su situacion comercial (no es un vendedor).
+  const { rows } = await h.q(
+    "SELECT trial_inicio, estado_cuenta FROM usuarios WHERE email = $1",
+    [h.ADMIN_EMAIL]
+  );
+  h.assert(rows[0].trial_inicio === null, "el admin no recibe prueba de vendedor");
 });
 
 // --- 14. Un turista NO puede usar el panel del vendedor ------------------

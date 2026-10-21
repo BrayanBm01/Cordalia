@@ -48,14 +48,22 @@ const UsuarioModel = {
     return rows[0] || null;
   },
 
-  async create(nombre, email, hashedPassword = null, rol_id = 1, options = {}) {
+  /**
+   * Crea un usuario.
+   *
+   * @param {object} [client] - Cliente de una transaccion en curso. Si se
+   *   indica, la sentencia participa de esa transaccion (permite crear la
+   *   cuenta y su prueba gratuita de forma ATOMICA: si la segunda parte
+   *   falla, no queda ninguna cuenta a medias).
+   */
+  async create(nombre, email, hashedPassword = null, rol_id = 1, options = {}, client = pool) {
     const {
       proveedor = "local",
       google_id = null,
       avatar_url = null,
     } = options;
     const password = hashedPassword || "";
-    const { rows } = await pool.query(
+    const { rows } = await client.query(
       `INSERT INTO usuarios (nombre, email, password, rol_id, proveedor, google_id, avatar_url)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING id, nombre, email, rol_id, avatar_url, proveedor, google_id, ${PERFIL_COLUMNS}, created_at, updated_at`,
@@ -133,8 +141,8 @@ const UsuarioModel = {
     return rows[0].count;
   },
 
-  async setToken(id, token) {
-    await pool.query("UPDATE usuarios SET token_activo = $1 WHERE id = $2", [token, id]);
+  async setToken(id, token, client = pool) {
+    await client.query("UPDATE usuarios SET token_activo = $1 WHERE id = $2", [token, id]);
   },
 
   async clearToken(id) {

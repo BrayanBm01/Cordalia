@@ -104,15 +104,41 @@ destructivas**. Orden de aplicación (las nuevas al final):
 
 ### Cómo aplicarlas (con revisión previa)
 
+**Paso 0 — Comprobar si faltan (solo lectura).** Script listo en
+`database/COMPROBACIONES-PRODUCCION.sql`; la primera consulta dice qué
+migraciones hay:
+
+```sql
+SELECT
+  EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public'
+            AND table_name='inscripciones' AND column_name='plan_id')      AS "018_ok",
+  EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public'
+            AND table_name='usuarios' AND column_name='trial_inicio')     AS "019_ok",
+  EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public'
+            AND table_name='password_reset_tokens')                        AS "020_ok";
+```
+
+Si `018_ok`, `019_ok` o `020_ok` son `false`, hay migraciones pendientes.
+Sin ellas, el backend responde **503 `ESQUEMA_INCOMPLETO`** (y lo
+detalla en el log de arranque).
+
 ```bash
 # 1. Revisar el SQL antes de ejecutarlo
 less database/migrations/018_inscripcion_gratuita.sql
 
-# 2. Aplicar con psql (o con el editor SQL de Supabase)
+# 2. Aplicar con psql (o con el editor SQL de Supabase), una a una
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/018_inscripcion_gratuita.sql
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/019_prueba_gratuita_suscripciones.sql
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/020_password_reset_tokens.sql
+
+# 3. Verificar (las tres columnas deben salir en true)
+psql "$DATABASE_URL" -f database/COMPROBACIONES-PRODUCCION.sql
 ```
+
+**Orden obligatorio**: migraciones → reinicio de Render → (frontend).
+Si el backend se despliega antes de migrar, el registro de vendedores
+responde 503 y la cuenta **no** se crea a medias (la creación de la
+cuenta y su prueba de 7 días son una sola transacción).
 
 Qué hace cada una (resumen, sin datos destructivos):
 
@@ -279,6 +305,10 @@ curl -s -o /dev/null -w "%{http_code}\n" https://cordalia.vercel.app/planes/1
    muestran en el panel.
 6. **Cerrar sesión y volver a entrar** → el vendedor vuelve a
    `/panel-vendedor` y **la prueba no se reinicia** (mismas fechas).
+6b. **Administrador** → inicia sesión → llega a la **página pública**
+   (`/`) como cualquier visitante; su sesión y sus permisos siguen
+   intactos y abre `/admin` cuando lo necesita (la ruta sigue protegida
+   por rol ADMIN).
 7. **Administración** → `/admin/vendedores` → ver el estado comercial de
    cada vendedor → *Suspender cuenta* → el vendedor recibe **403** en las
    escrituras comerciales → *Reactivar cuenta* → recupera el acceso.

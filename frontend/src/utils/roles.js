@@ -64,15 +64,20 @@ export function normalizarUsuario(usuario) {
 
 /**
  * Ruta a la que debe ir cada rol tras registrarse o iniciar sesión.
- * El vendedor entra a SU panel comercial (donde ve la prueba gratuita
- * y los planes); el administrador a su panel; el turista a la home.
+ *
+ * - Vendedor -> su panel comercial (prueba gratuita, planes y pagos).
+ * - Administrador -> la página PÚBLICA principal. El panel de
+ *   administración sigue protegido por su propio guard (AdminRoute con
+ *   roles ['ADMIN']): el administrador entra por su cuenta, ve la home
+ *   como cualquier visitante y abre /admin cuando lo necesita.
+ * - Turista -> la home.
  */
 export function rutaInicioPorRol(rol) {
   switch (normalizarRol(rol)) {
     case ROL_BUSINESS:
       return '/panel-vendedor'
     case ROL_ADMIN:
-      return '/admin'
+      return '/'
     default:
       return '/'
   }

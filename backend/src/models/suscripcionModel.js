@@ -39,9 +39,12 @@ const SuscripcionModel = {
    * - Si el administrador crea la cuenta, aplica la misma regla.
    * - Los vendedores anteriores (sin trial) no se tocan: se les
    *   asigna la prueba solo si nunca la tuvieron.
+   *
+   * @param {object} [client] - Cliente de una transaccion en curso, para
+   *   que la asignacion sea atomica con la creacion de la cuenta.
    */
-  async asignarPruebaGratuita(usuarioId) {
-    const { rows } = await pool.query(
+  async asignarPruebaGratuita(usuarioId, client = pool) {
+    const { rows } = await client.query(
       `UPDATE usuarios
           SET trial_inicio = NOW(),
               trial_fin = NOW() + ($2 || ' days')::interval,
@@ -55,7 +58,7 @@ const SuscripcionModel = {
     );
     if (rows.length > 0) return rows[0];
     // Ya tenia prueba (o no es vendedor): se devuelve el estado actual.
-    const { rows: actual } = await pool.query(
+    const { rows: actual } = await client.query(
       `SELECT id, trial_inicio, trial_fin, estado_cuenta FROM usuarios WHERE id = $1`,
       [usuarioId]
     );
