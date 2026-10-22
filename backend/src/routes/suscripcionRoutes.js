@@ -42,3 +42,7 @@ module.exports.webhookRouter.post(
   "/suscripciones/webhook/mercadopago",
   suscripcionController.webhookMercadopago
 );
+module.exports.webhookRouter.post(
+  "/suscripciones/webhook/mercadopago/",
+  suscripcionController.webhookMercadopago
+);

@@ -158,6 +158,10 @@ async function crearPago({ planId, nombrePlan, monto, referencia, usuarioEmail, 
       },
       auto_return: "approved",
       notification_url: backendUrl("/api/suscripciones/webhook/mercadopago") || undefined,
+      // No enviamos datos personales del pagador al proveedor. Mercado Pago
+      // debe solicitar los datos necesarios (incluyendo Nequi) en su propio
+      // checkout. El correo se omite intencionalmente para evitar prefijar
+      // la cuenta/sesión del pagador con datos de otro usuario.
       metadata: { usuario_id: String(idUsuario || ""), plan_id: String(planId) },
     };
     if (!cuerpo.notification_url) delete cuerpo.notification_url;

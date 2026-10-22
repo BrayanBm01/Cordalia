@@ -121,6 +121,7 @@ app.use("/api", require("./routes/inscripcionRoutes"));
 app.use("/api", require("./routes/suscripcionRoutes"));
 // Webhook del proveedor de pagos (firma verificada, sin sesión).
 app.use("/api", require("./routes/suscripcionRoutes").webhookRouter);
+app.use("/", require("./routes/suscripcionRoutes").webhookRouter);
 
 app.get("/api/health", (req, res) => {
   res.json({ success: true, message: "API funcionando" });
