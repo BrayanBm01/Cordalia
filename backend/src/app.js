@@ -5,6 +5,14 @@ require("dotenv").config();
 
 const app = express();
 
+// Render/Proxies reversos: necesario para obtener la IP real y para
+// que express-rate-limit confíe en X-Forwarded-For de forma segura.
+if (process.env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
+} else {
+  app.set("trust proxy", false);
+}
+
 // Seguridad: headers
 app.use(
   helmet({

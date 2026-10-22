@@ -29,13 +29,14 @@ const SECRETO_WEBHOOK = process.env.MERCADOPAGO_WEBHOOK_SECRET || "secreto-de-pr
 
 /**
  * Envia una notificacion al webhook firmando el cuerpo como exige
- * Mercado Pago: HMAC-SHA256 de `id:timestamp:body`.
+ * Mercado Pago (SDK): HMAC-SHA256 del manifiesto
+ * `id:<data.id>;request-id:<x-request-id>;ts:<ts>;`
  */
 async function webhookConFirma({ id, secreto }) {
-  const ts = Date.now().toString();
+  const ts = Math.floor(Date.now() / 1000).toString();
   const body = JSON.stringify({ type: "payment", data: { id } });
-  const payload = `${id}:${ts}:${body}`;
-  const v1 = crypto.createHmac("sha256", secreto).update(payload).digest("hex");
+  const manifest = `id:${id};request-id:${id};ts:${ts};`;
+  const v1 = crypto.createHmac("sha256", secreto).update(manifest).digest("hex");
   const url = `${h.BASE}/api/suscripciones/webhook/mercadopago?id=${id}&data.id=${id}`;
   const res = await fetch(url, {
     method: "POST",

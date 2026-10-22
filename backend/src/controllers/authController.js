@@ -393,9 +393,22 @@ exports.google = async (req, res) => {
       }
     }
 
-    if (await tieneSesionVigente(usuario)) {
-      return res.status(403).json({ success: false, message: "Ya hay una sesión activa" });
+    // Con Google el usuario se reidentifica explicitamente. Si existe una
+    // sesion vigente en otro dispositivo/navegador, se sustituye por la nueva
+    // (sigue habiendo UNA sola sesion activa). Esto corrige el re-login con
+    // Google sin romper la politica de sesion unica.
+    if (usuario.token_activo) {
+      try {
+        verificarToken(usuario.token_activo);
+        // Hay sesion vigente: se revoca para permitir el re-login con Google.
+        await UsuarioModel.clearToken(usuario.id);
+        usuario.token_activo = null;
+      } catch {
+        await UsuarioModel.clearToken(usuario.id);
+        usuario.token_activo = null;
+      }
     }
+
     if (usuario.rol_id === null || usuario.rol_id === undefined) {
       return res.status(401).json({ success: false, message: "Usuario sin rol asignado" });
     }

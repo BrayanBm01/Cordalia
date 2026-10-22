@@ -284,7 +284,7 @@ exports.webhookMercadopago = async (req, res) => {
     const referenciaInterna = verificado.referencia;
     const idProveedor = verificado.pago_id || id;
     const { rows: subs } = await pool.query(
-      `SELECT id, usuario_id, plan_id FROM subscriptions
+      `SELECT id, usuario_id, plan_id, monto, moneda FROM subscriptions
         WHERE referencia_externa = $1 OR pago_id = $2
         ORDER BY id DESC LIMIT 1`,
       [referenciaInterna, idProveedor]
@@ -294,6 +294,32 @@ exports.webhookMercadopago = async (req, res) => {
       return res.status(404).json({ success: false, message: "Suscripción no encontrada" });
     }
     const sub = subs[0];
+
+    // 4.b) El importe y la moneda deben coincidir con lo contratado.
+    //      Aunque la preferencia la crea el servidor, esta comprobacion
+    //      impide activar un plan de 49.000 COP con un pago de otro
+    //      importe o de otra moneda (por ejemplo, una preferencia
+    //      manipulada o un pago ajeno con la misma referencia).
+    const montoEsperado = Number(sub.monto);
+    const montoRecibido = Number(verificado.monto);
+    if (
+      Number.isFinite(montoEsperado) &&
+      montoEsperado > 0 &&
+      (!Number.isFinite(montoRecibido) || Math.abs(montoRecibido - montoEsperado) > 1)
+    ) {
+      console.error("[webhook mp] el importe pagado no coincide con la suscripción");
+      return res.status(400).json({
+        success: false,
+        message: "El importe del pago no corresponde a la suscripción",
+      });
+    }
+    if (verificado.moneda && sub.moneda && String(verificado.moneda) !== String(sub.moneda)) {
+      console.error("[webhook mp] la moneda pagada no coincide con la suscripción");
+      return res.status(400).json({
+        success: false,
+        message: "La moneda del pago no corresponde a la suscripción",
+      });
+    }
 
     // 5) Idempotencia: la clave de idempotencia es el id del evento.
     const idempotencyKey = `mp:${id}`;
@@ -307,7 +333,7 @@ exports.webhookMercadopago = async (req, res) => {
       referenciaExterna: referenciaInterna,
       pagoId: verificado.pago_id || id,
       monto: verificado.monto ?? null,
-      moneda: "COP",
+      moneda: verificado.moneda || sub.moneda || "COP",
       idempotencyKey,
       payload: verificado.datos || null,
     });

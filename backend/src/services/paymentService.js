@@ -78,6 +78,7 @@ function estadoProveedor() {
 // Mercado Pago: cliente perezoso (solo si hay credenciales)
 // ------------------------------------------------------------
 let mpClient = null;
+let mpClases = null;
 let mpConfigurado = null;
 
 function configMp() {
@@ -86,9 +87,12 @@ function configMp() {
   mpConfigurado = Boolean(accessToken);
   if (mpConfigurado) {
     // El SDK oficial no se carga si no hay token (modo sandbox).
-    const { MercadoPagoConfig, Payment } = require("mercadopago");
+    // MercadoPagoConfig es el cliente HTTP; Preference y Payment son
+    // los recursos. No se deben mezclar (el SDK v3 no expone
+    // `preferences` dentro de Payment).
+    const { MercadoPagoConfig, Preference, Payment } = require("mercadopago");
     mpClient = new MercadoPagoConfig({ accessToken });
-    mpClient.__Payment = Payment;
+    mpClases = { Preference, Payment };
   }
   return mpConfigurado;
 }
@@ -133,7 +137,6 @@ async function crearPago({ planId, nombrePlan, monto, referencia, usuarioEmail, 
         code: "PAYMENT_PROVIDER_NOT_CONFIGURED",
       });
     }
-    const { Payment } = mpClient;
     const cuerpo = {
       items: [
         {
@@ -160,7 +163,7 @@ async function crearPago({ planId, nombrePlan, monto, referencia, usuarioEmail, 
     if (!cuerpo.notification_url) delete cuerpo.notification_url;
     if (!cuerpo.back_urls.success) delete cuerpo.back_urls;
 
-    const preference = await new Payment(mpClient).preferences.create(cuerpo);
+    const preference = await new mpClases.Preference(mpClient).create({ body: cuerpo });
     return {
       proveedor: "mercadopago",
       referencia,
@@ -220,12 +223,11 @@ async function verificarPago(pago = {}) {
         code: "PAYMENT_PROVIDER_NOT_CONFIGURED",
       });
     }
-    const { Payment } = mpClient;
     const id = pago.externo || pago.pago_id;
     if (!id) {
       return { confirmado: false, estado: ESTADOS_PROVEEDOR.IN_PROCESS, referencia: pago.referencia || null };
     }
-    const respuesta = await new Payment(mpClient).get({ id: String(id) });
+    const respuesta = await new mpClases.Payment(mpClient).get({ id: String(id) });
     const data = respuesta && respuesta.response ? respuesta.response : respuesta;
     const estado = data && data.status ? String(data.status) : null;
     const monto = data && data.transaction_amount ? Number(data.transaction_amount) : null;
@@ -235,6 +237,7 @@ async function verificarPago(pago = {}) {
       referencia: (data && data.external_reference) || pago.referencia || null,
       pago_id: data && data.id ? String(data.id) : String(id),
       monto,
+      moneda: (data && data.currency_id) || null,
       datos: data || null,
     };
   }
@@ -253,53 +256,54 @@ async function verificarPago(pago = {}) {
 /**
  * Valida la FIRMA de la webhook de Mercado Pago.
  *
- * Segun la documentacion oficial, la cabecera `x-signature` es
- * `ts=<timestamp>,v1=<hmac_sha256>` donde el HMAC se calcula sobre
- * `id:timestamp:body` con el secreto del webhook. Si el secreto no
- * esta configurado, la validacion no puede realizarse: en ese caso la
- * webhook NO procesa pagos (se rechaza) para no abrir una puerta.
+ * La documentacion oficial define la firma como `ts=<segundos>,v1=<hmac>`
+ * y el HMAC SHA-256 se calcula sobre el manifiesto:
+ *
+ *   id:<data.id>;request-id:<x-request-id>;ts:<ts>;
+ *
+ * (los pares sin valor se omiten). NO se firma el cuerpo completo.
+ * Se usa el validador oficial del SDK para no desviarse del algoritmo.
+ *
+ * Si el secreto no esta configurado, la validacion no puede realizarse:
+ * la webhook NO procesa pagos (fail closed). Ademas se exige que el
+ * timestamp este dentro de una ventana de 5 minutos para evitar replay.
  *
  * @returns {{valido: boolean, motivo?: string}}
  */
-function validarFirmaWebhook({ headers = {}, bodyRaw = "", query = {} }) {
+function validarFirmaWebhook({ headers = {}, bodyRaw = "", query = {} } = {}) {
+  // `bodyRaw` se conserva en la firma por compatibilidad con el
+  // controlador, pero NO forma parte del manifiesto oficial.
+  void bodyRaw;
+
   const secreto = process.env.MERCADOPAGO_WEBHOOK_SECRET;
   if (!secreto) {
     return { valido: false, motivo: "Webhook sin secreto configurado (MERCADOPAGO_WEBHOOK_SECRET)" };
   }
-  const signature = headers["x-signature"];
-  if (!signature) return { valido: false, motivo: "Falta la cabecera x-signature" };
 
-  const partes = Object.fromEntries(
-    String(signature)
-      .split(",")
-      .map((p) => p.split("="))
-      .map(([k, v]) => [String(k).trim(), String(v).trim()])
-  );
-  const ts = partes.ts;
-  const v1 = partes.v1;
-  if (!ts || !v1) return { valido: false, motivo: "Cabecera x-signature mal formada" };
+  const xSignature = headers["x-signature"];
+  if (!xSignature) return { valido: false, motivo: "Falta la cabecera x-signature" };
 
-  // `id` es el id de la notificacion (query.data.id) o el del evento.
-  const id = String(query.id || query["data.id"] || "");
-  const dataId = query["data.id"];
-  const idUsado = dataId ? String(dataId) : id;
+  const dataId = query["data.id"] || query?.data?.id || "";
+  const xRequestId = headers["x-request-id"] || "";
 
-  const tsNum = Number(ts);
-  if (!Number.isFinite(tsNum)) return { valido: false, motivo: "Timestamp inválido" };
-
-  // Ventana de 5 minutos: evita replay de una firma capturada.
-  if (Math.abs(Date.now() - tsNum) > 5 * 60 * 1000) {
-    return { valido: false, motivo: "Timestamp fuera de la ventana permitida" };
+  try {
+    const { WebhookSignatureValidator } = require("mercadopago");
+    WebhookSignatureValidator.validate({
+      xSignature: String(xSignature),
+      xRequestId: String(xRequestId),
+      dataId: String(dataId),
+      secret: secreto,
+      toleranceSeconds: 5 * 60,
+    });
+    return { valido: true };
+  } catch (error) {
+    return {
+      valido: false,
+      motivo: error && (error.reason || error.message)
+        ? String(error.reason || error.message)
+        : "Firma inválida",
+    };
   }
-
-  const payload = `${idUsado}:${ts}:${bodyRaw}`;
-  const esperado = crypto.createHmac("sha256", secreto).update(payload).digest("hex");
-  const a = Buffer.from(esperado);
-  const b = Buffer.from(v1);
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
-    return { valido: false, motivo: "Firma no coincide" };
-  }
-  return { valido: true };
 }
 
 module.exports = {
