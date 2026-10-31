@@ -26,14 +26,35 @@ import { useAuth } from '../context/AuthContext'
 import GoogleButton from '../components/GoogleButton'
 import { VENDOR_MEMBERSHIP_PLAN } from '../services/mercadoPago'
 import { rutaInicioPorRol } from '../utils/roles'
+import {
+  EMAIL_MAX,
+  isEmail,
+  isValidPersonName,
+  validatePassword,
+} from '../utils/validation'
 import { vendedorAPI } from '../services/api'
 import { formatMoney } from './negocios/businessUtils'
 
 const registerSchema = z
   .object({
-    nombre: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
-    email: z.string().min(1, 'El email es requerido').email('Ingresa un email válido'),
-    password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
+    nombre: z
+      .string()
+      .trim()
+      .min(1, 'El nombre es requerido')
+      .refine(
+        isValidPersonName,
+        'Nombre inválido: usa solo letras, tildes, ñ, espacios, guiones o apóstrofos (2 a 100 caracteres)'
+      ),
+    email: z
+      .string()
+      .trim()
+      .min(1, 'El email es requerido')
+      .max(EMAIL_MAX, `El email no puede superar ${EMAIL_MAX} caracteres`)
+      .refine(isEmail, 'Ingresa un email válido'),
+    password: z.string().superRefine((value, ctx) => {
+      const error = validatePassword(value)
+      if (error) ctx.addIssue({ code: 'custom', message: error })
+    }),
     confirmPassword: z.string().min(1, 'Confirma tu contraseña'),
   })
   .refine((data) => data.password === data.confirmPassword, {

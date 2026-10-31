@@ -3,6 +3,8 @@ const cors = require("cors");
 const helmet = require("helmet");
 require("dotenv").config();
 
+const { globalLimiter } = require("./middlewares/rateLimit");
+
 const app = express();
 
 // Render/Proxies reversos: necesario para obtener la IP real y para
@@ -72,7 +74,9 @@ app.use(
       if (normalizado && allowedOriginsExpandidos.has(normalizado)) {
         callback(null, true);
       } else {
-        callback(new Error("Origen no permitido por CORS"));
+        const error = new Error("Origen no permitido por CORS");
+        error.status = 403;
+        callback(error);
       }
     },
     credentials: true,
@@ -100,6 +104,11 @@ app.use(
 );
 app.use(express.urlencoded({ extended: true, limit: "4mb" }));
 
+// Backstop general de peticiones para toda la API. Los limitadores
+// especificos (auth, registro, resenas, busquedas) se aplican ademas en
+// cada router con limites mas estrictos.
+app.use("/api", globalLimiter);
+
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/usuarios", require("./routes/usuarioRoutes"));
 app.use("/api/lugares", require("./routes/lugaresRoutes"));
@@ -125,6 +134,14 @@ app.use("/", require("./routes/suscripcionRoutes").webhookRouter);
 
 app.get("/api/health", (req, res) => {
   res.json({ success: true, message: "API funcionando" });
+});
+
+// 404 uniforme en JSON (en lugar del HTML por defecto de Express).
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: "Ruta no encontrada",
+  });
 });
 
 app.use(require("./middlewares/errorHandler"));

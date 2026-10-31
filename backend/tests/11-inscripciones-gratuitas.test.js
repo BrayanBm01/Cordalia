@@ -31,8 +31,8 @@ h.test("INSCR: setup (admin, owner, 2 turistas, negocio, plan y salida)", async 
   const emailT2 = h.repo("f21test.insc.turista2");
 
   h.assertStatus((await h.createUser(admin.token, { nombre: "Owner Inscription", email: emailO, password: pass, rol_id: 2 })).status, 201, "crear owner");
-  h.assertStatus((await h.createUser(admin.token, { nombre: "Turista Insc 1", email: emailT1, password: pass, rol_id: 1 })).status, 201, "crear turista 1");
-  h.assertStatus((await h.createUser(admin.token, { nombre: "Turista Insc 2", email: emailT2, password: pass, rol_id: 1 })).status, 201, "crear turista 2");
+  h.assertStatus((await h.createUser(admin.token, { nombre: "Turista Insc Uno", email: emailT1, password: pass, rol_id: 1 })).status, 201, "crear turista 1");
+  h.assertStatus((await h.createUser(admin.token, { nombre: "Turista Insc Dos", email: emailT2, password: pass, rol_id: 1 })).status, 201, "crear turista 2");
 
   const O = await h.login(emailO, pass);
   const T1 = await h.login(emailT1, pass);

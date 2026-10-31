@@ -15,10 +15,16 @@ const ReviewModel = {
     return rows[0] || null;
   },
 
-  async findActiveByUserAndBusiness(userId, businessId) {
+  /**
+   * Busca una resena del usuario para el negocio en CUALQUIER estado.
+   * La tabla tiene UNIQUE (user_id, business_id): comprobar solo las
+   * activas permitiria reintentar tras ocultar/eliminar y chocar con
+   * un 500 por la restriccion de la base.
+   */
+  async findByUserAndBusiness(userId, businessId) {
     const { rows } = await pool.query(
-      `SELECT id FROM reviews
-       WHERE user_id = $1 AND business_id = $2 AND estado = 'active'
+      `SELECT id, estado FROM reviews
+       WHERE user_id = $1 AND business_id = $2
        LIMIT 1`,
       [userId, businessId]
     );

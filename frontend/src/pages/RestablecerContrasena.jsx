@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { KeyRound, Loader2, Mail, CheckCircle2, ArrowLeft, ShieldCheck } from 'lucide-react'
 import { authAPI } from '../services/api'
+import { EMAIL_MAX, isEmail, validatePassword } from '../utils/validation'
 
 /**
  * Recuperación / establecimiento de contraseña.
@@ -26,13 +27,18 @@ export default function RestablecerContrasena() {
 
   async function solicitarEnlace(e) {
     e.preventDefault()
-    if (!email.trim()) {
+    const correo = email.trim()
+    if (!correo) {
       toast.error('Ingresa tu correo')
+      return
+    }
+    if (correo.length > EMAIL_MAX || !isEmail(correo)) {
+      toast.error('Ingresa un correo electrónico válido')
       return
     }
     setLoading(true)
     try {
-      const res = await authAPI.recuperarPassword(email.trim())
+      const res = await authAPI.recuperarPassword(correo)
       setEnviado(true)
       toast.success(res.message || 'Si el correo está registrado, te enviamos un enlace.')
     } catch (err) {
@@ -44,8 +50,9 @@ export default function RestablecerContrasena() {
 
   async function guardarNuevaContrasena(e) {
     e.preventDefault()
-    if (password.length < 6) {
-      toast.error('La contraseña debe tener al menos 6 caracteres')
+    const passwordError = validatePassword(password)
+    if (passwordError) {
+      toast.error(passwordError)
       return
     }
     if (password !== confirmar) {

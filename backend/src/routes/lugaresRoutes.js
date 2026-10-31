@@ -5,9 +5,10 @@ const destinoContenidoController = require("../controllers/destinoContenidoContr
 const requireAuth = require("../middlewares/authMiddleware");
 const requireAdmin = require("../middlewares/adminMiddleware");
 const { optionalAuth } = require("../middlewares/authMiddleware");
+const { searchLimiter } = require("../middlewares/rateLimit");
 
 // Lectura pública de destinos (visitantes ven la información y sus negocios aprobados)
-router.get("/", lugaresController.getAll);
+router.get("/", searchLimiter, lugaresController.getAll);
 router.get("/slug/:slug", lugaresController.getBySlug);
 router.get("/:id", lugaresController.getById);
 router.get("/:id/negocios", optionalAuth, lugaresController.getBusinesses);

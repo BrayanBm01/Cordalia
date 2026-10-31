@@ -3,6 +3,7 @@ const planController = require("../controllers/planController");
 const requireAuth = require("../middlewares/authMiddleware");
 const { optionalAuth } = require("../middlewares/authMiddleware");
 const { requireVendorActive } = require("../middlewares/vendorMiddleware");
+const { searchLimiter } = require("../middlewares/rateLimit");
 const {
   loadVisibleBusiness,
   requireOwnedBusiness,
@@ -15,7 +16,7 @@ const {
 // ---------------------------------------------------------------
 const publicRouter = express.Router();
 
-publicRouter.get("/", optionalAuth, planController.list);
+publicRouter.get("/", optionalAuth, searchLimiter, planController.list);
 publicRouter.get("/:planId", optionalAuth, planController.getById);
 publicRouter.get("/:planId/precio", optionalAuth, planController.calcularPrecio);
 publicRouter.get("/:planId/salidas", optionalAuth, planController.listSalidas);

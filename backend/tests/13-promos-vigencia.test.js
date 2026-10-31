@@ -236,7 +236,7 @@ h.test("VIG 9: promo vencida tras la inscripcion no altera el snapshot ya regist
 
   const emailT2 = h.repo("f13vig.turista2");
   h.assertStatus((await h.createUser(h.test.adminToken, {
-    nombre: "Turista Vigencia 2", email: emailT2, password: "Test1234x!", rol_id: 1,
+    nombre: "Turista Vigencia Dos", email: emailT2, password: "Test1234x!", rol_id: 1,
   })).status, 201, "crear turista 2");
   const T2 = await h.login(emailT2, "Test1234x!");
   h.assertStatus(T2.status, 200, "login turista 2");
@@ -262,7 +262,7 @@ h.test("VIG 9: promo vencida tras la inscripcion no altera el snapshot ya regist
   h.assertStatus(salida3.status, 201, "crear salida para la inscripcion posterior");
   const emailT3 = h.repo("f13vig.turista3");
   h.assertStatus((await h.createUser(h.test.adminToken, {
-    nombre: "Turista Vigencia 3", email: emailT3, password: "Test1234x!", rol_id: 1,
+    nombre: "Turista Vigencia Tres", email: emailT3, password: "Test1234x!", rol_id: 1,
   })).status, 201, "crear turista 3");
   const T3 = await h.login(emailT3, "Test1234x!");
   h.assertStatus(T3.status, 200, "login turista 3");

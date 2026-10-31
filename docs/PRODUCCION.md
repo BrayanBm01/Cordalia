@@ -51,7 +51,14 @@ Se configuran en *Render → Environment* del servicio web del backend.
 | `DB_SSL` | No | `true` | Render/Supabase suelen exigir TLS |
 | `JWT_SECRET` | **Sí** | clave aleatoria larga | Firma de los JWT |
 | `JWT_EXPIRES_IN` | No | `2h` | Vigencia de la sesión |
-| `AUTH_RATE_LIMIT_MAX` | No | `30` | Intentos de login por IP cada 15 min |
+| `AUTH_RATE_LIMIT_MAX` | No | `30` | Login/cambio de contraseña por IP o usuario cada 15 min |
+| `REGISTER_RATE_LIMIT_MAX` | No | `20` | Registros públicos por IP cada hora |
+| `GOOGLE_RATE_LIMIT_MAX` | No | `20` | Verificaciones de Google por IP cada 15 min |
+| `PASSWORD_RESET_RATE_LIMIT_MAX` | No | `10` | Recuperación/restablecimiento por IP cada hora |
+| `BUSINESS_WRITE_RATE_LIMIT_MAX` | No | `60` | Escrituras de negocios por usuario cada hora |
+| `REVIEW_RATE_LIMIT_MAX` | No | `20` | Reseñas por usuario cada hora |
+| `SEARCH_RATE_LIMIT_MAX` | No | `120` | Búsquedas/listados por usuario o IP cada minuto |
+| `GLOBAL_RATE_LIMIT_MAX` | No | `5000` | Backstop de toda la API por IP cada 15 min |
 | `FRONTEND_URL` | No | `https://cordalia.vercel.app` | CORS + enlaces de retorno |
 | `BACKEND_URL` | No | `https://cordalia.onrender.com` | CORS + base de la webhook |
 | `APP_URL` | No | igual que `BACKEND_URL` | Alternativa a `BACKEND_URL` |
@@ -97,9 +104,11 @@ destructivas**. Orden de aplicación (las nuevas al final):
 
 ```
 001 … 017   (ya aplicadas en producción)
-018_inscripcion_gratuita.sql            ← Sección 6 (inscripciones gratuitas)
-019_prueba_gratuita_suscripciones.sql    ← Secciones 4 y 5 (prueba + planes)
-020_password_reset_tokens.sql            ← Sección 2 (recuperación de contraseña)
+018_inscripcion_gratuita.sql            ← Inscripciones gratuitas
+019_prueba_gratuita_suscripciones.sql    ← Prueba gratuita + planes comerciales
+020_password_reset_tokens.sql            ← Recuperación de contraseña
+021_restaurar_catalogo_cordoba.sql       ← Catálogo demo de Córdoba (solo inserta)
+022_indices_rendimiento.sql              ← Índices de lectura (solo índices)
 ```
 
 ### Cómo aplicarlas (con revisión previa)
@@ -130,6 +139,8 @@ less database/migrations/018_inscripcion_gratuita.sql
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/018_inscripcion_gratuita.sql
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/019_prueba_gratuita_suscripciones.sql
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/020_password_reset_tokens.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/021_restaurar_catalogo_cordoba.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/022_indices_rendimiento.sql
 
 # 3. Verificar (las tres columnas deben salir en true)
 psql "$DATABASE_URL" -f database/COMPROBACIONES-PRODUCCION.sql
@@ -153,10 +164,15 @@ Qué hace cada una (resumen, sin datos destructivos):
   Los vendedores que ya existían quedan con `estado_cuenta = NULL`: su
   situación comercial **no cambia** hasta que un administrador la defina.
 - **020** — crea `password_reset_tokens` (tokens de un solo uso).
+- **021** — restaura el catálogo demo de Córdoba sin borrar datos reales
+  (es idempotente y solo inserta lo que falta).
+- **022** — añade índices compuestos para listados de negocios, reseñas e
+  historial de accesos. **No modifica datos ni columnas.**
 
-> Las migraciones 018–020 ya están aplicadas en la base de datos **local**
+> Las migraciones 018–022 ya están aplicadas en la base de datos **local**
 > de desarrollo. En producción deben aplicarse **una vez**, revisando el
-> SQL.
+> SQL. La 022 puede aplicarse en caliente, aunque en tablas muy grandes
+> conviene hacerlo en una ventana de mantenimiento.
 
 ---
 
@@ -352,3 +368,9 @@ curl -s https://cordalia.vercel.app/ | grep -oE '/assets/index-[A-Za-z0-9_-]+\.j
 4. **Los planes turísticos no tienen pagos.** Las suscripciones y las
    inscripciones son flujos separados: `subscriptions` (con pago) vs
    `inscripciones` (gratuitas).
+5. **Rate limiting en memoria.** Los límites de `express-rate-limit` viven
+   en el proceso y son exactos con **una sola instancia** del backend (el
+   despliegue documentado usa una). Con varias instancias o réplicas, cada
+   una lleva su propia cuenta y el límite efectivo se multiplica. Para
+   escalar horizontalmente hace falta un store compartido (Redis o
+   PostgreSQL). Las respuestas bloqueadas son **429** con `Retry-After`.

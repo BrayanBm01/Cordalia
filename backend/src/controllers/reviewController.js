@@ -1,18 +1,20 @@
 const ReviewModel = require("../models/reviewModel");
 const BusinessModel = require("../models/businessModel");
-const { sanitizeString } = require("../utils/validators");
+const { parseInteger, validarTexto } = require("../utils/validators");
 
 const ESTADOS_REVIEW = ["active", "hidden", "deleted"];
 const COMENTARIO_MAX = 2000;
 
 function parseId(val) {
-  const n = Number(val);
-  return Number.isInteger(n) && n > 0 ? n : null;
+  return parseInteger(val, { min: 1 });
 }
 
+/**
+ * Puntuacion estricta: entero 1-5. Rechaza booleanos, decimales,
+ * NaN, Infinity y cadenas no numericas.
+ */
 function parseRating(val) {
-  const n = Number(val);
-  return Number.isInteger(n) && n >= 1 && n <= 5 ? n : null;
+  return parseInteger(val, { min: 1, max: 5 });
 }
 
 async function businessVisible(business, req) {
@@ -52,21 +54,49 @@ exports.create = async (req, res) => {
       return res.status(400).json({ success: false, message: "ID de negocio inválido" });
     }
     const business = await BusinessModel.findById(businessId);
-    if (!(await businessVisible(business, req))) {
+    if (!business) {
       return res.status(404).json({ success: false, message: "Negocio no encontrado" });
     }
-    const rating = parseRating(req.body?.rating);
-    if (!rating) {
-      return res.status(400).json({ success: false, message: "La puntuación debe ser un número entre 1 y 5" });
+    // Regla de negocio: SOLO los negocios aprobados reciben resenas.
+    // Se aplica tambien a ADMIN: la aprobacion es un requisito funcional,
+    // no un permiso de rol. El frontend no es autoridad.
+    if (business.estado !== "approved") {
+      return res.status(409).json({
+        success: false,
+        message: "Este negocio aún no está aprobado y no puede recibir reseñas",
+      });
     }
-    const comment = sanitizeString(req.body?.comment || "").slice(0, COMENTARIO_MAX);
-    if (await ReviewModel.findActiveByUserAndBusiness(req.usuario.id, businessId)) {
+    // El propietario no puede resenar su propio negocio.
+    if (business.owner_id === req.usuario.id) {
+      return res.status(403).json({
+        success: false,
+        message: "No puedes reseñar tu propio negocio",
+      });
+    }
+    const rating = parseRating(req.body?.rating);
+    if (rating === null) {
+      return res.status(400).json({ success: false, message: "La puntuación debe ser un entero entre 1 y 5" });
+    }
+    const commentResult = validarTexto(req.body?.comment, {
+      max: COMENTARIO_MAX,
+      label: "El comentario",
+      multiline: true,
+    });
+    if (commentResult.error) {
+      return res.status(400).json({ success: false, message: commentResult.error });
+    }
+    // Se comprueba CUALQUIER estado: la restriccion UNIQUE de la base
+    // cubre todas las resenas, no solo las activas.
+    if (await ReviewModel.findByUserAndBusiness(req.usuario.id, businessId)) {
       return res.status(409).json({ success: false, message: "Ya has reseñado este negocio" });
     }
-    const review = await ReviewModel.create(req.usuario.id, businessId, rating, comment || null);
+    const review = await ReviewModel.create(req.usuario.id, businessId, rating, commentResult.value);
     const stats = await ReviewModel.statsByBusiness(businessId);
     return res.status(201).json({ success: true, message: "Reseña publicada", data: { review, promedio: stats.promedio, cantidad: stats.cantidad } });
   } catch (error) {
+    if (error && error.code === "23505") {
+      return res.status(409).json({ success: false, message: "Ya has reseñado este negocio" });
+    }
     console.error("Error crear reseña:", error);
     return res.status(500).json({ success: false, message: "Error al crear la reseña" });
   }
@@ -89,14 +119,21 @@ exports.update = async (req, res) => {
     const data = {};
     if (req.body?.rating !== undefined) {
       const rating = parseRating(req.body.rating);
-      if (!rating) {
-        return res.status(400).json({ success: false, message: "La puntuación debe ser un número entre 1 y 5" });
+      if (rating === null) {
+        return res.status(400).json({ success: false, message: "La puntuación debe ser un entero entre 1 y 5" });
       }
       data.rating = rating;
     }
     if (req.body?.comment !== undefined) {
-      const c = sanitizeString(req.body.comment).slice(0, COMENTARIO_MAX);
-      data.comment = c === "" ? null : c;
+      const commentResult = validarTexto(req.body.comment, {
+        max: COMENTARIO_MAX,
+        label: "El comentario",
+        multiline: true,
+      });
+      if (commentResult.error) {
+        return res.status(400).json({ success: false, message: commentResult.error });
+      }
+      data.comment = commentResult.value;
     }
     const updated = await ReviewModel.update(id, data);
     const stats = await ReviewModel.statsByBusiness(review.business_id);
@@ -136,7 +173,7 @@ exports.moderar = async (req, res) => {
     if (!id) {
       return res.status(400).json({ success: false, message: "ID de reseña inválido" });
     }
-    const estado = sanitizeString(req.body?.estado || "");
+    const estado = typeof req.body?.estado === "string" ? req.body.estado.trim() : "";
     if (!ESTADOS_REVIEW.includes(estado)) {
       return res.status(400).json({ success: false, message: "Estado de moderación inválido" });
     }
@@ -169,14 +206,16 @@ exports.addReply = async (req, res) => {
     if (await ReviewModel.findReplyByReview(id)) {
       return res.status(409).json({ success: false, message: "Esta reseña ya tiene una respuesta" });
     }
-    const reply = sanitizeString(req.body?.reply || "");
-    if (!reply) {
-      return res.status(400).json({ success: false, message: "La respuesta no puede estar vacía" });
+    const replyResult = validarTexto(req.body?.reply, {
+      max: COMENTARIO_MAX,
+      label: "La respuesta",
+      obligatorio: true,
+      multiline: true,
+    });
+    if (replyResult.error) {
+      return res.status(400).json({ success: false, message: replyResult.error });
     }
-    if (reply.length > COMENTARIO_MAX) {
-      return res.status(400).json({ success: false, message: `La respuesta no puede superar ${COMENTARIO_MAX} caracteres` });
-    }
-    const created = await ReviewModel.addReply(id, req.usuario.id, reply);
+    const created = await ReviewModel.addReply(id, req.usuario.id, replyResult.value);
     return res.status(201).json({ success: true, message: "Respuesta publicada", data: created });
   } catch (error) {
     console.error("Error responder reseña:", error);

@@ -416,7 +416,7 @@ async function main() {
     });
     const local = {
       id: 6,
-      nombre: "Local 2",
+      nombre: "Local Dos",
       email: "local2@pruebas.test",
       password: await hashPassword("clave-correcta"),
       rol_id: 1,

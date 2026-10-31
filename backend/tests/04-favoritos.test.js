@@ -24,9 +24,9 @@ h.test("FAV: setup usuarios y negocio aprobado", async () => {
 
   for (const [n, e, r] of [
     ["Fav Negociante", emailNeg, 2],
-    ["Fav Turista 1", emailT1, 1],
-    ["Fav Turista 2", emailT2, 1],
-    ["Fav Turista 3", emailT3, 1],
+    ["Fav Turista Uno", emailT1, 1],
+    ["Fav Turista Dos", emailT2, 1],
+    ["Fav Turista Tres", emailT3, 1],
   ]) {
     h.assertStatus((await h.createUser(token, { nombre: n, email: e, password: pass, rol_id: r })).status, 201, `crear ${e}`);
   }

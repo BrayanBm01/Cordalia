@@ -1,7 +1,13 @@
 const UsuarioModel = require("../models/usuarioModel");
 const SuscripcionModel = require("../models/suscripcionModel");
 const { hashPassword } = require("../utils/password");
-const { isEmail, isNonEmptyString, sanitizeString } = require("../utils/validators");
+const {
+  isEmail,
+  isValidPersonName,
+  validatePassword,
+  parseInteger,
+  sanitizeString,
+} = require("../utils/validators");
 
 exports.getAll = async (req, res) => {
   try {
@@ -29,24 +35,39 @@ exports.getById = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
-    let { nombre, email, password, rol_id } = req.body;
+    const body = req.body && typeof req.body === "object" ? req.body : {};
+    let { nombre, email, password } = body;
+    const { rol_id } = body;
 
-    if (!nombre || !email || !password) {
+    if (typeof nombre !== "string" || typeof email !== "string" || !password) {
       return res.status(400).json({ success: false, message: "Nombre, email y contraseña son obligatorios" });
     }
 
     nombre = sanitizeString(nombre);
     email = sanitizeString(email).toLowerCase();
-    password = sanitizeString(password);
 
-    if (!isNonEmptyString(nombre, 2, 100)) {
-      return res.status(400).json({ success: false, message: "Nombre inválido" });
+    if (!isValidPersonName(nombre)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Nombre inválido: usa solo letras, tildes, ñ, espacios, guiones o apóstrofos (2 a 100 caracteres)",
+      });
     }
     if (!isEmail(email)) {
       return res.status(400).json({ success: false, message: "Email inválido" });
     }
-    if (password.length < 6) {
-      return res.status(400).json({ success: false, message: "La contraseña debe tener al menos 6 caracteres" });
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      return res.status(400).json({ success: false, message: passwordError });
+    }
+
+    let rolFinal = 1;
+    if (rol_id !== undefined && rol_id !== null && rol_id !== "") {
+      const rolNum = parseInteger(rol_id, { min: 0, max: 2 });
+      if (rolNum === null) {
+        return res.status(400).json({ success: false, message: "Rol inválido" });
+      }
+      rolFinal = rolNum;
     }
 
     const existe = await UsuarioModel.findByEmail(email);
@@ -54,9 +75,7 @@ exports.create = async (req, res) => {
       return res.status(409).json({ success: false, message: "El email ya está registrado" });
     }
 
-    const rolesValidos = [0, 1, 2];
-    const rolNum = Number(rol_id);
-    const rolFinal = rolesValidos.includes(rolNum) ? rolNum : 1;
+    // La contrasena se usa exactamente como se ingreso (sin recortar).
     const hashed = await hashPassword(password);
     const usuario = await UsuarioModel.create(nombre, email, hashed, rolFinal);
 
@@ -72,6 +91,9 @@ exports.create = async (req, res) => {
       data: usuario,
     });
   } catch (error) {
+    if (error && error.code === "23505") {
+      return res.status(409).json({ success: false, message: "El email ya está registrado" });
+    }
     console.error("Error create usuario:", error);
     return res.status(500).json({ success: false, message: "Error al crear usuario" });
   }
@@ -80,19 +102,27 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const { id } = req.params;
-    let { nombre, email, password, rol_id } = req.body;
+    const body = req.body && typeof req.body === "object" ? req.body : {};
+    let { nombre, email, password } = body;
+    const { rol_id } = body;
 
     const fields = {};
 
-    if (nombre) {
-      nombre = sanitizeString(nombre);
-      if (!isNonEmptyString(nombre, 2, 100)) {
-        return res.status(400).json({ success: false, message: "Nombre inválido" });
+    if (nombre !== undefined) {
+      if (typeof nombre !== "string" || !isValidPersonName(nombre)) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Nombre inválido: usa solo letras, tildes, ñ, espacios, guiones o apóstrofos (2 a 100 caracteres)",
+        });
       }
-      fields.nombre = nombre;
+      fields.nombre = sanitizeString(nombre);
     }
 
-    if (email) {
+    if (email !== undefined) {
+      if (typeof email !== "string") {
+        return res.status(400).json({ success: false, message: "Email inválido" });
+      }
       email = sanitizeString(email).toLowerCase();
       if (!isEmail(email)) {
         return res.status(400).json({ success: false, message: "Email inválido" });
@@ -104,16 +134,20 @@ exports.update = async (req, res) => {
       fields.email = email;
     }
 
-    if (password && sanitizeString(password).length > 0) {
-      if (password.length < 6) {
-        return res.status(400).json({ success: false, message: "La contraseña debe tener al menos 6 caracteres" });
+    if (password !== undefined && password !== null && password !== "") {
+      const passwordError = validatePassword(password);
+      if (passwordError) {
+        return res.status(400).json({ success: false, message: passwordError });
       }
-      fields.password = await hashPassword(sanitizeString(password));
+      // Sin recortar espacios: se guarda exactamente lo ingresado.
+      fields.password = await hashPassword(password);
     }
 
     if (rol_id !== undefined && req.usuario.rol === "ADMIN") {
-      const rolNum = Number(rol_id);
-      const rolFinal = [0, 1, 2].includes(rolNum) ? rolNum : 1;
+      const rolFinal = parseInteger(rol_id, { min: 0, max: 2 });
+      if (rolFinal === null) {
+        return res.status(400).json({ success: false, message: "Rol inválido" });
+      }
       if (rolFinal !== 0) {
         const target = await UsuarioModel.findById(id);
         if (target && target.rol_id === 0) {
@@ -140,6 +174,9 @@ exports.update = async (req, res) => {
 
     return res.json({ success: true, message: "Usuario actualizado", data: updated });
   } catch (error) {
+    if (error && error.code === "23505") {
+      return res.status(409).json({ success: false, message: "El email ya está en uso" });
+    }
     console.error("Error update usuario:", error);
     return res.status(500).json({ success: false, message: "Error al actualizar usuario" });
   }

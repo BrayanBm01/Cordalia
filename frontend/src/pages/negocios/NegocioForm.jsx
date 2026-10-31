@@ -9,6 +9,13 @@ import { businessesAPI, lugaresAPI } from '../../services/api'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import ImageUploader from '../../components/ImageUploader'
 import MoneyInput from '../../components/MoneyInput'
+import {
+  PRECIO_MAX,
+  isEmail,
+  isValidBusinessName,
+  isValidHttpUrl,
+  isValidPhone,
+} from '../../utils/validation'
 import { toast } from 'sonner'
 
 const MONEDAS = ['COP', 'USD', 'EUR', 'MXN', 'PEN']
@@ -22,29 +29,64 @@ const CATEGORIAS_CON_PRECIO = [
 function buildSchema(categorias = []) {
   const nombresPorId = new Map(categorias.map((c) => [String(c.id), c.nombre]))
 
+  const precioSchema = z.preprocess(
+    (v) => (v === '' || v === null || v === undefined ? undefined : v),
+    z.coerce
+      .number()
+      .finite('Precio inválido')
+      .min(0, 'El precio no puede ser negativo')
+      .max(PRECIO_MAX, `El precio máximo permitido es ${PRECIO_MAX}`)
+      .refine(
+        (v) => Math.round(v * 100) === v * 100,
+        'El precio admite como máximo 2 decimales'
+      )
+  )
+
   return z
     .object({
-      nombre: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(200, 'Máximo 200 caracteres'),
+      nombre: z
+        .string()
+        .trim()
+        .min(1, 'El nombre es obligatorio')
+        .refine(
+          isValidBusinessName,
+          'El nombre debe tener entre 2 y 200 caracteres y contener letras o números'
+        ),
       category_id: z.string().transform((v) => (v === '' ? '' : Number(v))),
       destination_id: z.string().transform((v) => (v === '' ? '' : Number(v))),
-      descripcion: z.string().max(5000).optional().or(z.literal('')),
-      direccion: z.string().max(300).optional().or(z.literal('')),
-      telefono: z.string().max(30).optional().or(z.literal('')),
-      whatsapp: z.string().max(30).optional().or(z.literal('')),
-      email_contacto: z.string().email('Email de contacto inválido').optional().or(z.literal('')),
+      descripcion: z.string().max(5000, 'Máximo 5000 caracteres').optional().or(z.literal('')),
+      direccion: z.string().max(300, 'Máximo 300 caracteres').optional().or(z.literal('')),
+      telefono: z
+        .string()
+        .refine((v) => v === '' || isValidPhone(v), 'Teléfono inválido (7 a 15 dígitos)')
+        .optional()
+        .or(z.literal('')),
+      whatsapp: z
+        .string()
+        .refine((v) => v === '' || isValidPhone(v), 'WhatsApp inválido (7 a 15 dígitos)')
+        .optional()
+        .or(z.literal('')),
+      email_contacto: z
+        .string()
+        .refine((v) => v === '' || isEmail(v), 'Email de contacto inválido')
+        .optional()
+        .or(z.literal('')),
       website: z
         .string()
-        .refine((v) => v === '' || /^https?:\/\/.+/i.test(v), 'URL inválida (http/https)')
+        .refine((v) => v === '' || isValidHttpUrl(v), 'URL inválida (http/https)')
         .optional()
         .or(z.literal('')),
       portada_url: z
         .string()
-        .refine((v) => v === '' || /^https?:\/\/.+/i.test(v) || /^data:image\//i.test(v), 'URL inválida (http/https o imagen base64)')
+        .refine(
+          (v) => v === '' || isValidHttpUrl(v) || /^data:image\//i.test(v),
+          'URL inválida (http/https o imagen base64)'
+        )
         .optional()
         .or(z.literal('')),
       moneda: z.enum(MONEDAS, { message: 'Selecciona una moneda válida' }),
-      precio_min: z.coerce.number().min(0).optional(),
-      precio_max: z.coerce.number().min(0).optional(),
+      precio_min: precioSchema.optional(),
+      precio_max: precioSchema.optional(),
     })
     .superRefine((d, ctx) => {
       const nombre = nombresPorId.get(String(d.category_id))

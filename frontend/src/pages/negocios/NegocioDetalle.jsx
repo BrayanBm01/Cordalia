@@ -480,7 +480,7 @@ export default function NegocioDetalle({ manage = false }) {
               <>
                 <PublicInfo business={business} horarios={horarios} redes={redes} servicios={servicios} imagenes={imagenes} />
                 <PublicPlanesSection businessId={business.id} />
-                <ResenasSection businessId={business.id} businessOwnerId={business.owner_id || user?.id} />
+                <ResenasSection businessId={business.id} businessOwnerId={business.owner_id || user?.id} businessEstado={business.estado} />
               </>
             )}
 
@@ -609,7 +609,7 @@ export default function NegocioDetalle({ manage = false }) {
             <PublicInfo business={business} horarios={horarios} redes={redes} servicios={servicios} imagenes={imagenes} destinos={destinos} />
             <PublicPlanesSection businessId={business.id} />
             <div className="mt-6">
-              <ResenasSection businessId={business.id} businessOwnerId={business.owner_id || user?.id} />
+              <ResenasSection businessId={business.id} businessOwnerId={business.owner_id || user?.id} businessEstado={business.estado} />
             </div>
           </>
         )}

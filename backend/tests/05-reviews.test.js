@@ -16,9 +16,9 @@ h.test("REV: setup y lectura pública de reseñas", async () => {
 
   for (const [n, e, r] of [
     ["Review Negociante", emailNeg, 2],
-    ["Review Negociante 2", emailNeg2, 2],
-    ["Review Turista 1", emailT1, 1],
-    ["Review Turista 2", emailT2, 1],
+    ["Review Negociante Dos", emailNeg2, 2],
+    ["Review Turista Uno", emailT1, 1],
+    ["Review Turista Dos", emailT2, 1],
   ]) {
     h.assertStatus((await h.createUser(admin.token, { nombre: n, email: e, password: pass, rol_id: r })).status, 201, `crear ${e}`);
   }

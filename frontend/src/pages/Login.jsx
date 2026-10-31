@@ -10,9 +10,16 @@ import { useAuth } from '../context/AuthContext'
 import { consumirAvisoSesion, suscribirAvisoSesion, SESION_INACTIVIDAD_MS } from '../utils/session'
 import GoogleButton from '../components/GoogleButton'
 import { rutaInicioPorRol } from '../utils/roles'
+import { EMAIL_MAX, isEmail } from '../utils/validation'
 
 const loginSchema = z.object({
-  email: z.string().min(1, 'El email es requerido').email('Ingresa un email válido'),
+  email: z
+    .string()
+    .trim()
+    .min(1, 'El email es requerido')
+    .max(EMAIL_MAX, `El email no puede superar ${EMAIL_MAX} caracteres`)
+    .refine(isEmail, 'Ingresa un email válido'),
+  // La contrasena NO se recorta: se envia tal como se escribio.
   password: z.string().min(1, 'La contraseña es requerida'),
 })
 

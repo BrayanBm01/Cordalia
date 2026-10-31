@@ -1,4 +1,5 @@
 const app = require("./app");
+const pool = require("./config/db");
 require("dotenv").config();
 
 const PORT = process.env.PORT || 3000;
@@ -79,9 +80,52 @@ async function verificarVencidas() {
   }
 }
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Servidor corriendo en http://localhost:${PORT}`);
   verificarEsquema();
   verificarVencidas();
-  setInterval(verificarVencidas, 10 * 60 * 1000);
 });
+
+// Timeouts del servidor HTTP: una conexion lenta o un cliente que no
+// termina de enviar la peticion no puede retener recursos indefinidamente.
+server.requestTimeout = 30_000;
+server.headersTimeout = 35_000;
+server.keepAliveTimeout = 5_000;
+
+let intervaloVencidas = setInterval(verificarVencidas, 10 * 60 * 1000);
+intervaloVencidas.unref?.();
+
+server.on("error", (error) => {
+  console.error("[server] Error del servidor HTTP:", error.message);
+  process.exitCode = 1;
+});
+
+// Apagado ordenado: deja de aceptar peticiones, espera a las activas y
+// cierra el pool de PostgreSQL. Render envia SIGTERM al reiniciar.
+let cerrando = false;
+function apagar(senal) {
+  if (cerrando) return;
+  cerrando = true;
+  console.log(`[server] ${senal} recibido: cerrando ordenadamente...`);
+  clearInterval(intervaloVencidas);
+
+  const forzar = setTimeout(() => {
+    console.error("[server] El cierre ordenado tardó demasiado; saliendo.");
+    process.exit(1);
+  }, 10_000);
+  forzar.unref?.();
+
+  server.close(async () => {
+    try {
+      await pool.end();
+    } catch (error) {
+      console.error("[server] Error al cerrar el pool:", error.message);
+    } finally {
+      clearTimeout(forzar);
+      process.exit(0);
+    }
+  });
+}
+
+process.on("SIGTERM", () => apagar("SIGTERM"));
+process.on("SIGINT", () => apagar("SIGINT"));

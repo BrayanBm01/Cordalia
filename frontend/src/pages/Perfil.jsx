@@ -8,6 +8,12 @@ import {
 import { toast } from 'sonner'
 import { useAuth } from '../context/AuthContext'
 import { authAPI, inscripcionesAPI } from '../services/api'
+import {
+  isEmail,
+  isValidPersonName,
+  isValidPhone,
+  validatePassword,
+} from '../utils/validation'
 import { formatMoney } from './negocios/businessUtils'
 
 const inputBase =
@@ -273,6 +279,36 @@ export default function Perfil() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+
+    if (!isValidPersonName(form.nombre)) {
+      toast.error('Nombre inválido: usa solo letras, tildes, ñ, espacios, guiones o apóstrofos (2 a 100 caracteres)')
+      return
+    }
+    if (form.apellido.trim() && !isValidPersonName(form.apellido)) {
+      toast.error('Apellido inválido: usa solo letras, tildes, ñ, espacios, guiones o apóstrofos (2 a 100 caracteres)')
+      return
+    }
+    if (!isEmail(form.email)) {
+      toast.error('Ingresa un correo electrónico válido')
+      return
+    }
+    if (form.telefono.trim() && !isValidPhone(form.telefono)) {
+      toast.error('Teléfono inválido: usa entre 7 y 15 dígitos, con +, espacios, guiones o paréntesis')
+      return
+    }
+    if (form.ciudad.length > 100) {
+      toast.error('La ciudad no puede superar 100 caracteres')
+      return
+    }
+    if (form.bio.length > 1000) {
+      toast.error('La biografía no puede superar 1000 caracteres')
+      return
+    }
+    if (form.intereses_turisticos.length > 500 || form.preferencias_viaje.length > 500) {
+      toast.error('Los intereses y preferencias no pueden superar 500 caracteres')
+      return
+    }
+
     setSaving(true)
 
     const body = { ...form }
@@ -301,8 +337,13 @@ export default function Perfil() {
   // cambiarla. Todo se valida en el backend (POST /auth/password).
   async function handlePasswordSubmit(e) {
     e.preventDefault()
-    if (pwd.nueva.length < 6) {
-      toast.error('La contraseña debe tener al menos 6 caracteres')
+    const passwordError = validatePassword(pwd.nueva)
+    if (passwordError) {
+      toast.error(passwordError)
+      return
+    }
+    if (tienePasswordLocal && !pwd.actual) {
+      toast.error('Ingresa tu contraseña actual')
       return
     }
     if (pwd.nueva !== pwd.confirmar) {

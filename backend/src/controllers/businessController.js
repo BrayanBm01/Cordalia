@@ -1,14 +1,26 @@
 const BusinessModel = require("../models/businessModel");
 const LugarModel = require("../models/lugarModel");
 const { slugify } = require("../utils/slug");
-const { isEmail, isNonEmptyString, sanitizeString } = require("../utils/validators");
+const {
+  isEmail,
+  isNonEmptyString,
+  isValidBusinessName,
+  isValidPersonName,
+  isValidPhone,
+  isValidHttpUrl,
+  isValidDateOnly,
+  parseInteger,
+  parseDecimal,
+  sanitizeString,
+  validarTexto,
+} = require("../utils/validators");
 
 const ESTADOS = ["draft", "pending", "approved", "rejected", "suspended", "inactive"];
-const URL_RE = /^https?:\/\/.+/i;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
 const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 const IMAGEN_MAX_BYTES = 1500 * 1024; // 1.5 MB por imagen
 const IMAGENES_PERMITIDAS = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const PRECIO_MAX = 99999999.99; // DECIMAL(10,2) en PostgreSQL
 
 // Monedas disponibles en los catálogos de la plataforma.
 const MONEDAS_PERMITIDAS = ["COP", "USD", "EUR", "MXN", "PEN"];
@@ -38,12 +50,6 @@ function validarImagenDataUrl(dataUrl) {
   return null;
 }
 
-function parseNumber(val) {
-  if (val === undefined || val === null || val === "") return null;
-  const n = Number(val);
-  return Number.isFinite(n) ? n : NaN;
-}
-
 async function uniqueSlugFor(nombre, excludeId = null) {
   const base = slugify(nombre);
   if (!base) throw { status: 400, message: "No se pudo generar un slug válido desde el nombre" };
@@ -56,30 +62,38 @@ async function uniqueSlugFor(nombre, excludeId = null) {
 }
 
 function validarBusiness(body, esCreacion = false) {
-  let {
+  const input = body && typeof body === "object" ? body : {};
+  const {
     nombre, category_id, destination_id, descripcion, direccion, telefono, whatsapp,
     email_contacto, website, precio_min, precio_max, moneda, lat, lng, portada_url,
-  } = body || {};
+  } = input;
 
   const data = {};
 
   if (nombre !== undefined) {
-    nombre = sanitizeString(nombre);
-    if (!isNonEmptyString(nombre, 2, 200)) {
-      return { error: { status: 400, message: "El nombre debe tener entre 2 y 200 caracteres" } };
+    if (typeof nombre !== "string" || !isValidBusinessName(nombre)) {
+      return {
+        error: {
+          status: 400,
+          message:
+            "El nombre del negocio debe tener entre 2 y 200 caracteres y contener letras o números",
+        },
+      };
     }
-    data.nombre = nombre;
+    data.nombre = sanitizeString(nombre);
   } else if (esCreacion) {
     return { error: { status: 400, message: "El nombre del negocio es obligatorio" } };
   }
 
   if (category_id !== undefined && category_id !== null && category_id !== "") {
-    const cid = Number(category_id);
-    if (!Number.isInteger(cid) || cid <= 0) {
+    const cid = parseInteger(category_id, { min: 1 });
+    if (cid === null) {
       return { error: { status: 400, message: "Categoría inválida" } };
     }
     data.category_id = cid;
   } else if (esCreacion) {
+    data.category_id = null;
+  } else if (category_id === null || category_id === "") {
     data.category_id = null;
   }
 
@@ -87,8 +101,8 @@ function validarBusiness(body, esCreacion = false) {
     if (destination_id === null || destination_id === "") {
       data.destination_id = null;
     } else {
-      const did = Number(destination_id);
-      if (!Number.isInteger(did) || did <= 0) {
+      const did = parseInteger(destination_id, { min: 1 });
+      if (did === null) {
         return { error: { status: 400, message: "Destino inválido" } };
       }
       data.destination_id = did;
@@ -97,45 +111,88 @@ function validarBusiness(body, esCreacion = false) {
     data.destination_id = null;
   }
 
-  if (descripcion !== undefined) data.descripcion = sanitizeString(descripcion).slice(0, 5000);
-  if (direccion !== undefined) data.direccion = sanitizeString(direccion).slice(0, 300);
-  if (telefono !== undefined) data.telefono = sanitizeString(telefono).slice(0, 30);
-  if (whatsapp !== undefined) data.whatsapp = sanitizeString(whatsapp).slice(0, 30);
+  const textos = [
+    { key: "descripcion", max: 5000, label: "La descripción", multiline: true },
+    { key: "direccion", max: 300, label: "La dirección" },
+  ];
+  for (const campo of textos) {
+    if (input[campo.key] === undefined) continue;
+    const resultado = validarTexto(input[campo.key], {
+      max: campo.max,
+      label: campo.label,
+      multiline: Boolean(campo.multiline),
+    });
+    if (resultado.error) {
+      return { error: { status: 400, message: resultado.error } };
+    }
+    data[campo.key] = resultado.value || "";
+  }
+
+  for (const campo of [
+    { key: "telefono", label: "El teléfono" },
+    { key: "whatsapp", label: "El WhatsApp" },
+  ]) {
+    if (input[campo.key] === undefined) continue;
+    if (input[campo.key] === null || input[campo.key] === "") {
+      data[campo.key] = "";
+      continue;
+    }
+    if (typeof input[campo.key] !== "string" || !isValidPhone(input[campo.key])) {
+      return {
+        error: {
+          status: 400,
+          message: `${campo.label} es inválido: usa entre 7 y 15 dígitos, con +, espacios, guiones o paréntesis`,
+        },
+      };
+    }
+    data[campo.key] = sanitizeString(input[campo.key]);
+  }
 
   if (email_contacto !== undefined) {
-    const em = sanitizeString(email_contacto).toLowerCase();
-    data.email_contacto = em === "" ? null : em;
-    if (data.email_contacto && !isEmail(data.email_contacto)) {
+    if (email_contacto !== null && typeof email_contacto !== "string") {
       return { error: { status: 400, message: "Email de contacto inválido" } };
     }
+    const em = sanitizeString(email_contacto || "").toLowerCase();
+    if (em && !isEmail(em)) {
+      return { error: { status: 400, message: "Email de contacto inválido" } };
+    }
+    data.email_contacto = em || "";
   }
 
   if (website !== undefined) {
-    const w = sanitizeString(website);
-    data.website = w === "" ? null : w.slice(0, 300);
-    if (data.website && !URL_RE.test(data.website)) {
+    if (website !== null && typeof website !== "string") {
       return { error: { status: 400, message: "URL del sitio web inválida" } };
     }
+    const w = sanitizeString(website || "");
+    if (w && !isValidHttpUrl(w)) {
+      return { error: { status: 400, message: "URL del sitio web inválida (debe iniciar con http:// o https://)" } };
+    }
+    data.website = w || "";
   }
 
   if (portada_url !== undefined) {
-    const p = sanitizeString(portada_url);
-    data.portada_url = p === "" ? null : p;
-    const esUrl = URL_RE.test(p);
-    const esDataUrl = /^data:image\//i.test(p);
-    if (data.portada_url && !esUrl && !esDataUrl) {
+    if (portada_url !== null && typeof portada_url !== "string") {
       return { error: { status: 400, message: "URL de la portada inválida" } };
     }
-    if (esDataUrl) {
-      const errorImg = validarImagenDataUrl(p);
-      if (errorImg) return { error: { status: 400, message: errorImg } };
+    const p = sanitizeString(portada_url || "");
+    if (p) {
+      const esDataUrl = /^data:image\//i.test(p);
+      if (esDataUrl) {
+        const errorImg = validarImagenDataUrl(p);
+        if (errorImg) return { error: { status: 400, message: errorImg } };
+      } else if (!isValidHttpUrl(p)) {
+        return { error: { status: 400, message: "URL de la portada inválida" } };
+      }
     }
+    data.portada_url = p || "";
   }
 
   if (moneda !== undefined) {
-    const m = sanitizeString(moneda).toUpperCase();
-    data.moneda = m === "" ? null : m;
-    if (data.moneda && !MONEDAS_PERMITIDAS.includes(data.moneda)) {
+    if (moneda !== null && typeof moneda !== "string") {
+      return { error: { status: 400, message: "Moneda inválida" } };
+    }
+    const m = sanitizeString(moneda || "").toUpperCase();
+    if (m && !MONEDAS_PERMITIDAS.includes(m)) {
       return {
         error: {
           status: 400,
@@ -143,19 +200,26 @@ function validarBusiness(body, esCreacion = false) {
         },
       };
     }
+    data.moneda = m || null;
   }
 
   if (precio_min !== undefined) {
-    const p = parseNumber(precio_min);
-    if (Number.isNaN(p) || p < 0) {
+    const p = parseDecimal(precio_min, { min: 0, max: PRECIO_MAX, decimals: 2 });
+    if (p === null && precio_min !== null && precio_min !== "") {
+      return { error: { status: 400, message: "Precio mínimo inválido" } };
+    }
+    if (Number.isNaN(p)) {
       return { error: { status: 400, message: "Precio mínimo inválido" } };
     }
     data.precio_min = p;
   }
 
   if (precio_max !== undefined) {
-    const p = parseNumber(precio_max);
-    if (Number.isNaN(p) || p < 0) {
+    const p = parseDecimal(precio_max, { min: 0, max: PRECIO_MAX, decimals: 2 });
+    if (p === null && precio_max !== null && precio_max !== "") {
+      return { error: { status: 400, message: "Precio máximo inválido" } };
+    }
+    if (Number.isNaN(p)) {
       return { error: { status: 400, message: "Precio máximo inválido" } };
     }
     data.precio_max = p;
@@ -166,16 +230,16 @@ function validarBusiness(body, esCreacion = false) {
   }
 
   if (lat !== undefined) {
-    const n = parseNumber(lat);
-    if (Number.isNaN(n) || n < -90 || n > 90) {
+    const n = parseDecimal(lat, { min: -90, max: 90, decimals: 7 });
+    if (Number.isNaN(n) || (n === null && lat !== null && lat !== "")) {
       return { error: { status: 400, message: "Latitud inválida" } };
     }
     data.lat = n;
   }
 
   if (lng !== undefined) {
-    const n = parseNumber(lng);
-    if (Number.isNaN(n) || n < -180 || n > 180) {
+    const n = parseDecimal(lng, { min: -180, max: 180, decimals: 7 });
+    if (Number.isNaN(n) || (n === null && lng !== null && lng !== "")) {
       return { error: { status: 400, message: "Longitud inválida" } };
     }
     data.lng = n;
@@ -230,7 +294,13 @@ exports.list = async (req, res) => {
 };
 
 exports.getById = async (req, res) => {
-  return res.json({ success: true, data: req.business });
+  const data = { ...req.business };
+  // El correo del propietario es dato administrativo: solo un ADMIN
+  // autenticado puede verlo. La ficha publica no lo expone.
+  if (!req.usuario || req.usuario.rol !== "ADMIN") {
+    delete data.owner_email;
+  }
+  return res.json({ success: true, data });
 };
 
 exports.create = async (req, res) => {
@@ -296,6 +366,26 @@ exports.update = async (req, res) => {
       return res.status(400).json({ success: false, message: "No hay datos para actualizar" });
     }
 
+    // En una edicion parcial hay que comparar los precios EFECTIVOS
+    // (los nuevos y los que ya tenia el negocio). Si no, cambiar solo
+    // precio_min podria dejar un rango invalido en la base de datos.
+    const preciosEfectivos = {
+      precio_min:
+        data.precio_min !== undefined ? data.precio_min : req.business.precio_min,
+      precio_max:
+        data.precio_max !== undefined ? data.precio_max : req.business.precio_max,
+    };
+    if (
+      preciosEfectivos.precio_min != null &&
+      preciosEfectivos.precio_max != null &&
+      Number(preciosEfectivos.precio_max) < Number(preciosEfectivos.precio_min)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "El precio máximo no puede ser menor que el mínimo",
+      });
+    }
+
     if (data.nombre && data.nombre !== req.business.nombre) {
       data.slug = await uniqueSlugFor(data.nombre, req.business.id);
     }
@@ -306,7 +396,7 @@ exports.update = async (req, res) => {
       if (!categoria) {
         return res.status(400).json({ success: false, message: "La categoría seleccionada no existe" });
       }
-      const precioError = validarPreciosPorCategoria(categoria.nombre, data);
+      const precioError = validarPreciosPorCategoria(categoria.nombre, preciosEfectivos);
       if (precioError) {
         return res.status(precioError.status).json({ success: false, message: precioError.message });
       }
@@ -413,22 +503,39 @@ exports.listImages = async (req, res) => {
 exports.addImage = async (req, res) => {
   try {
     const { url, alt_text, is_primary, orden } = req.body || {};
+    if (typeof url !== "string") {
+      return res.status(400).json({ success: false, message: "URL de la imagen inválida" });
+    }
     const img = sanitizeString(url);
-    const esUrl = URL_RE.test(img);
     const esDataUrl = /^data:image\//i.test(img);
-    if (!isNonEmptyString(img, 1, 3000000) || (!esUrl && !esDataUrl)) {
+    if (!img || (!esDataUrl && !isValidHttpUrl(img, 3000000))) {
       return res.status(400).json({ success: false, message: "URL de la imagen inválida" });
     }
     if (esDataUrl) {
       const errorImg = validarImagenDataUrl(img);
       if (errorImg) return res.status(400).json({ success: false, message: errorImg });
     }
+    const alt = validarTexto(alt_text, { max: 250, label: "El texto alternativo" });
+    if (alt.error) {
+      return res.status(400).json({ success: false, message: alt.error });
+    }
+    let ordenFinal = 0;
+    if (orden !== undefined) {
+      const o = parseInteger(orden, { min: 0, max: 10000 });
+      if (o === null) {
+        return res.status(400).json({ success: false, message: "El orden debe ser un entero entre 0 y 10000" });
+      }
+      ordenFinal = o;
+    }
+    if (is_primary !== undefined && typeof is_primary !== "boolean") {
+      return res.status(400).json({ success: false, message: "is_primary debe ser verdadero o falso" });
+    }
     const imagen = await BusinessModel.addImage(
       req.params.id,
-      img.trim(),
-      sanitizeString(alt_text).slice(0, 250) || null,
+      img,
+      alt.value || null,
       Boolean(is_primary),
-      Number.isInteger(Number(orden)) ? Number(orden) : 0
+      ordenFinal
     );
     return res.status(201).json({ success: true, message: "Imagen agregada", data: imagen });
   } catch (error) {
@@ -441,13 +548,33 @@ exports.updateImage = async (req, res) => {
     const { url, alt_text, orden } = req.body || {};
     const fields = {};
     if (url !== undefined) {
-      if (!isNonEmptyString(url, 1, 2000) || !URL_RE.test(url)) {
+      if (typeof url !== "string") {
         return res.status(400).json({ success: false, message: "URL de la imagen inválida" });
       }
-      fields.url = url.trim();
+      const img = sanitizeString(url);
+      if (!img || (!/^data:image\//i.test(img) && !isValidHttpUrl(img, 3000000))) {
+        return res.status(400).json({ success: false, message: "URL de la imagen inválida" });
+      }
+      if (/^data:image\//i.test(img)) {
+        const errorImg = validarImagenDataUrl(img);
+        if (errorImg) return res.status(400).json({ success: false, message: errorImg });
+      }
+      fields.url = img;
     }
-    if (alt_text !== undefined) fields.alt_text = sanitizeString(alt_text).slice(0, 250) || null;
-    if (orden !== undefined) fields.orden = Number.isInteger(Number(orden)) ? Number(orden) : 0;
+    if (alt_text !== undefined) {
+      const alt = validarTexto(alt_text, { max: 250, label: "El texto alternativo" });
+      if (alt.error) {
+        return res.status(400).json({ success: false, message: alt.error });
+      }
+      fields.alt_text = alt.value;
+    }
+    if (orden !== undefined) {
+      const o = parseInteger(orden, { min: 0, max: 10000 });
+      if (o === null) {
+        return res.status(400).json({ success: false, message: "El orden debe ser un entero entre 0 y 10000" });
+      }
+      fields.orden = o;
+    }
     if (Object.keys(fields).length === 0) {
       return res.status(400).json({ success: false, message: "No hay datos para actualizar" });
     }
@@ -498,10 +625,18 @@ exports.listServices = async (req, res) => {
 exports.addService = async (req, res) => {
   try {
     const { nombre, descripcion } = req.body || {};
-    if (!isNonEmptyString(nombre, 2, 150)) {
+    if (typeof nombre !== "string" || !isNonEmptyString(nombre, 2, 150)) {
       return res.status(400).json({ success: false, message: "El nombre del servicio debe tener entre 2 y 150 caracteres" });
     }
-    const servicio = await BusinessModel.addService(req.params.id, sanitizeString(nombre), sanitizeString(descripcion).slice(0, 1000) || null);
+    const desc = validarTexto(descripcion, {
+      max: 1000,
+      label: "La descripción del servicio",
+      multiline: true,
+    });
+    if (desc.error) {
+      return res.status(400).json({ success: false, message: desc.error });
+    }
+    const servicio = await BusinessModel.addService(req.params.id, sanitizeString(nombre), desc.value);
     return res.status(201).json({ success: true, message: "Servicio agregado", data: servicio });
   } catch (error) {
     return serverError(res, error, "addService");
@@ -513,12 +648,22 @@ exports.updateService = async (req, res) => {
     const { nombre, descripcion } = req.body || {};
     const fields = {};
     if (nombre !== undefined) {
-      if (!isNonEmptyString(nombre, 2, 150)) {
+      if (typeof nombre !== "string" || !isNonEmptyString(nombre, 2, 150)) {
         return res.status(400).json({ success: false, message: "El nombre del servicio debe tener entre 2 y 150 caracteres" });
       }
       fields.nombre = sanitizeString(nombre);
     }
-    if (descripcion !== undefined) fields.descripcion = sanitizeString(descripcion).slice(0, 1000) || null;
+    if (descripcion !== undefined) {
+      const desc = validarTexto(descripcion, {
+        max: 1000,
+        label: "La descripción del servicio",
+        multiline: true,
+      });
+      if (desc.error) {
+        return res.status(400).json({ success: false, message: desc.error });
+      }
+      fields.descripcion = desc.value;
+    }
     if (Object.keys(fields).length === 0) {
       return res.status(400).json({ success: false, message: "No hay datos para actualizar" });
     }
@@ -546,12 +691,13 @@ exports.deleteService = async (req, res) => {
 
 // ---------- Horarios ----------
 function validarHorario(body, esEdicion = false) {
-  let { day_of_week, open_time, close_time, is_closed, orden } = body || {};
+  const input = body && typeof body === "object" ? body : {};
+  const { day_of_week, open_time, close_time, is_closed, orden } = input;
   const data = {};
 
   if (day_of_week !== undefined) {
-    const d = Number(day_of_week);
-    if (!Number.isInteger(d) || d < 0 || d > 6) {
+    const d = parseInteger(day_of_week, { min: 0, max: 6 });
+    if (d === null) {
       return { error: { status: 400, message: "Día de la semana inválido (0-6)" } };
     }
     data.day_of_week = d;
@@ -559,21 +705,29 @@ function validarHorario(body, esEdicion = false) {
     return { error: { status: 400, message: "day_of_week es obligatorio" } };
   }
 
-  if (is_closed !== undefined) data.is_closed = Boolean(is_closed);
+  if (is_closed !== undefined) {
+    if (typeof is_closed !== "boolean") {
+      return { error: { status: 400, message: "is_closed debe ser verdadero o falso" } };
+    }
+    data.is_closed = is_closed;
+  }
 
   for (const key of ["open_time", "close_time"]) {
-    const val = body[key];
+    const val = input[key];
     if (val !== undefined) {
       if (val === null || val === "") data[key] = null;
-      else if (!TIME_RE.test(String(val))) {
+      else if (typeof val !== "string" || !TIME_RE.test(val)) {
         return { error: { status: 400, message: `Hora ${key} inválida (HH:MM)` } };
-      } else data[key] = String(val);
+      } else data[key] = val;
     }
   }
 
   if (orden !== undefined) {
-    const o = Number(orden);
-    data.orden = Number.isInteger(o) ? o : 0;
+    const o = parseInteger(orden, { min: 0, max: 10000 });
+    if (o === null) {
+      return { error: { status: 400, message: "El orden debe ser un entero entre 0 y 10000" } };
+    }
+    data.orden = o;
   }
 
   return { data };
@@ -649,10 +803,10 @@ exports.deleteHour = async (req, res) => {
 // ---------- Redes sociales ----------
 async function validarRed(body) {
   const { plataforma, url } = body || {};
-  if (!isNonEmptyString(plataforma, 2, 50)) {
+  if (typeof plataforma !== "string" || !isNonEmptyString(plataforma, 2, 50)) {
     return { error: { status: 400, message: "Plataforma inválida" } };
   }
-  if (!isNonEmptyString(url, 1, 2000) || !URL_RE.test(url)) {
+  if (typeof url !== "string" || !isValidHttpUrl(url, 2000)) {
     return { error: { status: 400, message: "URL de la red social inválida" } };
   }
   return { data: { plataforma: sanitizeString(plataforma).toLowerCase(), url: sanitizeString(url) } };
@@ -690,13 +844,13 @@ exports.updateSocialLink = async (req, res) => {
     const { plataforma, url } = req.body || {};
     const fields = {};
     if (plataforma !== undefined) {
-      if (!isNonEmptyString(plataforma, 2, 50)) {
+      if (typeof plataforma !== "string" || !isNonEmptyString(plataforma, 2, 50)) {
         return res.status(400).json({ success: false, message: "Plataforma inválida" });
       }
       fields.plataforma = sanitizeString(plataforma).toLowerCase();
     }
     if (url !== undefined) {
-      if (!isNonEmptyString(url, 1, 2000) || !URL_RE.test(url)) {
+      if (typeof url !== "string" || !isValidHttpUrl(url, 2000)) {
         return res.status(400).json({ success: false, message: "URL de la red social inválida" });
       }
       fields.url = sanitizeString(url);
@@ -757,14 +911,17 @@ function normalizarTipoVehiculo(tipo) {
 exports.addVehiculo = async (req, res) => {
   try {
     const { nombre, tipo, marca, modelo, anio, placa, capacidad, estado, descripcion, conductor_id } = req.body || {};
-    if (!isNonEmptyString(nombre, 2, 150)) {
+    if (typeof nombre !== "string" || !isNonEmptyString(nombre, 2, 150)) {
       return res.status(400).json({ success: false, message: "El nombre del vehículo debe tener entre 2 y 150 caracteres" });
     }
-    const cap = Number(capacidad);
-    if (!Number.isInteger(cap) || cap < 1 || cap > 200) {
+    const cap = parseInteger(capacidad, { min: 1, max: 200 });
+    if (cap === null) {
       return res.status(400).json({ success: false, message: "La capacidad debe ser un entero entre 1 y 200" });
     }
-    const placaNormalizada = sanitizeString(placa).toUpperCase().slice(0, 20) || null;
+    if (placa !== undefined && placa !== null && typeof placa !== "string") {
+      return res.status(400).json({ success: false, message: "Placa inválida: usa letras y números (ej. ABC-123)" });
+    }
+    const placaNormalizada = sanitizeString(placa || "").toUpperCase() || null;
     if (placaNormalizada && !/^[A-Z0-9]{2,}-?[A-Z0-9]{1,6}$/.test(placaNormalizada.replace(/\s+/g, ""))) {
       return res.status(400).json({ success: false, message: "Placa inválida: usa letras y números (ej. ABC-123)" });
     }
@@ -778,30 +935,40 @@ exports.addVehiculo = async (req, res) => {
     }
     let anioNorm = null;
     if (anio !== undefined && anio !== null && anio !== "") {
-      anioNorm = Number(anio);
-      if (!Number.isInteger(anioNorm) || anioNorm < 1960 || anioNorm > 2100) {
+      anioNorm = parseInteger(anio, { min: 1960, max: 2100 });
+      if (anioNorm === null) {
         return res.status(400).json({ success: false, message: "El año debe ser un entero entre 1960 y 2100" });
       }
     }
     let conductorNorm = null;
     if (conductor_id !== undefined && conductor_id !== null && conductor_id !== "") {
-      conductorNorm = Number(conductor_id);
-      if (!Number.isInteger(conductorNorm) || conductorNorm <= 0) {
+      conductorNorm = parseInteger(conductor_id, { min: 1 });
+      if (conductorNorm === null) {
         return res.status(400).json({ success: false, message: "Conductor inválido" });
       }
       const existe = await BusinessModel.findConductorById(req.params.id, conductorNorm);
       if (!existe) return res.status(400).json({ success: false, message: "El conductor asignado no pertenece a este negocio" });
     }
+    const marcaTexto = validarTexto(marca, { max: 100, label: "La marca" });
+    if (marcaTexto.error) return res.status(400).json({ success: false, message: marcaTexto.error });
+    const modeloTexto = validarTexto(modelo, { max: 100, label: "El modelo" });
+    if (modeloTexto.error) return res.status(400).json({ success: false, message: modeloTexto.error });
+    const descripcionTexto = validarTexto(descripcion, {
+      max: 1000,
+      label: "La descripción",
+      multiline: true,
+    });
+    if (descripcionTexto.error) return res.status(400).json({ success: false, message: descripcionTexto.error });
     const vehiculo = await BusinessModel.addVehiculo(req.params.id, {
       nombre: sanitizeString(nombre),
       tipo: tipoNorm,
-      marca: sanitizeString(marca).slice(0, 100) || null,
-      modelo: sanitizeString(modelo).slice(0, 100) || null,
+      marca: marcaTexto.value,
+      modelo: modeloTexto.value,
       anio: anioNorm,
       placa: placaNormalizada,
       capacidad: cap,
       estado: estadoNorm,
-      descripcion: sanitizeString(descripcion).slice(0, 1000) || null,
+      descripcion: descripcionTexto.value,
       conductor_id: conductorNorm,
     });
     return res.status(201).json({ success: true, message: "Vehículo agregado", data: vehiculo });
@@ -818,7 +985,7 @@ exports.updateVehiculo = async (req, res) => {
     const { nombre, tipo, marca, modelo, anio, placa, capacidad, estado, descripcion, conductor_id } = req.body || {};
     const fields = {};
     if (nombre !== undefined) {
-      if (!isNonEmptyString(nombre, 2, 150)) {
+      if (typeof nombre !== "string" || !isNonEmptyString(nombre, 2, 150)) {
         return res.status(400).json({ success: false, message: "El nombre del vehículo debe tener entre 2 y 150 caracteres" });
       }
       fields.nombre = sanitizeString(nombre);
@@ -830,32 +997,43 @@ exports.updateVehiculo = async (req, res) => {
       }
       fields.tipo = String(tipo || "") === "" ? null : t;
     }
-    if (marca !== undefined) fields.marca = sanitizeString(marca).slice(0, 100) || null;
-    if (modelo !== undefined) fields.modelo = sanitizeString(modelo).slice(0, 100) || null;
+    if (marca !== undefined) {
+      const texto = validarTexto(marca, { max: 100, label: "La marca" });
+      if (texto.error) return res.status(400).json({ success: false, message: texto.error });
+      fields.marca = texto.value;
+    }
+    if (modelo !== undefined) {
+      const texto = validarTexto(modelo, { max: 100, label: "El modelo" });
+      if (texto.error) return res.status(400).json({ success: false, message: texto.error });
+      fields.modelo = texto.value;
+    }
     if (placa !== undefined) {
-      const p = sanitizeString(placa).toUpperCase().slice(0, 20) || null;
+      if (placa !== null && typeof placa !== "string") {
+        return res.status(400).json({ success: false, message: "Placa inválida: usa letras y números (ej. ABC-123)" });
+      }
+      const p = sanitizeString(placa || "").toUpperCase() || null;
       if (p && !/^[A-Z0-9]{2,}-?[A-Z0-9]{1,6}$/.test(p.replace(/\s+/g, ""))) {
         return res.status(400).json({ success: false, message: "Placa inválida: usa letras y números (ej. ABC-123)" });
       }
       fields.placa = p;
     }
     if (capacidad !== undefined) {
-      const cap = Number(capacidad);
-      if (!Number.isInteger(cap) || cap < 1 || cap > 200) {
+      const cap = parseInteger(capacidad, { min: 1, max: 200 });
+      if (cap === null) {
         return res.status(400).json({ success: false, message: "La capacidad debe ser un entero entre 1 y 200" });
       }
       fields.capacidad = cap;
     }
     if (estado !== undefined) {
-      const e = String(estado).toLowerCase();
+      const e = typeof estado === "string" ? estado.toLowerCase() : "";
       if (!ESTADOS_VEHICULO.includes(e)) {
         return res.status(400).json({ success: false, message: "Estado inválido (disponible, mantenimiento, inactivo)" });
       }
       fields.estado = e;
     }
     if (anio !== undefined && anio !== null && anio !== "") {
-      const a = Number(anio);
-      if (!Number.isInteger(a) || a < 1960 || a > 2100) {
+      const a = parseInteger(anio, { min: 1960, max: 2100 });
+      if (a === null) {
         return res.status(400).json({ success: false, message: "El año debe ser un entero entre 1960 y 2100" });
       }
       fields.anio = a;
@@ -866,8 +1044,8 @@ exports.updateVehiculo = async (req, res) => {
       if (conductor_id === null || conductor_id === "") {
         fields.conductor_id = null;
       } else {
-        const c = Number(conductor_id);
-        if (!Number.isInteger(c) || c <= 0) {
+        const c = parseInteger(conductor_id, { min: 1 });
+        if (c === null) {
           return res.status(400).json({ success: false, message: "Conductor inválido" });
         }
         const existe = await BusinessModel.findConductorById(req.params.id, c);
@@ -875,7 +1053,15 @@ exports.updateVehiculo = async (req, res) => {
         fields.conductor_id = c;
       }
     }
-    if (descripcion !== undefined) fields.descripcion = sanitizeString(descripcion).slice(0, 1000) || null;
+    if (descripcion !== undefined) {
+      const texto = validarTexto(descripcion, {
+        max: 1000,
+        label: "La descripción",
+        multiline: true,
+      });
+      if (texto.error) return res.status(400).json({ success: false, message: texto.error });
+      fields.descripcion = texto.value;
+    }
     if (Object.keys(fields).length === 0) {
       return res.status(400).json({ success: false, message: "No hay datos para actualizar" });
     }
@@ -913,31 +1099,58 @@ exports.listConductores = async (req, res) => {
 exports.addConductor = async (req, res) => {
   try {
     const { nombre, email, telefono, licencia, licencia_categoria, licencia_vencimiento, experiencia, disponible } = req.body || {};
-    if (!isNonEmptyString(nombre, 2, 150)) {
-      return res.status(400).json({ success: false, message: "El nombre del conductor debe tener entre 2 y 150 caracteres" });
+    if (typeof nombre !== "string" || !isValidPersonName(nombre)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "El nombre del conductor es inválido: usa solo letras, tildes, ñ, espacios, guiones o apóstrofos (2 a 100 caracteres)",
+      });
     }
     let emailNorm = null;
     if (email !== undefined && email !== null && email !== "") {
-      emailNorm = sanitizeString(email).toLowerCase().slice(0, 150) || null;
-      if (emailNorm && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNorm)) {
+      if (typeof email !== "string") {
+        return res.status(400).json({ success: false, message: "Correo electrónico inválido" });
+      }
+      emailNorm = sanitizeString(email).toLowerCase() || null;
+      if (emailNorm && !isEmail(emailNorm)) {
         return res.status(400).json({ success: false, message: "Correo electrónico inválido" });
       }
     }
+    let telefonoNorm = null;
+    if (telefono !== undefined && telefono !== null && telefono !== "") {
+      if (typeof telefono !== "string" || !isValidPhone(telefono)) {
+        return res.status(400).json({ success: false, message: "Teléfono del conductor inválido" });
+      }
+      telefonoNorm = sanitizeString(telefono);
+    }
     let vencimiento = null;
     if (licencia_vencimiento !== undefined && licencia_vencimiento !== null && licencia_vencimiento !== "") {
-      vencimiento = String(licencia_vencimiento);
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(vencimiento) || Number.isNaN(new Date(vencimiento + "T00:00:00").getTime())) {
-        return res.status(400).json({ success: false, message: "La fecha de vencimiento de licencia debe tener formato YYYY-MM-DD" });
+      if (!isValidDateOnly(licencia_vencimiento)) {
+        return res.status(400).json({ success: false, message: "La fecha de vencimiento de licencia debe ser una fecha real YYYY-MM-DD" });
       }
+      vencimiento = licencia_vencimiento;
     }
+    if (disponible !== undefined && typeof disponible !== "boolean") {
+      return res.status(400).json({ success: false, message: "disponible debe ser verdadero o falso" });
+    }
+    const licenciaTexto = validarTexto(licencia, { max: 50, label: "La licencia" });
+    if (licenciaTexto.error) return res.status(400).json({ success: false, message: licenciaTexto.error });
+    const categoriaTexto = validarTexto(licencia_categoria, { max: 20, label: "La categoría de licencia" });
+    if (categoriaTexto.error) return res.status(400).json({ success: false, message: categoriaTexto.error });
+    const experienciaTexto = validarTexto(experiencia, {
+      max: 1000,
+      label: "La experiencia",
+      multiline: true,
+    });
+    if (experienciaTexto.error) return res.status(400).json({ success: false, message: experienciaTexto.error });
     const conductor = await BusinessModel.addConductor(req.params.id, {
       nombre: sanitizeString(nombre),
       email: emailNorm,
-      telefono: sanitizeString(telefono).slice(0, 30) || null,
-      licencia: sanitizeString(licencia).slice(0, 50) || null,
-      licencia_categoria: sanitizeString(licencia_categoria).slice(0, 20) || null,
+      telefono: telefonoNorm,
+      licencia: licenciaTexto.value,
+      licencia_categoria: categoriaTexto.value,
       licencia_vencimiento: vencimiento,
-      experiencia: sanitizeString(experiencia).slice(0, 1000) || null,
+      experiencia: experienciaTexto.value,
       disponible: disponible !== false,
     });
     return res.status(201).json({ success: true, message: "Conductor agregado", data: conductor });
@@ -951,8 +1164,12 @@ exports.updateConductor = async (req, res) => {
     const { nombre, email, telefono, licencia, licencia_categoria, licencia_vencimiento, experiencia, disponible } = req.body || {};
     const fields = {};
     if (nombre !== undefined) {
-      if (!isNonEmptyString(nombre, 2, 150)) {
-        return res.status(400).json({ success: false, message: "El nombre del conductor debe tener entre 2 y 150 caracteres" });
+      if (typeof nombre !== "string" || !isValidPersonName(nombre)) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "El nombre del conductor es inválido: usa solo letras, tildes, ñ, espacios, guiones o apóstrofos (2 a 100 caracteres)",
+        });
       }
       fields.nombre = sanitizeString(nombre);
     }
@@ -960,29 +1177,60 @@ exports.updateConductor = async (req, res) => {
       if (email === null || email === "") {
         fields.email = null;
       } else {
-        const e = sanitizeString(email).toLowerCase().slice(0, 150);
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+        if (typeof email !== "string") {
+          return res.status(400).json({ success: false, message: "Correo electrónico inválido" });
+        }
+        const e = sanitizeString(email).toLowerCase();
+        if (!isEmail(e)) {
           return res.status(400).json({ success: false, message: "Correo electrónico inválido" });
         }
         fields.email = e;
       }
     }
-    if (telefono !== undefined) fields.telefono = sanitizeString(telefono).slice(0, 30) || null;
-    if (licencia !== undefined) fields.licencia = sanitizeString(licencia).slice(0, 50) || null;
-    if (licencia_categoria !== undefined) fields.licencia_categoria = sanitizeString(licencia_categoria).slice(0, 20) || null;
+    if (telefono !== undefined) {
+      if (telefono === null || telefono === "") {
+        fields.telefono = null;
+      } else if (typeof telefono !== "string" || !isValidPhone(telefono)) {
+        return res.status(400).json({ success: false, message: "Teléfono del conductor inválido" });
+      } else {
+        fields.telefono = sanitizeString(telefono);
+      }
+    }
+    if (licencia !== undefined) {
+      const texto = validarTexto(licencia, { max: 50, label: "La licencia" });
+      if (texto.error) return res.status(400).json({ success: false, message: texto.error });
+      fields.licencia = texto.value;
+    }
+    if (licencia_categoria !== undefined) {
+      const texto = validarTexto(licencia_categoria, { max: 20, label: "La categoría de licencia" });
+      if (texto.error) return res.status(400).json({ success: false, message: texto.error });
+      fields.licencia_categoria = texto.value;
+    }
     if (licencia_vencimiento !== undefined) {
       if (licencia_vencimiento === null || licencia_vencimiento === "") {
         fields.licencia_vencimiento = null;
       } else {
-        const v = String(licencia_vencimiento);
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(v) || Number.isNaN(new Date(v + "T00:00:00").getTime())) {
-          return res.status(400).json({ success: false, message: "La fecha de vencimiento de licencia debe tener formato YYYY-MM-DD" });
+        if (!isValidDateOnly(licencia_vencimiento)) {
+          return res.status(400).json({ success: false, message: "La fecha de vencimiento de licencia debe ser una fecha real YYYY-MM-DD" });
         }
-        fields.licencia_vencimiento = v;
+        fields.licencia_vencimiento = licencia_vencimiento;
       }
     }
-    if (experiencia !== undefined) fields.experiencia = sanitizeString(experiencia).slice(0, 1000) || null;
-    if (disponible !== undefined) fields.disponible = disponible !== false;
+    if (experiencia !== undefined) {
+      const texto = validarTexto(experiencia, {
+        max: 1000,
+        label: "La experiencia",
+        multiline: true,
+      });
+      if (texto.error) return res.status(400).json({ success: false, message: texto.error });
+      fields.experiencia = texto.value;
+    }
+    if (disponible !== undefined) {
+      if (typeof disponible !== "boolean") {
+        return res.status(400).json({ success: false, message: "disponible debe ser verdadero o falso" });
+      }
+      fields.disponible = disponible;
+    }
     if (Object.keys(fields).length === 0) {
       return res.status(400).json({ success: false, message: "No hay datos para actualizar" });
     }

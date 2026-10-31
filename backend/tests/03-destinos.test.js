@@ -32,7 +32,7 @@ h.test("DEST: crear negocio con/ sin destino y validaciones", async () => {
   h.assertStatus(a.status, 201, "crear business A");
   const b = await h.createUser(token, { nombre: "Hotel Destino B", email: emailB, password: pass, rol_id: 2 });
   h.assertStatus(b.status, 201, "crear business B");
-  const t = await h.createUser(token, { nombre: "Turista F4", email: emailT, password: pass, rol_id: 1 });
+  const t = await h.createUser(token, { nombre: "Turista Foxtrot", email: emailT, password: pass, rol_id: 1 });
   h.assertStatus(t.status, 201, "crear turista F4");
 
   const negA = await h.login(emailA, pass);

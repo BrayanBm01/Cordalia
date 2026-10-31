@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Star, Trash2, Pencil, Send, Loader2, MessageSquare, CornerDownRight, X } from 'lucide-react'
 import { reviewsAPI } from '../../services/api'
@@ -9,19 +9,58 @@ const inputClass =
   'w-full px-3 py-2 rounded-lg border border-dark-200 text-sm bg-white text-dark-900 placeholder:text-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors'
 
 function StarPicker({ value, onChange }) {
+  const refs = useRef([])
+
+  function mover(delta) {
+    const actual = value >= 1 && value <= 5 ? value : 1
+    const siguiente = Math.min(5, Math.max(1, actual + delta))
+    onChange(siguiente)
+    refs.current[siguiente - 1]?.focus()
+  }
+
+  function handleKeyDown(event) {
+    if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      mover(1)
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
+      event.preventDefault()
+      mover(-1)
+    } else if (event.key === 'Home') {
+      event.preventDefault()
+      onChange(1)
+      refs.current[0]?.focus()
+    } else if (event.key === 'End') {
+      event.preventDefault()
+      onChange(5)
+      refs.current[4]?.focus()
+    }
+  }
+
   return (
-    <div className="flex items-center gap-1">
-      {[1, 2, 3, 4, 5].map((n) => (
-        <button
-          key={n}
-          type="button"
-          onClick={() => onChange(n)}
-          className={`p-0.5 transition-colors cursor-pointer ${n <= value ? 'text-amber-400' : 'text-dark-200 hover:text-amber-300'}`}
-          aria-label={`${n} estrellas`}
-        >
-          <Star className={`w-6 h-6 ${n <= value ? 'fill-current' : ''}`} />
-        </button>
-      ))}
+    <div
+      role="radiogroup"
+      aria-label="Calificación de 1 a 5 estrellas"
+      onKeyDown={handleKeyDown}
+      className="flex items-center gap-1"
+    >
+      {[1, 2, 3, 4, 5].map((n) => {
+        const seleccionada = n === value
+        return (
+          <button
+            key={n}
+            ref={(el) => { refs.current[n - 1] = el }}
+            type="button"
+            role="radio"
+            aria-checked={seleccionada}
+            aria-label={`${n} ${n === 1 ? 'estrella' : 'estrellas'}`}
+            tabIndex={seleccionada || (value === 0 && n === 1) ? 0 : -1}
+            onClick={() => onChange(n)}
+            className={`p-0.5 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded ${n <= value ? 'text-amber-400' : 'text-dark-200 hover:text-amber-300'}`}
+          >
+            <Star className={`w-6 h-6 ${n <= value ? 'fill-current' : ''}`} />
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -42,7 +81,7 @@ function formatDate(value) {
   return date.toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-export default function ResenasSection({ businessId, businessOwnerId }) {
+export default function ResenasSection({ businessId, businessOwnerId, businessEstado }) {
   const { user } = useAuth()
   const [data, setData] = useState({ promedio: 0, cantidad: 0, resenas: [] })
   const [loading, setLoading] = useState(true)
@@ -50,14 +89,20 @@ export default function ResenasSection({ businessId, businessOwnerId }) {
 
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState(null)
-  const [rating, setRating] = useState(5)
+  // La calificacion SIEMPRE empieza en 0: el usuario debe elegir 1-5.
+  const [rating, setRating] = useState(0)
+  const [ratingError, setRatingError] = useState('')
   const [comment, setComment] = useState('')
   const [saving, setSaving] = useState(false)
 
   const [replyTarget, setReplyTarget] = useState(null)
   const [replyText, setReplyText] = useState('')
 
-  const isOwner = !!user && (user.rol === 'ADMIN' || Number(user?.id) === Number(businessOwnerId))
+  const isBusinessOwner = !!user && Number(user?.id) === Number(businessOwnerId)
+  // ADMIN puede moderar/respuestas, pero NO se considera dueno para resenar.
+  const isOwner = !!user && (user.rol === 'ADMIN' || isBusinessOwner)
+  const isApproved = businessEstado === 'approved'
+  const canReview = !!user && isApproved && !isBusinessOwner
 
   async function fetchReviews() {
     setLoading(true)
@@ -78,7 +123,8 @@ export default function ResenasSection({ businessId, businessOwnerId }) {
 
   function openCreate() {
     setEditing(null)
-    setRating(5)
+    setRating(0)
+    setRatingError('')
     setComment('')
     setFormOpen(true)
   }
@@ -86,12 +132,22 @@ export default function ResenasSection({ businessId, businessOwnerId }) {
   function openEdit(review) {
     setEditing(review)
     setRating(review.rating)
+    setRatingError('')
     setComment(review.comment || '')
     setFormOpen(true)
   }
 
   async function submitReview(e) {
     e.preventDefault()
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      setRatingError('Selecciona una calificación de 1 a 5 estrellas')
+      return
+    }
+    if (comment.length > 2000) {
+      toast.error('El comentario no puede superar 2000 caracteres')
+      return
+    }
+    setRatingError('')
     setSaving(true)
     try {
       if (editing) {
@@ -123,6 +179,10 @@ export default function ResenasSection({ businessId, businessOwnerId }) {
 
   async function submitReply(reviewId) {
     if (!replyText.trim()) return
+    if (replyText.length > 2000) {
+      toast.error('La respuesta no puede superar 2000 caracteres')
+      return
+    }
     setSaving(true)
     try {
       const res = await reviewsAPI.reply(reviewId, replyText)
@@ -175,7 +235,20 @@ export default function ResenasSection({ businessId, businessOwnerId }) {
         </div>
       )}
 
-      {user && !formOpen && (miResena ? (
+      {user && !isApproved && (
+        <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-800">
+          Este negocio aún no está aprobado. Las reseñas se habilitan cuando un
+          administrador lo apruebe; no se crea un negocio nuevo para lograrlo.
+        </div>
+      )}
+
+      {user && isApproved && isBusinessOwner && (
+        <div className="mb-6 p-4 rounded-xl bg-dark-50 border border-dark-100 text-sm text-dark-600">
+          No puedes reseñar tu propio negocio. Puedes responder las reseñas de tus clientes.
+        </div>
+      )}
+
+      {canReview && !formOpen && (miResena ? (
         <div className="mb-6 p-4 rounded-xl bg-primary-50 border border-primary-100 flex flex-wrap items-center gap-3">
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-primary-800">Ya reseñaste este negocio</p>
@@ -199,7 +272,7 @@ export default function ResenasSection({ businessId, businessOwnerId }) {
         </button>
       ))}
 
-      {formOpen && (
+      {canReview && formOpen && (
         <form onSubmit={submitReview} className="mb-6 p-4 rounded-xl bg-dark-50 border border-dark-100">
           <div className="flex items-center justify-between mb-3">
             <label className="text-sm font-medium text-dark-700">{editing ? 'Editar tu reseña' : 'Tu reseña'}</label>
@@ -207,14 +280,27 @@ export default function ResenasSection({ businessId, businessOwnerId }) {
               <X className="w-4 h-4" />
             </button>
           </div>
-          <StarPicker value={rating} onChange={setRating} />
+          <StarPicker
+            value={rating}
+            onChange={(valor) => {
+              setRating(valor)
+              setRatingError('')
+            }}
+          />
+          {ratingError && (
+            <p role="alert" className="mt-2 text-sm text-red-600">
+              {ratingError}
+            </p>
+          )}
           <textarea
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder="Cuéntanos tu experiencia (opcional)"
             rows={3}
+            maxLength={2000}
             className={`${inputClass} mt-3`}
           />
+          <p className="mt-1 text-right text-xs text-dark-400">{comment.length}/2000</p>
           <button
             type="submit"
             disabled={saving}
@@ -294,6 +380,7 @@ export default function ResenasSection({ businessId, businessOwnerId }) {
                     value={replyText}
                     onChange={(e) => setReplyText(e.target.value)}
                     placeholder="Escribe tu respuesta como negocio..."
+                    maxLength={2000}
                     className={inputClass}
                     autoFocus
                   />

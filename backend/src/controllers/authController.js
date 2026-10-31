@@ -7,7 +7,15 @@ const { esErrorDeEsquema } = require("../utils/sqlErrors");
 const pool = require("../config/db");
 const { hashPassword, comparePassword } = require("../utils/password");
 const { generarToken, verificarToken } = require("../utils/jwt");
-const { isEmail, isNonEmptyString, sanitizeString } = require("../utils/validators");
+const {
+  isEmail,
+  isValidPersonName,
+  validatePassword,
+  isValidPhone,
+  isValidHttpUrl,
+  sanitizeString,
+  validarTexto,
+} = require("../utils/validators");
 const { GoogleAuthError } = require("../services/googleAuth");
 const googleAuth = require("../services/googleAuth");
 
@@ -135,24 +143,33 @@ async function tieneSesionVigente(usuario) {
  */
 exports.register = async (req, res) => {
   try {
-    let { nombre, email, password, rol } = req.body;
+    let { nombre, email, password, rol } = req.body || {};
 
     if (!nombre || !email || !password) {
       return res.status(400).json({ success: false, message: "Todos los campos son obligatorios" });
     }
+    if (typeof nombre !== "string" || typeof email !== "string") {
+      return res.status(400).json({ success: false, message: "Datos inválidos" });
+    }
 
     nombre = sanitizeString(nombre);
     email = sanitizeString(email).toLowerCase();
-    password = sanitizeString(password);
+    // La contraseña NO se recorta: se usa exactamente como la escribió el
+    // usuario. bcrypt limita el hash a 72 bytes; validamos ese limite.
+    const passwordError = validatePassword(password);
 
-    if (!isNonEmptyString(nombre, 2, 100)) {
-      return res.status(400).json({ success: false, message: "Nombre debe tener entre 2 y 100 caracteres" });
+    if (!isValidPersonName(nombre)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Nombre inválido: usa solo letras, tildes, ñ, espacios, guiones o apóstrofos (2 a 100 caracteres)",
+      });
     }
     if (!isEmail(email)) {
       return res.status(400).json({ success: false, message: "Email inválido" });
     }
-    if (password.length < 6) {
-      return res.status(400).json({ success: false, message: "La contraseña debe tener al menos 6 caracteres" });
+    if (passwordError) {
+      return res.status(400).json({ success: false, message: passwordError });
     }
 
     const existe = await UsuarioModel.findByEmail(email);
@@ -255,14 +272,24 @@ exports.register = async (req, res) => {
 
 exports.login = async (req, res) => {
   try {
-    let { email, password } = req.body;
+    let { email, password } = req.body || {};
 
     if (!email || !password) {
       return res.status(400).json({ success: false, message: "Email y contraseña son obligatorios" });
     }
+    if (typeof email !== "string") {
+      return res.status(400).json({ success: false, message: "Email inválido" });
+    }
 
     email = sanitizeString(email).toLowerCase();
-    password = sanitizeString(password);
+    // No se recorta la contraseña: debe coincidir exactamente con la
+    // registrada. El limite evita procesar cadenas enormes con bcrypt.
+    if (!isEmail(email)) {
+      return res.status(400).json({ success: false, message: "Email inválido" });
+    }
+    if (typeof password !== "string" || Buffer.byteLength(password, "utf8") > 72) {
+      return res.status(400).json({ success: false, message: "Credenciales incorrectas" });
+    }
 
     const usuario = await UsuarioModel.findByEmail(email);
     if (!usuario) {
@@ -277,7 +304,13 @@ exports.login = async (req, res) => {
       });
     }
 
-    const coincide = await comparePassword(password, usuario.password);
+    let coincide = await comparePassword(password, usuario.password);
+    // Compatibilidad con cuentas antiguas: antes se recortaban los espacios
+    // de la contraseña al registrarla. Se acepta una unica vez el valor
+    // historico recortado, sin cambiar la contraseña almacenada.
+    if (!coincide && password !== password.trim()) {
+      coincide = await comparePassword(password.trim(), usuario.password);
+    }
     if (!coincide) {
       await LoginModel.registrar(usuario.id, false, getClientIp(req), getUserAgent(req));
       return res.status(401).json({ success: false, message: "Credenciales incorrectas" });
@@ -370,10 +403,16 @@ exports.google = async (req, res) => {
         // (igual que en /auth/register): si algo falla, no queda ninguna
         // cuenta a medias.
         const rolFinal = resolvePublicRol(rol);
+        // El nombre visible de Google puede traer caracteres especiales;
+        // se normaliza y se limita a la columna. Nunca se confia en el
+        // cliente para el rol (resolvePublicRol) ni para identidad.
+        let nombreGoogle = sanitizeString(nombre || "");
+        if (!nombreGoogle) nombreGoogle = sanitizeString(email.split("@")[0]);
+        nombreGoogle = nombreGoogle.slice(0, 100);
         const client = await pool.connect();
         try {
           await client.query("BEGIN");
-          usuario = await UsuarioModel.create(nombre || email.split("@")[0], email, null, rolFinal, {
+          usuario = await UsuarioModel.create(nombreGoogle, email, null, rolFinal, {
             proveedor: "google",
             google_id: googleId,
             avatar_url: avatarUrl || null,
@@ -468,14 +507,12 @@ exports.google = async (req, res) => {
 exports.setPassword = async (req, res) => {
   try {
     const id = req.usuario.id;
-    const passwordNueva = sanitizeString(String(req.body?.password_nueva ?? ""));
-    const passwordActual = sanitizeString(String(req.body?.password_actual ?? ""));
+    const passwordNueva = req.body?.password_nueva;
+    const passwordActual = req.body?.password_actual;
 
-    if (passwordNueva.length < 6) {
-      return res.status(400).json({
-        success: false,
-        message: "La contraseña debe tener al menos 6 caracteres",
-      });
+    const passwordError = validatePassword(passwordNueva);
+    if (passwordError) {
+      return res.status(400).json({ success: false, message: passwordError });
     }
 
     // Necesitamos el hash actual: findByEmail no aplica, buscamos por id con
@@ -488,14 +525,23 @@ exports.setPassword = async (req, res) => {
     const tienePasswordLocal = Boolean(conPassword.password);
 
     if (tienePasswordLocal) {
-      // Cambio de contrasena: exige la actual.
-      if (!passwordActual) {
+      // Cambio de contrasena: exige la actual. No se recorta (la
+      // contrasena se usa tal cual), pero se acota su tamano para no
+      // procesar cadenas absurdamente grandes con bcrypt.
+      if (typeof passwordActual !== "string" || passwordActual.length === 0) {
         return res.status(400).json({
           success: false,
           message: "Debes ingresar tu contraseña actual para cambiarla",
         });
       }
-      const coincide = await comparePassword(passwordActual, conPassword.password);
+      if (Buffer.byteLength(passwordActual, "utf8") > 72) {
+        return res.status(401).json({ success: false, message: "La contraseña actual no es correcta" });
+      }
+      let coincide = await comparePassword(passwordActual, conPassword.password);
+      // Compatibilidad con hashes antiguos creados tras recortar espacios.
+      if (!coincide && passwordActual !== passwordActual.trim()) {
+        coincide = await comparePassword(passwordActual.trim(), conPassword.password);
+      }
       if (!coincide) {
         return res.status(401).json({ success: false, message: "La contraseña actual no es correcta" });
       }
@@ -530,7 +576,11 @@ exports.setPassword = async (req, res) => {
  */
 exports.recuperarPassword = async (req, res) => {
   try {
-    const email = sanitizeString(String(req.body?.email || "")).toLowerCase();
+    const emailRaw = req.body?.email;
+    if (typeof emailRaw !== "string") {
+      return res.status(400).json({ success: false, message: "Email inválido" });
+    }
+    const email = sanitizeString(emailRaw).toLowerCase();
     if (!email || !isEmail(email)) {
       return res.status(400).json({ success: false, message: "Email inválido" });
     }
@@ -595,14 +645,23 @@ exports.recuperarPassword = async (req, res) => {
  */
 exports.resetearPassword = async (req, res) => {
   try {
-    const token = String(req.body?.token || "");
-    const password = sanitizeString(String(req.body?.password || ""));
+    const tokenRaw = req.body?.token;
+    const password = req.body?.password;
 
-    if (!token) {
+    if (typeof tokenRaw !== "string" || tokenRaw.trim().length === 0) {
       return res.status(400).json({ success: false, message: "Token requerido" });
     }
-    if (password.length < 6) {
-      return res.status(400).json({ success: false, message: "La contraseña debe tener al menos 6 caracteres" });
+    // Los tokens son cadenas aleatorias cortas; un limite evita procesar
+    // entradas enormes en la consulta.
+    if (tokenRaw.length > 512) {
+      return res.status(400).json({ success: false, message: "Token inválido" });
+    }
+    const token = tokenRaw.trim();
+
+    // La contrasena NO se recorta: se guarda exactamente como se ingreso.
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      return res.status(400).json({ success: false, message: passwordError });
     }
 
     const consumo = await PasswordResetModel.consumirToken(token);
@@ -668,20 +727,39 @@ exports.me = async (req, res) => {
 exports.updateProfile = async (req, res) => {
   try {
     const id = req.usuario.id;
-
-    let { nombre, email, password } = req.body;
+    const body = req.body && typeof req.body === "object" ? req.body : {};
     const fields = {};
 
-    if (nombre) {
-      nombre = sanitizeString(nombre);
-      if (!isNonEmptyString(nombre, 2, 100)) {
-        return res.status(400).json({ success: false, message: "Nombre inválido" });
+    if (body.nombre !== undefined) {
+      if (typeof body.nombre !== "string" || !isValidPersonName(body.nombre)) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Nombre inválido: usa solo letras, tildes, ñ, espacios, guiones o apóstrofos (2 a 100 caracteres)",
+        });
       }
-      fields.nombre = nombre;
+      fields.nombre = sanitizeString(body.nombre);
     }
 
-    if (email) {
-      email = sanitizeString(email).toLowerCase();
+    if (body.apellido !== undefined) {
+      if (body.apellido === null || body.apellido === "") {
+        fields.apellido = null;
+      } else if (typeof body.apellido !== "string" || !isValidPersonName(body.apellido)) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Apellido inválido: usa solo letras, tildes, ñ, espacios, guiones o apóstrofos (2 a 100 caracteres)",
+        });
+      } else {
+        fields.apellido = sanitizeString(body.apellido);
+      }
+    }
+
+    if (body.email !== undefined) {
+      if (typeof body.email !== "string") {
+        return res.status(400).json({ success: false, message: "Email inválido" });
+      }
+      const email = sanitizeString(body.email).toLowerCase();
       if (!isEmail(email)) {
         return res.status(400).json({ success: false, message: "Email inválido" });
       }
@@ -692,49 +770,68 @@ exports.updateProfile = async (req, res) => {
       fields.email = email;
     }
 
-    if (password && sanitizeString(password).length > 0) {
-      if (password.length < 6) {
-        return res.status(400).json({ success: false, message: "La contraseña debe tener al menos 6 caracteres" });
+    // Una contrasena vacia/null significa "no cambiarla"; cualquier otro
+    // valor debe cumplir la politica y se guarda SIN recortar espacios.
+    if (body.password !== undefined && body.password !== null && body.password !== "") {
+      const passwordError = validatePassword(body.password);
+      if (passwordError) {
+        return res.status(400).json({ success: false, message: passwordError });
       }
-      fields.password = await hashPassword(sanitizeString(password));
+      fields.password = await hashPassword(body.password);
     }
 
     // Campos opcionales de perfil. Un string vacio limpia el campo.
-    const opcionales = [
-      { key: "apellido", max: 100, label: "Apellido" },
-      { key: "telefono", max: 30, label: "Teléfono" },
+    const textosOpcionales = [
       { key: "ciudad", max: 100, label: "Ciudad" },
       { key: "pais", max: 100, label: "País" },
-      { key: "bio", max: 1000, label: "Biografía" },
+      { key: "bio", max: 1000, label: "Biografía", multiline: true },
       { key: "intereses_turisticos", max: 500, label: "Intereses turísticos" },
       { key: "preferencias_viaje", max: 500, label: "Preferencias de viaje" },
     ];
 
-    for (const campo of opcionales) {
-      if (req.body[campo.key] === undefined) continue;
-      const valor = sanitizeString(String(req.body[campo.key] ?? ""));
-      if (valor.length > campo.max) {
-        return res.status(400).json({
-          success: false,
-          message: `${campo.label} debe tener máximo ${campo.max} caracteres`,
-        });
+    for (const campo of textosOpcionales) {
+      if (body[campo.key] === undefined) continue;
+      const resultado = validarTexto(body[campo.key], {
+        max: campo.max,
+        label: campo.label,
+        multiline: Boolean(campo.multiline),
+      });
+      if (resultado.error) {
+        return res.status(400).json({ success: false, message: resultado.error });
       }
-      fields[campo.key] = valor || null;
+      fields[campo.key] = resultado.value;
     }
 
-    if (req.body.avatar_url !== undefined) {
-      const avatar = sanitizeString(String(req.body.avatar_url ?? ""));
+    if (body.telefono !== undefined) {
+      if (body.telefono === null || body.telefono === "") {
+        fields.telefono = null;
+      } else if (typeof body.telefono !== "string" || !isValidPhone(body.telefono)) {
+        return res.status(400).json({
+          success: false,
+          message: "Teléfono inválido: usa entre 7 y 15 dígitos, con +, espacios, guiones o paréntesis",
+        });
+      } else {
+        fields.telefono = sanitizeString(body.telefono);
+      }
+    }
+
+    if (body.avatar_url !== undefined) {
+      if (body.avatar_url !== null && typeof body.avatar_url !== "string") {
+        return res.status(400).json({ success: false, message: "Avatar inválido: debe ser una URL" });
+      }
+      const avatar = sanitizeString(body.avatar_url || "");
       if (avatar) {
-        const esUrl = /^https?:\/\//i.test(avatar);
         const esDataUrl = /^data:image\//i.test(avatar);
-        if (!esUrl && !esDataUrl) {
-          return res.status(400).json({ success: false, message: "Avatar inválido: debe ser una URL" });
-        }
         if (esDataUrl) {
           const errorAvatar = validarAvatarDataUrl(avatar);
           if (errorAvatar) {
             return res.status(400).json({ success: false, message: errorAvatar });
           }
+        } else if (!isValidHttpUrl(avatar)) {
+          return res.status(400).json({
+            success: false,
+            message: "Avatar inválido: debe ser una URL http(s) válida",
+          });
         }
       }
       fields.avatar_url = avatar || null;
@@ -751,6 +848,9 @@ exports.updateProfile = async (req, res) => {
 
     return res.json({ success: true, message: "Perfil actualizado", data: mapPublicUser(updated, req.usuario.rol) });
   } catch (error) {
+    if (error && error.code === "23505") {
+      return res.status(409).json({ success: false, message: "El email ya está en uso" });
+    }
     console.error("Error en updateProfile:", error);
     return res.status(500).json({ success: false, message: "Error al actualizar" });
   }

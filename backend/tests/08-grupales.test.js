@@ -17,7 +17,7 @@ h.test("GPL: setup (admin, negocios aprobados y turista)", async () => {
 
   for (const [n, e, r] of [
     ["Owner Grupal", emailO, 2],
-    ["Owner Grupal 2", emailO2, 2],
+    ["Owner Grupal Dos", emailO2, 2],
     ["Turista Grupal", emailT, 1],
   ]) {
     h.assertStatus((await h.createUser(admin.token, { nombre: n, email: e, password: pass, rol_id: r })).status, 201, `crear ${e}`);
@@ -664,7 +664,8 @@ h.test("GPL-E: transporte por salida según inscritos reales", async () => {
   for (let i = 0; i < 3; i++) {
     const emailExtra = h.repo("f21ext.grup.turistaExtra");
     h.assertStatus((await h.createUser(h.test.adminToken, {
-      nombre: `Turista Grupal Extra ${i + 1}`, email: emailExtra, password: passT, rol_id: 1,
+      nombre: ["Turista Grupal Extra Uno", "Turista Grupal Extra Dos", "Turista Grupal Extra Tres"][i],
+      email: emailExtra, password: passT, rol_id: 1,
     })).status, 201, `crear turista extra ${i + 1}`);
     const loginExtra = await h.login(emailExtra, passT);
     h.assertStatus(loginExtra.status, 200, `login turista extra ${i + 1}`);

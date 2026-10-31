@@ -10,6 +10,7 @@ const {
   requireOwnedBusiness,
 } = require("../middlewares/businessMiddleware");
 const { requireVendorActive } = require("../middlewares/vendorMiddleware");
+const { businessWriteLimiter, searchLimiter } = require("../middlewares/rateLimit");
 
 // Destinos del negocio: GET es de solo lectura y funciona sin sesión
 // (visibilidad según rol aplicado por loadVisibleBusiness). Se registra antes
@@ -24,7 +25,7 @@ router.use("/:id/promociones", require("./promotionRoutes").businessRouter);
 // Lectura pública de negocios: listado y detalle de un negocio.
 // Sin sesión se trata como TOURIST (solo negocios aprobados son visibles).
 router.get("/categories", businessController.getCategories);
-router.get("/", optionalAuth, businessController.list);
+router.get("/", optionalAuth, searchLimiter, businessController.list);
 router.get("/:id", optionalAuth, loadVisibleBusiness, businessController.getById);
 
 // Imágenes, servicios, horarios y redes: lectura pública visible.
@@ -40,8 +41,8 @@ router.use(requireAuth);
 // suspendida, el backend responde 403 con un mensaje claro. El vendedor
 // conserva acceso al perfil, a la informacion de facturacion y a la
 // pantalla de contratacion (/api/vendedor/*).
-router.post("/", requireBusinessRole, requireVendorActive, businessController.create);
-router.put("/:id", requireOwnedBusiness, requireVendorActive, businessController.update);
+router.post("/", requireBusinessRole, requireVendorActive, businessWriteLimiter, businessController.create);
+router.put("/:id", requireOwnedBusiness, requireVendorActive, businessWriteLimiter, businessController.update);
 router.delete("/:id", requireOwnedBusiness, businessController.remove);
 router.put("/:id/estado", requireAdmin, businessController.setEstado);
 

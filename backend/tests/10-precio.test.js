@@ -180,7 +180,8 @@ h.test("PRECIO: datos de ocupación para 0/20, 6%(1/16), 50%(10/20), 75%(15/20) 
   for (let i = 0; i < 3; i++) {
     const emailExtra = h.repo("f21fix.turistaOcup");
     h.assertStatus((await h.createUser(h.test.adminToken, {
-      nombre: `Turista Ocupacion ${i + 1}`, email: emailExtra, password: passT, rol_id: 1,
+      nombre: ["Turista Ocupacion Uno", "Turista Ocupacion Dos", "Turista Ocupacion Tres"][i],
+      email: emailExtra, password: passT, rol_id: 1,
     })).status, 201, `crear turista ocupacion ${i + 1}`);
     const loginExtra = await h.login(emailExtra, passT);
     h.assertStatus(loginExtra.status, 200, `login turista ocupacion ${i + 1}`);
