@@ -621,7 +621,7 @@ export default function PlanDetalle() {
                         Tu cupo está garantizado. Te contactaremos por WhatsApp con los detalles del viaje.
                       </p>
                       <div className="mt-3 flex flex-wrap gap-2">
-                        <Link to="/perfil" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-moss-900 text-white text-xs font-semibold hover:bg-moss-800 cursor-pointer">
+                        <Link to={obtenerRuta('PERFIL')} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-moss-900 text-white text-xs font-semibold hover:bg-moss-800 cursor-pointer">
                           Ver en mi perfil
                         </Link>
                         <button onClick={() => window.print()} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full border border-moss-400 text-moss-800 text-xs font-semibold hover:bg-moss-100 cursor-pointer">
@@ -635,8 +635,8 @@ export default function PlanDetalle() {
                         {!user && (
                           <p className="text-xs text-dark-500 bg-cream-100 border border-cream-200 rounded-xl p-2.5">
                             Necesitas una cuenta.{' '}
-                            <Link to="/login" className="text-moss-800 font-bold underline">Inicia sesión</Link> o{' '}
-                            <Link to="/registro" className="text-moss-800 font-bold underline">regístrate</Link>.
+                            <Link to={obtenerRuta('LOGIN')} className="text-moss-800 font-bold underline">Inicia sesión</Link> o{' '}
+                            <Link to={obtenerRuta('REGISTRO')} className="text-moss-800 font-bold underline">regístrate</Link>.
                           </p>
                         )}
                         <button

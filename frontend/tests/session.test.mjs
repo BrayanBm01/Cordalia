@@ -283,8 +283,10 @@ async function main() {
       const s = await importarSesion()
       const app = leer('App.jsx')
       for (const ruta of s.RUTAS_PUBLICAS) {
-        const pathDeclarado = ruta === '/' ? 'path="/"' : `path="${ruta}"`
-        assert.ok(app.includes(pathDeclarado), `App.jsx debe declarar ${pathDeclarado}`)
+        const pathLiteral = ruta === '/' ? 'path="/"' : `path="${ruta}"`
+        // Comprobar tanto la forma literal como la ofuscada (identificador)
+        const pathOfuscado = ruta === '/' ? `obtenerRuta('INICIO')` : `obtenerRuta('${ruta.replace(/\//g, '_').toUpperCase()}')`
+        assert.ok(app.includes(pathLiteral) || app.includes(pathOfuscado), `App.jsx debe declarar ${pathLiteral} o ${pathOfuscado}`)
       }
     } finally {
       g.restaurar()

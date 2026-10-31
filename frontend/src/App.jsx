@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom'
 import { MotionConfig } from 'framer-motion'
 import { AuthProvider } from './context/AuthContext'
+import { obtenerRuta } from './routes/offuscatedRoutes'
 import AppErrorBoundary from './components/AppErrorBoundary'
 import ScrollToTop from './components/ScrollToTop'
 import PublicLayout from './layouts/PublicLayout'
@@ -42,45 +43,47 @@ export default function App() {
         <AppErrorBoundary>
         <Routes>
           <Route element={<PublicLayout />}>
-          <Route path="/" element={<Home />} />
-          <Route path="/lugares" element={<Lugares />} />
-          <Route path="/lugares/:id" element={<LugarDetalle />} />
-          <Route path="/negocios" element={<NegociosPublicos />} />
-          <Route path="/negocios/:id" element={<NegocioDetalle />} />
-          <Route path="/planes" element={<PlanesPublicos />} />
-          <Route path="/planes/:id" element={<PlanDetalle />} />
-          <Route path="/perfil" element={
+          <Route path={obtenerRuta('INICIO')} element={<Home />} />
+          <Route path={obtenerRuta('LUGARES')} element={<Lugares />} />
+          <Route path={obtenerRuta('LUGARES') + '/:id'} element={<LugarDetalle />} />
+          <Route path={obtenerRuta('NEGOCIOS_PUBLICOS')} element={<NegociosPublicos />} />
+          <Route path={obtenerRuta('NEGOCIOS_PUBLICOS') + '/:id'} element={<NegocioDetalle />} />
+          <Route path={obtenerRuta('PLANES_PUBLICOS')} element={<PlanesPublicos />} />
+          <Route path={obtenerRuta('PLANES_PUBLICOS') + '/:id'} element={<PlanDetalle />} />
+          <Route path={obtenerRuta('PERFIL')} element={
             <ProtectedRoute><Perfil /></ProtectedRoute>
           } />
-          <Route path="/favoritos" element={
+          <Route path={obtenerRuta('FAVORITOS')} element={
             <ProtectedRoute><MisFavoritos /></ProtectedRoute>
           } />
         </Route>
 
         <Route element={<AuthLayout />}>
-          <Route path="/login" element={<Login />} />
-          <Route path="/registro" element={<Registro />} />
-          <Route path="/restablecer-contrasena" element={<RestablecerContrasena />} />
+          <Route path={obtenerRuta('LOGIN')} element={<Login />} />
+          <Route path={obtenerRuta('_LOGIN')} element={<Login />} />
+          <Route path={obtenerRuta('REGISTRO')} element={<Registro />} />
+          <Route path={obtenerRuta('_REGISTRO')} element={<Registro />} />
+          <Route path={obtenerRuta('RESET_PASSWORD')} element={<RestablecerContrasena />} />
         </Route>
 
         <Route element={<ProtectedRoute roles={['BUSINESS', 'ADMIN']}><BusinessLayout /></ProtectedRoute>}>
-          <Route path="/panel-vendedor" element={<PanelVendedor />} />
-          <Route path="/mis-negocios/resumen" element={<ResumenNegocios />} />
-          <Route path="/mis-negocios" element={<MisNegocios />} />
-          <Route path="/mis-negocios/nuevo" element={<NegocioForm />} />
-          <Route path="/mis-negocios/:id" element={<NegocioDetalle manage />} />
-          <Route path="/mis-negocios/:id/editar" element={<NegocioForm />} />
+          <Route path={obtenerRuta('PANEL_VENDEDOR')} element={<PanelVendedor />} />
+          <Route path={obtenerRuta('MIS_NEGOCIOS_RESUMEN')} element={<ResumenNegocios />} />
+          <Route path={obtenerRuta('MIS_NEGOCIOS')} element={<MisNegocios />} />
+          <Route path={obtenerRuta('NEGOCIO_NUEVO')} element={<NegocioForm />} />
+          <Route path={obtenerRuta('MIS_NEGOCIOS') + '/:id'} element={<NegocioDetalle manage />} />
+          <Route path={obtenerRuta('MIS_NEGOCIOS') + '/:id/editar'} element={<NegocioForm />} />
         </Route>
 
         <Route element={<AdminRoute />}>
           <Route element={<AdminLayout />}>
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/usuarios" element={<AdminUsuarios />} />
-            <Route path="/admin/vendedores" element={<AdminVendedores />} />
-            <Route path="/admin/lugares" element={<AdminDestinos />} />
-            <Route path="/admin/negocios" element={<AdminNegocios />} />
-            <Route path="/admin/resenas" element={<AdminResenas />} />
-            <Route path="/admin/historial" element={<AdminHistorial />} />
+            <Route path={obtenerRuta('ADMIN')} element={<AdminDashboard />} />
+            <Route path={obtenerRuta('ADMIN_USUARIOS')} element={<AdminUsuarios />} />
+            <Route path={obtenerRuta('ADMIN_VENDEDORES')} element={<AdminVendedores />} />
+            <Route path={obtenerRuta('ADMIN_LUGARES')} element={<AdminDestinos />} />
+            <Route path={obtenerRuta('ADMIN_NEGOCIOS')} element={<AdminNegocios />} />
+            <Route path={obtenerRuta('ADMIN_RESEÑAS')} element={<AdminResenas />} />
+            <Route path={obtenerRuta('ADMIN_HISTORIAL')} element={<AdminHistorial />} />
           </Route>
         </Route>
 

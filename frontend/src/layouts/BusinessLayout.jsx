@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
+import { obtenerRuta } from '../routes/offuscatedRoutes'
 import {
   LayoutDashboard,
   Store,
@@ -15,13 +16,13 @@ import {
 import { useAuth } from '../context/AuthContext'
 
 const principalLinks = [
-  { to: '/mis-negocios/resumen', icon: LayoutDashboard, label: 'Dashboard', end: true },
-  { to: '/panel-vendedor', icon: Crown, label: 'Mi plan y pagos' },
+  { to: obtenerRuta('MIS_NEGOCIOS_RESUMEN'), icon: LayoutDashboard, label: 'Dashboard', end: true },
+  { to: obtenerRuta('PANEL_VENDEDOR'), icon: Crown, label: 'Mi plan y pagos' },
 ]
 
 const gestionLinks = [
-  { to: '/mis-negocios', icon: Store, label: 'Mis negocios', end: true },
-  { to: '/mis-negocios/nuevo', icon: Plus, label: 'Nuevo negocio' },
+  { to: obtenerRuta('MIS_NEGOCIOS'), icon: Store, label: 'Mis negocios', end: true },
+  { to: obtenerRuta('NEGOCIO_NUEVO'), icon: Plus, label: 'Nuevo negocio' },
 ]
 
 const sidebarLinkClass = ({ isActive }) =>

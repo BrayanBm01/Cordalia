@@ -553,7 +553,7 @@ export default function LugarDetalle() {
           </h1>
           <p className="text-dark-500 mb-6">El destino que buscas no existe o ha sido removido.</p>
           <Link
-            to="/lugares"
+            to={obtenerRuta('LUGARES')}
             className="inline-flex items-center gap-2 px-6 py-3 bg-moss-900 text-white rounded-full font-semibold hover:bg-moss-800 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -583,7 +583,7 @@ export default function LugarDetalle() {
         {/* Content pinned to bottom-left */}
         <div className="absolute inset-0 flex flex-col justify-end max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
           <Link
-            to="/lugares"
+            to={obtenerRuta('LUGARES')}
             className="inline-flex items-center gap-1.5 text-white/75 hover:text-white text-sm font-medium mb-8 transition-colors w-fit group"
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />

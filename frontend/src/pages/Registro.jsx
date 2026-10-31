@@ -184,7 +184,7 @@ export default function Registro() {
 
         {/* Brand header */}
         <div className="relative z-10">
-          <Link to="/" className="inline-flex items-center gap-3 group">
+          <Link to={obtenerRuta('INICIO')} className="inline-flex items-center gap-3 group">
             <div className="w-11 h-11 rounded-full bg-moss-900 border border-moss-700/60 text-white flex items-center justify-center shadow-md transition-transform duration-300 group-hover:scale-105">
               <Sprout className="w-5 h-5 text-moss-200" />
             </div>
@@ -540,7 +540,7 @@ export default function Registro() {
               <p className="text-xs sm:text-sm text-dark-600">
                 ¿Ya tienes una cuenta registrada?{' '}
                 <Link
-                  to="/login"
+                  to={obtenerRuta('LOGIN')}
                   className="text-moss-800 hover:text-moss-950 font-bold hover:underline transition-colors ml-1"
                 >
                   Inicia sesión aquí

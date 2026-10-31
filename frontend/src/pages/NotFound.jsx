@@ -41,7 +41,7 @@ export default function NotFound() {
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <Link
-            to="/"
+            to={obtenerRuta('INICIO')}
             className="inline-flex items-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-xl font-medium hover:bg-primary-700 transition-colors"
           >
             <Home className="w-4 h-4" />

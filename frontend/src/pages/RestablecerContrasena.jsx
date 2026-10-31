@@ -80,7 +80,7 @@ export default function RestablecerContrasena() {
         className="w-full max-w-md bg-white rounded-3xl border border-cream-200 p-7 sm:p-9 shadow-sm"
       >
         <Link
-          to="/login"
+          to={obtenerRuta('LOGIN')}
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-dark-500 hover:text-moss-800 mb-6"
         >
           <ArrowLeft className="w-3.5 h-3.5" /> Volver al inicio de sesión

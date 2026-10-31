@@ -284,7 +284,7 @@ export default function Home() {
                 className="flex flex-wrap items-center gap-3.5 mb-6"
               >
                 <Link
-                  to="/lugares"
+                  to={obtenerRuta('LUGARES')}
                   className="group inline-flex items-center gap-2.5 px-7 py-3.5 rounded-full bg-[#1b3d2f] hover:bg-[#254f3e] text-white font-semibold text-sm sm:text-base transition-all duration-300 shadow-pill hover:shadow-xl hover:-translate-y-0.5"
                 >
                   <span>Explorar Destinos</span>
@@ -292,7 +292,7 @@ export default function Home() {
                 </Link>
 
                 <Link
-                  to="/planes"
+                  to={obtenerRuta('PLANES_PUBLICOS')}
                   className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-white/15 hover:bg-white/25 text-white font-semibold text-sm sm:text-base backdrop-blur-md border border-white/25 transition-all duration-300 hover:-translate-y-0.5"
                 >
                   <Ticket className="w-4 h-4 text-moss-200" />
@@ -373,7 +373,7 @@ export default function Home() {
               </p>
             </div>
             <Link
-              to="/lugares"
+              to={obtenerRuta('LUGARES')}
               className="inline-flex items-center gap-2 self-start md:self-auto px-5 py-2.5 rounded-full border border-cream-300 bg-white hover:bg-cream-100 text-dark-800 text-sm font-semibold transition-all duration-200 shadow-sm hover:shadow"
             >
               <span>Ver Todos los Destinos</span>
@@ -453,7 +453,7 @@ export default function Home() {
               </p>
             </div>
             <Link
-              to="/planes"
+              to={obtenerRuta('PLANES_PUBLICOS')}
               className="inline-flex items-center gap-2 self-start md:self-auto px-5 py-2.5 rounded-full border border-cream-300 bg-white hover:bg-cream-100 text-dark-800 text-sm font-semibold transition-all duration-200 shadow-sm hover:shadow"
             >
               <span>Ver Todos los Planes</span>
@@ -759,7 +759,7 @@ export default function Home() {
 
               <div className="flex flex-wrap items-center gap-4">
                 <Link
-                  to="/planes"
+                  to={obtenerRuta('PLANES_PUBLICOS')}
                   className="inline-flex items-center gap-2.5 px-8 py-4 rounded-full bg-moss-800 hover:bg-moss-700 text-white font-semibold text-sm sm:text-base transition-all duration-300 shadow-pill hover:shadow-xl hover:-translate-y-0.5"
                 >
                   <span>Planear Mi Viaje</span>
@@ -767,7 +767,7 @@ export default function Home() {
                 </Link>
 
                 <Link
-                  to="/lugares"
+                  to={obtenerRuta('LUGARES')}
                   className="inline-flex items-center gap-2 px-6 py-4 rounded-full bg-white/10 hover:bg-white/20 text-white font-semibold text-sm sm:text-base backdrop-blur-md border border-white/20 transition-all duration-300"
                 >
                   <span>Ver Destinos</span>

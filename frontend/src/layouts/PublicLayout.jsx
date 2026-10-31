@@ -76,7 +76,7 @@ function MobileDrawer({ open, onClose }) {
             {/* ── Cabecera del drawer ── */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-cream-200 bg-white/80">
               <Link
-                to="/"
+                to={obtenerRuta('INICIO')}
                 onClick={onClose}
                 className="flex items-center gap-2.5"
               >
@@ -109,19 +109,19 @@ function MobileDrawer({ open, onClose }) {
                 <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-moss-800/50 mb-3">
                   Explorar
                 </p>
-                <NavLink to="/" onClick={onClose} className={drawerNavClass} end>
+                <NavLink to={obtenerRuta('INICIO')} onClick={onClose} className={drawerNavClass} end>
                   <Compass className="w-4 h-4 text-moss-400 shrink-0" />
                   <span>Inicio</span>
                 </NavLink>
-                <NavLink to="/lugares" onClick={onClose} className={drawerNavClass}>
+                <NavLink to={obtenerRuta('LUGARES')} onClick={onClose} className={drawerNavClass}>
                   <MapPin className="w-4 h-4 text-moss-400 shrink-0" />
                   <span>Destinos de Córdoba</span>
                 </NavLink>
-                <NavLink to="/planes" onClick={onClose} className={drawerNavClass}>
+                <NavLink to={obtenerRuta('PLANES_PUBLICOS')} onClick={onClose} className={drawerNavClass}>
                   <Ticket className="w-4 h-4 text-moss-400 shrink-0" />
                   <span>Planes Turísticos</span>
                 </NavLink>
-                <NavLink to="/negocios" onClick={onClose} className={drawerNavClass}>
+                <NavLink to={obtenerRuta('NEGOCIOS_PUBLICOS')} onClick={onClose} className={drawerNavClass}>
                   <Store className="w-4 h-4 text-moss-400 shrink-0" />
                   <span>Negocios Locales</span>
                 </NavLink>
@@ -156,28 +156,28 @@ function MobileDrawer({ open, onClose }) {
 
                     {/* Links de cuenta */}
                     <div className="space-y-0.5">
-                      <Link to="/perfil" onClick={onClose} className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-dark-700 hover:bg-cream-200/60 rounded-xl transition-colors">
+                      <Link to={obtenerRuta('PERFIL')} onClick={onClose} className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-dark-700 hover:bg-cream-200/60 rounded-xl transition-colors">
                         <User className="w-4 h-4 text-moss-700" />
                         <span>Mi perfil</span>
                       </Link>
-                      <Link to="/favoritos" onClick={onClose} className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-dark-700 hover:bg-cream-200/60 rounded-xl transition-colors">
+                      <Link to={obtenerRuta('FAVORITOS')} onClick={onClose} className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-dark-700 hover:bg-cream-200/60 rounded-xl transition-colors">
                         <Heart className="w-4 h-4 text-moss-700" />
                         <span>Mis favoritos</span>
                       </Link>
                       {user.rol === 'BUSINESS' && (
                         <>
-                          <Link to="/panel-vendedor" onClick={onClose} className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-dark-700 hover:bg-cream-200/60 rounded-xl transition-colors">
+                          <Link to={obtenerRuta('PANEL_VENDEDOR')} onClick={onClose} className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-dark-700 hover:bg-cream-200/60 rounded-xl transition-colors">
                             <Crown className="w-4 h-4 text-moss-700" />
                             <span>Mi plan y pagos</span>
                           </Link>
-                          <Link to="/mis-negocios" onClick={onClose} className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-dark-700 hover:bg-cream-200/60 rounded-xl transition-colors">
+                          <Link to={obtenerRuta('MIS_NEGOCIOS')} onClick={onClose} className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-dark-700 hover:bg-cream-200/60 rounded-xl transition-colors">
                             <Store className="w-4 h-4 text-moss-700" />
                             <span>Mis negocios</span>
                           </Link>
                         </>
                       )}
                       {user.rol === 'ADMIN' && (
-                        <Link to="/admin" onClick={onClose} className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-dark-700 hover:bg-cream-200/60 rounded-xl transition-colors">
+                        <Link to={obtenerRuta('ADMIN')} onClick={onClose} className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-dark-700 hover:bg-cream-200/60 rounded-xl transition-colors">
                           <Shield className="w-4 h-4 text-moss-700" />
                           <span>Panel Admin</span>
                         </Link>
@@ -195,7 +195,7 @@ function MobileDrawer({ open, onClose }) {
                 ) : (
                   <div className="space-y-2.5">
                     <Link
-                      to="/planes"
+                      to={obtenerRuta('PLANES_PUBLICOS')}
                       onClick={onClose}
                       className="flex items-center justify-center gap-2 w-full py-3.5 px-4 text-sm font-semibold bg-moss-900 text-white rounded-full hover:bg-moss-800 transition-all shadow-sm"
                     >
@@ -204,14 +204,14 @@ function MobileDrawer({ open, onClose }) {
                     </Link>
                     <div className="grid grid-cols-2 gap-2">
                       <Link
-                        to="/login"
+                        to={obtenerRuta('LOGIN')}
                         onClick={onClose}
                         className="block w-full text-center py-2.5 px-3 text-sm font-semibold text-dark-800 border border-cream-300 rounded-full hover:bg-cream-200/60 transition-colors"
                       >
                         Iniciar sesión
                       </Link>
                       <Link
-                        to="/registro"
+                        to={obtenerRuta('REGISTRO')}
                         onClick={onClose}
                         className="block w-full text-center py-2.5 px-3 text-sm font-semibold text-moss-950 bg-cream-200/70 hover:bg-cream-300 rounded-full transition-colors"
                       >
@@ -287,7 +287,7 @@ function Navbar({ mobileOpen, setMobileOpen }) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           {/* Brand Logo */}
-          <Link to="/" className="flex items-center gap-3 group">
+          <Link to={obtenerRuta('INICIO')} className="flex items-center gap-3 group">
             <div className="w-10 h-10 rounded-full bg-moss-900 text-white flex items-center justify-center transition-transform duration-300 group-hover:scale-105 shadow-sm">
               <Sprout className="w-5 h-5 text-moss-200" />
             </div>
@@ -303,16 +303,16 @@ function Navbar({ mobileOpen, setMobileOpen }) {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-9">
-            <NavLink to="/" className={navLinkClass} end>
+            <NavLink to={obtenerRuta('INICIO')} className={navLinkClass} end>
               Inicio
             </NavLink>
-            <NavLink to="/lugares" className={navLinkClass}>
+            <NavLink to={obtenerRuta('LUGARES')} className={navLinkClass}>
               Destinos
             </NavLink>
-            <NavLink to="/planes" className={navLinkClass}>
+            <NavLink to={obtenerRuta('PLANES_PUBLICOS')} className={navLinkClass}>
               Planes Turísticos
             </NavLink>
-            <NavLink to="/negocios" className={navLinkClass}>
+            <NavLink to={obtenerRuta('NEGOCIOS_PUBLICOS')} className={navLinkClass}>
               Negocios Locales
             </NavLink>
           </nav>
@@ -320,7 +320,7 @@ function Navbar({ mobileOpen, setMobileOpen }) {
           {/* Right CTA (desktop) */}
           <div className="hidden md:flex items-center gap-4">
             <Link
-              to="/lugares"
+              to={obtenerRuta('LUGARES')}
               className="p-2.5 rounded-full text-dark-600 hover:text-moss-900 hover:bg-cream-100 transition-colors"
               title="Buscar destinos"
               aria-label="Buscar destinos"
@@ -365,7 +365,7 @@ function Navbar({ mobileOpen, setMobileOpen }) {
                       <p className="text-xs text-dark-500 truncate">{user.email}</p>
                     </div>
                     <Link
-                      to="/perfil"
+                      to={obtenerRuta('PERFIL')}
                       onClick={() => setDropdownOpen(false)}
                       className="flex items-center gap-3 px-4 py-2 text-sm text-dark-700 hover:bg-cream-50 transition-colors"
                     >
@@ -373,7 +373,7 @@ function Navbar({ mobileOpen, setMobileOpen }) {
                       Mi perfil
                     </Link>
                     <Link
-                      to="/favoritos"
+                      to={obtenerRuta('FAVORITOS')}
                       onClick={() => setDropdownOpen(false)}
                       className="flex items-center gap-3 px-4 py-2 text-sm text-dark-700 hover:bg-cream-50 transition-colors"
                     >
@@ -382,7 +382,7 @@ function Navbar({ mobileOpen, setMobileOpen }) {
                     </Link>
                     {user.rol === 'BUSINESS' && (
                       <Link
-                        to="/mis-negocios"
+                        to={obtenerRuta('MIS_NEGOCIOS')}
                         onClick={() => setDropdownOpen(false)}
                         className="flex items-center gap-3 px-4 py-2 text-sm text-dark-700 hover:bg-cream-50 transition-colors"
                       >
@@ -392,7 +392,7 @@ function Navbar({ mobileOpen, setMobileOpen }) {
                     )}
                     {user.rol === 'ADMIN' && (
                       <Link
-                        to="/admin"
+                        to={obtenerRuta('ADMIN')}
                         onClick={() => setDropdownOpen(false)}
                         className="flex items-center gap-3 px-4 py-2 text-sm text-dark-700 hover:bg-cream-50 transition-colors"
                       >
@@ -415,13 +415,13 @@ function Navbar({ mobileOpen, setMobileOpen }) {
             ) : (
               <>
                 <Link
-                  to="/login"
+                  to={obtenerRuta('LOGIN')}
                   className="text-sm font-semibold text-dark-700 hover:text-moss-900 transition-colors px-3 py-2"
                 >
                   Iniciar sesión
                 </Link>
                 <Link
-                  to="/planes"
+                  to={obtenerRuta('PLANES_PUBLICOS')}
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-moss-900 hover:bg-moss-800 text-white text-sm font-semibold transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5"
                 >
                   <span>Planear Viaje</span>
@@ -460,7 +460,7 @@ function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 lg:gap-12">
           {/* Col 1 & 2: Brand */}
           <div className="lg:col-span-2 space-y-4">
-            <Link to="/" className="inline-flex items-center gap-3 group">
+            <Link to={obtenerRuta('INICIO')} className="inline-flex items-center gap-3 group">
               <div className="w-9 h-9 rounded-full bg-moss-800 border border-moss-600/40 text-moss-300 flex items-center justify-center">
                 <Sprout className="w-5 h-5" />
               </div>
@@ -486,23 +486,23 @@ function Footer() {
             </h3>
             <ul className="space-y-2.5 text-sm">
               <li>
-                <Link to="/" className="hover:text-white transition-colors">
+                <Link to={obtenerRuta('INICIO')} className="hover:text-white transition-colors">
                   Inicio
                 </Link>
               </li>
               <li>
-                <Link to="/lugares" className="hover:text-white transition-colors">
+                <Link to={obtenerRuta('LUGARES')} className="hover:text-white transition-colors">
                   Destinos de Córdoba
                 </Link>
               </li>
               <li>
-                <Link to="/planes" className="hover:text-white transition-colors inline-flex items-center gap-1.5">
+                <Link to={obtenerRuta('PLANES_PUBLICOS')} className="hover:text-white transition-colors inline-flex items-center gap-1.5">
                   <Ticket className="w-3.5 h-3.5 text-moss-400" />
                   Planes y Paquetes
                 </Link>
               </li>
               <li>
-                <Link to="/negocios" className="hover:text-white transition-colors">
+                <Link to={obtenerRuta('NEGOCIOS_PUBLICOS')} className="hover:text-white transition-colors">
                   Negocios Locales
                 </Link>
               </li>
@@ -518,24 +518,24 @@ function Footer() {
               {user ? (
                 <>
                   <li>
-                    <Link to="/perfil" className="hover:text-white transition-colors">
+                    <Link to={obtenerRuta('PERFIL')} className="hover:text-white transition-colors">
                       Mi Perfil
                     </Link>
                   </li>
                   <li>
-                    <Link to="/favoritos" className="hover:text-white transition-colors">
+                    <Link to={obtenerRuta('FAVORITOS')} className="hover:text-white transition-colors">
                       Destinos Favoritos
                     </Link>
                   </li>
                   {user.rol === 'BUSINESS' && (
                     <>
                       <li>
-                        <Link to="/panel-vendedor" className="hover:text-white transition-colors">
+                        <Link to={obtenerRuta('PANEL_VENDEDOR')} className="hover:text-white transition-colors">
                           Mi plan y pagos
                         </Link>
                       </li>
                       <li>
-                        <Link to="/mis-negocios" className="hover:text-white transition-colors">
+                        <Link to={obtenerRuta('MIS_NEGOCIOS')} className="hover:text-white transition-colors">
                           Panel de Negocios
                         </Link>
                       </li>
@@ -543,7 +543,7 @@ function Footer() {
                   )}
                   {user.rol === 'ADMIN' && (
                     <li>
-                      <Link to="/admin" className="hover:text-white transition-colors">
+                      <Link to={obtenerRuta('ADMIN')} className="hover:text-white transition-colors">
                         Panel Administrador
                       </Link>
                     </li>
@@ -552,12 +552,12 @@ function Footer() {
               ) : (
                 <>
                   <li>
-                    <Link to="/login" className="hover:text-white transition-colors">
+                    <Link to={obtenerRuta('LOGIN')} className="hover:text-white transition-colors">
                       Iniciar Sesión
                     </Link>
                   </li>
                   <li>
-                    <Link to="/registro" className="hover:text-white transition-colors">
+                    <Link to={obtenerRuta('REGISTRO')} className="hover:text-white transition-colors">
                       Crear Cuenta de Viajero
                     </Link>
                   </li>

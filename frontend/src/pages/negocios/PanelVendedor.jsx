@@ -271,7 +271,7 @@ export default function PanelVendedor() {
               </p>
             )}
             <Link
-              to="/mis-negocios"
+              to={obtenerRuta('MIS_NEGOCIOS')}
               className="inline-flex items-center gap-1.5 mt-3 text-xs font-semibold text-moss-800 hover:underline"
             >
               <Store className="w-3.5 h-3.5" /> Ir a mis negocios

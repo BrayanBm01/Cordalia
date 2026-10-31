@@ -230,7 +230,7 @@ export default function ResenasSection({ businessId, businessOwnerId, businessEs
 
       {!user && (
         <div className="mb-6 p-4 rounded-xl bg-dark-50 border border-dark-100 text-sm text-dark-600">
-          <Link to="/login" className="font-medium text-primary-600 hover:underline">Inicia sesión</Link> para dejar
+          <Link to={obtenerRuta('LOGIN')} className="font-medium text-primary-600 hover:underline">Inicia sesión</Link> para dejar
           tu reseña y guardar favoritos.
         </div>
       )}

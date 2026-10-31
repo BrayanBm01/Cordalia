@@ -760,7 +760,7 @@ export default function Perfil() {
                       <Ticket className="w-10 h-10 text-dark-300 mx-auto mb-3" />
                       <p className="text-sm text-dark-600 font-medium">Aún no tienes inscripciones.</p>
                       <p className="text-xs text-dark-400 mt-1">Explora nuestros planes y reserva tu lugar gratis.</p>
-                      <Link to="/planes" className="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 transition-colors">
+                      <Link to={obtenerRuta('PLANES_PUBLICOS')} className="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 transition-colors">
                         Explorar planes
                       </Link>
                     </div>

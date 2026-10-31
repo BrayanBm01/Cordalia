@@ -264,7 +264,7 @@ export default function MisFavoritos() {
                   Explora los destinos y toca el corazón para guardarlos aquí.
                 </p>
                 <Link
-                  to="/lugares"
+                  to={obtenerRuta('LUGARES')}
                   className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 transition-colors"
                 >
                   <Store className="w-4 h-4" />
@@ -290,7 +290,7 @@ export default function MisFavoritos() {
                 Encuentra hoteles, restaurantes y tours que te interesen y guárdalos aquí.
               </p>
               <Link
-                to="/negocios"
+                to={obtenerRuta('NEGOCIOS_PUBLICOS')}
                 className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 transition-colors"
               >
                 <MapPin className="w-4 h-4" />
