@@ -10,6 +10,7 @@ import {
 import { lugaresAPI } from '../services/api'
 import { getDestinoImagen, esImagenDeRelleno } from '../utils/media'
 import FavoritoButton from '../components/FavoritoButton'
+import { obtenerRuta, rutaCon } from '../routes/offuscatedRoutes.js'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -109,7 +110,7 @@ function RelatedCard({ lugar }) {
 
   return (
     <Link
-      to={`/lugares/${lugar._id || lugar.id}`}
+      to={rutaCon('LUGARES', lugar._id || lugar.id)}
       className="group block rounded-[22px] overflow-hidden border border-cream-200 shadow-card hover:shadow-card-hover transition-all duration-300"
     >
       <div className="aspect-[16/10] bg-cream-100 overflow-hidden">
@@ -151,7 +152,7 @@ function BusinessCard({ business }) {
 
   return (
     <Link
-      to={`/negocios/${business.id}`}
+      to={rutaCon('NEGOCIOS_PUBLICOS', business.id)}
       className="group bg-white rounded-[22px] border border-cream-200 overflow-hidden hover:shadow-card-hover transition-all duration-300"
     >
       <div className="aspect-[16/9] bg-cream-100 overflow-hidden relative">
@@ -400,7 +401,7 @@ function PresupuestoComparacion({ presupuesto, lugarNombre }) {
               {planes.slice(0, 6).map((p) => (
                 <Link
                   key={p.id}
-                  to={`/planes/${p.slug}`}
+                  to={rutaCon('PLANES_PUBLICOS', p.slug)}
                   className="flex items-center justify-between gap-2 rounded-xl border border-cream-200 p-3.5 hover:border-moss-300 hover:bg-moss-50/60 transition-colors"
                 >
                   <div className="min-w-0">

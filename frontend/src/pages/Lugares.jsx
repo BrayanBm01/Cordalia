@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { Search, MapPin, Compass, ArrowRight, Sprout, Trees, Waves, Landmark } from 'lucide-react'
 import { lugaresAPI } from '../services/api'
 import { getDestinoImagen } from '../utils/media'
+import { rutaCon } from '../routes/offuscatedRoutes.js'
 
 function useDebounce(value, delay) {
   const [debouncedValue, setDebouncedValue] = useState(value)
@@ -37,7 +38,7 @@ function DestinationCard({ lugar, index }) {
     <div className="group bg-white rounded-[22px] border border-cream-200/90 overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300 flex flex-col justify-between">
       <div>
         <Link
-          to={`/lugares/${lugar._id || lugar.id}`}
+          to={rutaCon('LUGARES', lugar._id || lugar.id)}
           className="relative block aspect-[16/11] overflow-hidden bg-cream-200"
         >
           <img
@@ -56,7 +57,7 @@ function DestinationCard({ lugar, index }) {
           </div>
 
           <h3 className="font-[family-name:var(--font-display)] text-xl font-bold text-dark-900 group-hover:text-moss-900 transition-colors">
-            <Link to={`/lugares/${lugar._id || lugar.id}`}>{lugar.nombre}</Link>
+            <Link to={rutaCon('LUGARES', lugar._id || lugar.id)}>{lugar.nombre}</Link>
           </h3>
 
           {lugar.descripcion && (
@@ -73,7 +74,7 @@ function DestinationCard({ lugar, index }) {
             Explorar destino
           </span>
           <Link
-            to={`/lugares/${lugar._id || lugar.id}`}
+            to={rutaCon('LUGARES', lugar._id || lugar.id)}
             aria-label={`Ver detalles de ${lugar.nombre}`}
             className="w-9 h-9 rounded-full bg-moss-900 group-hover:bg-moss-800 text-white flex items-center justify-center transition-transform group-hover:scale-110 shadow-sm"
           >

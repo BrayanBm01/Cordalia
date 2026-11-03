@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Home, ArrowLeft } from 'lucide-react'
+import { obtenerRuta } from '../routes/offuscatedRoutes.js'
 
 export default function NotFound() {
   return (

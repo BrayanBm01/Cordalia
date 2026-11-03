@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { Heart } from 'lucide-react'
 import { useFavoritos } from '../hooks/useFavoritos'
 import { toast } from 'sonner'
+import { obtenerRuta } from '../routes/offuscatedRoutes.js'
 
 export default function FavoritoButton({
   tipo,
@@ -21,7 +22,7 @@ export default function FavoritoButton({
       const res = await toggle(id)
       if (res?.needsLogin) {
         toast.info('Inicia sesión para guardar favoritos.')
-        navigate('/login', { state: { from: window.location.pathname } })
+        navigate(obtenerRuta('LOGIN'), { state: { from: window.location.pathname } })
         return
       }
       if (res?.added) {

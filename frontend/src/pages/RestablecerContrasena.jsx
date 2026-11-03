@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { KeyRound, Loader2, Mail, CheckCircle2, ArrowLeft, ShieldCheck } from 'lucide-react'
 import { authAPI } from '../services/api'
 import { EMAIL_MAX, isEmail, validatePassword } from '../utils/validation'
+import { obtenerRuta } from '../routes/offuscatedRoutes.js'
 
 /**
  * Recuperación / establecimiento de contraseña.
@@ -63,7 +64,7 @@ export default function RestablecerContrasena() {
     try {
       const res = await authAPI.resetearPassword(token, password)
       toast.success(res.message || 'Contraseña establecida')
-      navigate('/login', { replace: true })
+      navigate(obtenerRuta('LOGIN'), { replace: true })
     } catch (err) {
       toast.error(err.message || 'No se pudo restablecer la contraseña')
     } finally {

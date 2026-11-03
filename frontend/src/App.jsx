@@ -1,7 +1,7 @@
 import { Routes, Route } from 'react-router-dom'
 import { MotionConfig } from 'framer-motion'
 import { AuthProvider } from './context/AuthContext'
-import { obtenerRuta } from './routes/offuscatedRoutes'
+import { obtenerRuta } from './routes/offuscatedRoutes.js'
 import AppErrorBoundary from './components/AppErrorBoundary'
 import ScrollToTop from './components/ScrollToTop'
 import PublicLayout from './layouts/PublicLayout'
@@ -43,6 +43,10 @@ export default function App() {
         <AppErrorBoundary>
         <Routes>
           <Route element={<PublicLayout />}>
+          {/* La raíz "/" es un alias neutro de la página de inicio: no revela
+              ningún nombre interno y mantiene funcionando el dominio, los
+              enlaces antiguos y las recargas directas. */}
+          <Route path="/" element={<Home />} />
           <Route path={obtenerRuta('INICIO')} element={<Home />} />
           <Route path={obtenerRuta('LUGARES')} element={<Lugares />} />
           <Route path={obtenerRuta('LUGARES') + '/:id'} element={<LugarDetalle />} />
@@ -60,9 +64,7 @@ export default function App() {
 
         <Route element={<AuthLayout />}>
           <Route path={obtenerRuta('LOGIN')} element={<Login />} />
-          <Route path={obtenerRuta('_LOGIN')} element={<Login />} />
           <Route path={obtenerRuta('REGISTRO')} element={<Registro />} />
-          <Route path={obtenerRuta('_REGISTRO')} element={<Registro />} />
           <Route path={obtenerRuta('RESET_PASSWORD')} element={<RestablecerContrasena />} />
         </Route>
 

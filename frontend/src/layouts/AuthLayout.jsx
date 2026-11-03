@@ -1,5 +1,6 @@
 import { Outlet, Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
+import { obtenerRuta } from '../routes/offuscatedRoutes.js'
 
 export default function AuthLayout() {
   return (

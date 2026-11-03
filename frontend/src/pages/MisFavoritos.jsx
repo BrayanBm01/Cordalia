@@ -6,6 +6,7 @@ import { favoritosAPI } from '../services/api'
 import { useFavoritos } from '../hooks/useFavoritos'
 import { formatRango } from './negocios/businessUtils'
 import LoadingSpinner from '../components/LoadingSpinner'
+import { obtenerRuta, rutaCon } from '../routes/offuscatedRoutes.js'
 
 function DestinoCard({ lugar, onRemove }) {
   const [imgError, setImgError] = useState(false)
@@ -19,7 +20,7 @@ function DestinoCard({ lugar, onRemove }) {
       transition={{ duration: 0.35 }}
       className="group bg-white rounded-2xl border border-dark-100 overflow-hidden hover:shadow-lg transition-all duration-300"
     >
-      <Link to={`/lugares/${lugar.id}`} className="block relative aspect-[16/10] bg-dark-100 overflow-hidden">
+      <Link to={rutaCon('LUGARES', lugar.id)} className="block relative aspect-[16/10] bg-dark-100 overflow-hidden">
         {lugar.imagen && !imgError ? (
           <img
             src={lugar.imagen}
@@ -38,7 +39,7 @@ function DestinoCard({ lugar, onRemove }) {
           className="font-semibold text-dark-900 group-hover:text-primary-700 transition-colors"
           style={{ fontFamily: 'var(--font-display)' }}
         >
-          <Link to={`/lugares/${lugar.id}`}>{lugar.nombre}</Link>
+          <Link to={rutaCon('LUGARES', lugar.id)}>{lugar.nombre}</Link>
         </h3>
         {lugar.ubicacion && (
           <p className="flex items-center gap-1.5 text-sm text-dark-500 mt-1">
@@ -48,7 +49,7 @@ function DestinoCard({ lugar, onRemove }) {
         )}
         <div className="mt-4 pt-4 border-t border-dark-100 flex items-center justify-between">
           <Link
-            to={`/lugares/${lugar.id}`}
+            to={rutaCon('LUGARES', lugar.id)}
             className="text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors"
           >
             Ver destino
@@ -84,7 +85,7 @@ function NegocioCard({ negocio, onRemove }) {
       transition={{ duration: 0.35 }}
       className="group bg-white rounded-2xl border border-dark-100 overflow-hidden hover:shadow-lg transition-all duration-300"
     >
-      <Link to={`/negocios/${negocio.id}`} className="block relative aspect-[16/10] bg-dark-100 overflow-hidden">
+      <Link to={rutaCon('NEGOCIOS_PUBLICOS', negocio.id)} className="block relative aspect-[16/10] bg-dark-100 overflow-hidden">
         {negocio.portada_url && !imgError ? (
           <img
             src={negocio.portada_url}
@@ -108,7 +109,7 @@ function NegocioCard({ negocio, onRemove }) {
           className="font-semibold text-dark-900 group-hover:text-primary-700 transition-colors"
           style={{ fontFamily: 'var(--font-display)' }}
         >
-          <Link to={`/negocios/${negocio.id}`}>{negocio.nombre}</Link>
+          <Link to={rutaCon('NEGOCIOS_PUBLICOS', negocio.id)}>{negocio.nombre}</Link>
         </h3>
         {negocio.destino && (
           <p className="flex items-center gap-1.5 text-sm text-primary-600 font-medium mt-1">

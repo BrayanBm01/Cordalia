@@ -1,34 +1,33 @@
 // ============================================================
 // Rutas ofuscadas — Cordalia frontend
 // ------------------------------------------------------------
-// Este archivo mapea nombres descriptivos de rutas a identificadores
-// aleatorios y criptográficamente seguros. Las rutas reales en React
-// Router usan estos identificadores en lugar de cadenas legibles,
-// evitando que la estructura interna de la aplicación quede expuesta
-// en la barra de direcciones del navegador.
+// Mapea nombres descriptivos de rutas a identificadores aleatorios
+// e impredecibles. Las rutas de React Router usan estos
+// identificadores en lugar de cadenas legibles, de modo que la
+// estructura interna de la aplicación no queda expuesta en la
+// barra de direcciones del navegador.
 //
-// El mapa es completo y canonical: toda navegación debe pasar por
-// RUTAS_OFUSCADAS[]. No se deben construir rutas manualmente.
+// IMPORTANTE:
+//   * Este mapa es la ÚNICA fuente de verdad de las rutas internas.
+//   * Toda navegación debe construirse con `obtenerRuta(nombre)`.
+//   * Los mapas están congelados: nadie puede modificarlos en runtime.
+//   * La ofuscación es una capa de obscurity: NO sustituye la
+//     autenticación ni la autorización, que se validan en el backend.
 // ============================================================
 
-// Identificadores generados con crypto.randomUniform para ser
-// impredecibles y únicos. No son secuenciales ni basados en nombres.
-// Las claves incluyen versiones con guión bajo prefijo para compatibilidad
-// con la comprobación de rutas en session.test.mjs (que usa
-// ruta.replace(/\//g, '_').toUpperCase()).
-export const RUTAS_OFUSCADAS = {
+// Identificadores de 8 caracteres generados con aleatoriedad
+// criptográfica (crypto.randomUniform sobre un alfabeto sin caracteres
+// ambiguos). No son secuenciales ni derivados de los nombres.
+export const RUTAS_OFUSCADAS = Object.freeze({
   // Rutas públicas
   INICIO: 'KJRkky3o',
-  INICIO_ALT: 'o8G2kxkW',
 
-  // Auth (con y sin guión bajo prefijo, para compatibilidad con pruebas)
-  _LOGIN: 'y8o5rdAd',
+  // Autenticación
   LOGIN: 'y8o5rdAd',
-  _REGISTRO: 'Myj4MJRB',
   REGISTRO: 'Myj4MJRB',
   RESET_PASSWORD: 'bjmu9kPf',
 
-  // Usuarios y roles
+  // Usuario
   PERFIL: '8VPWy3Pc',
   FAVORITOS: 'wyEGUjvW',
 
@@ -51,47 +50,74 @@ export const RUTAS_OFUSCADAS = {
   LUGARES: 'ubRbuKUD',
   NEGOCIOS_PUBLICOS: 'cWg3JMc3',
   PLANES_PUBLICOS: 'gJvs5ksh',
-}
+})
 
-// Mapping inverso: identificador -> nombre (solo para uso interno del router,
-  // nunca expuesto en respuestas ni en HTML público).
-export const RUTAS_INVERSA = {
-  'KJRkky3o': 'INICIO',
-  'o8G2kxkW': 'INICIO_ALT',
-  'y8o5rdAd': 'LOGIN',
-  'Myj4MJRB': 'REGISTRO',
-  'bjmu9kPf': 'RESET_PASSWORD',
-  '8VPWy3Pc': 'PERFIL',
-  'wyEGUjvW': 'FAVORITOS',
-  'F8HgnHJz': 'PANEL_VENDEDOR',
-  'xvZ4ms8E': 'MIS_NEGOCIOS',
-  'ZuKohE4c': 'MIS_NEGOCIOS_RESUMEN',
-  'Z7rNi7D8': 'NEGOCIO_NUEVO',
-  'DYNGcSq7': 'ADMIN',
-  'nP6jaBBP': 'ADMIN_USUARIOS',
-  'itVvm2oE': 'ADMIN_VENDEDORES',
-  'wCP4uS59': 'ADMIN_LUGARES',
-  'UeP4wJbT': 'ADMIN_NEGOCIOS',
-  'QYskqSc8': 'ADMIN_RESEÑAS',
-  'ZTM5g9BQ': 'ADMIN_HISTORIAL',
-  'ubRbuKUD': 'LUGARES',
-  'cWg3JMc3': 'NEGOCIOS_PUBLICOS',
-  'gJvs5ksh': 'PLANES_PUBLICOS',
-  '_LOGIN': 'LOGIN',
-  '_REGISTRO': 'REGISTRO',
-}
+// Mapa inverso (solo depuración interna). No se expone por API ni HTML.
+export const RUTAS_INVERSA = Object.freeze(
+  Object.fromEntries(Object.entries(RUTAS_OFUSCADAS).map(([nombre, id]) => [id, nombre])),
+)
 
-// Helper: devuelve el identificador para una clave de ruta.
-// Lanza si la clave no existe (fallo de desarrollo).
+// Conjunto de identificadores válidos: útil para validar rutas antes
+// de usarlas como destino de una navegación.
+const IDS_VALIDOS = new Set(Object.values(RUTAS_OFUSCADAS))
+
+/**
+ * Devuelve el identificador ofuscado correspondiente a un nombre de ruta.
+ * Lanza si la clave no existe (error de programación: ruta no registrada).
+ *
+ * @param {string} nombre - Clave canónica (p. ej. 'ADMIN_USUARIOS').
+ * @returns {string} Identificador ofuscado.
+ */
 export function obtenerRuta(nombre) {
+  if (typeof nombre !== 'string' || nombre.length === 0) {
+    throw new Error('obtenerRuta: el nombre de ruta debe ser un texto no vacío')
+  }
   const id = RUTAS_OFUSCADAS[nombre]
   if (!id) throw new Error(`Ruta ofuscada no definida: ${nombre}`)
   return id
 }
 
-// Helper: devuelve el nombre legible para un identificador (solo depuración).
+/**
+ * Construye una ruta ofuscada con segmentos adicionales (el patrón
+ * `/:id` o `/:id/editar` de React Router). Los segmentos se codifican
+ * para no romper la URL.
+ *
+ * Ejemplo:
+ *   rutaCon('LUGARES', 12)            -> '<id-lugares>/12'
+ *   rutaCon('MIS_NEGOCIOS', 7, 'editar') -> '<id-mis-negocios>/7/editar'
+ *
+ * @param {string} nombre - Clave canónica de la ruta base.
+ * @param {...(string|number)} partes - Segmentos a añadir.
+ * @returns {string}
+ */
+export function rutaCon(nombre, ...partes) {
+  const base = obtenerRuta(nombre)
+  const segmentos = partes
+    .filter((p) => p !== undefined && p !== null && p !== '')
+    .map((p) => encodeURIComponent(String(p)))
+  return segmentos.length > 0 ? `${base}/${segmentos.join('/')}` : base
+}
+
+/**
+ * Devuelve el nombre legible para un identificador (solo depuración)
+ * o `null` si el identificador no corresponde a ninguna ruta.
+ *
+ * @param {string} id - Identificador ofuscado.
+ * @returns {string|null}
+ */
 export function nombreRuta(id) {
-  const nombre = RUTAS_INVERSA[id]
-  if (!nombre) return null
-  return nombre
+  if (typeof id !== 'string') return null
+  return RUTAS_INVERSA[id] || null
+}
+
+/**
+ * Indica si un segmento corresponde a un identificador de ruta conocido.
+ * No lanza: devuelve `false` ante valores inválidos.
+ *
+ * @param {string} id - Identificador a comprobar.
+ * @returns {boolean}
+ */
+export function esRutaOfuscada(id) {
+  if (typeof id !== 'string' || id.length === 0) return false
+  return IDS_VALIDOS.has(id)
 }

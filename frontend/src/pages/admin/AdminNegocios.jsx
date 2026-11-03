@@ -8,6 +8,7 @@ import LoadingSpinner from '../../components/LoadingSpinner'
 import EmptyState from '../../components/EmptyState'
 import SearchInput from '../../components/SearchInput'
 import { toast } from 'sonner'
+import { rutaCon } from '../../routes/offuscatedRoutes.js'
 
 const ACCIONES = [
   { estado: 'approved', label: 'Aprobar', icon: CheckCircle2, clase: 'text-emerald-600 hover:bg-emerald-50' },
@@ -124,7 +125,7 @@ export default function AdminNegocios() {
                   <tr key={n.id} className="hover:bg-dark-50/40 transition-colors">
                     <td className="px-5 py-3.5 text-dark-500 font-mono text-xs">{n.id}</td>
                     <td className="px-5 py-3.5">
-                      <Link to={`/negocios/${n.id}`} className="font-medium text-dark-800 hover:text-primary-700 transition-colors">
+                      <Link to={rutaCon('NEGOCIOS_PUBLICOS', n.id)} className="font-medium text-dark-800 hover:text-primary-700 transition-colors">
                         {n.nombre}
                       </Link>
                     </td>
@@ -132,7 +133,7 @@ export default function AdminNegocios() {
                     <td className="px-5 py-3.5 text-dark-600">{n.owner_nombre || `#${n.owner_id}`}</td>
                     <td className="px-5 py-3.5">
                       {n.destination_id ? (
-                        <Link to={`/lugares/${n.destination_id}`} className="inline-flex items-center gap-1.5 text-primary-700 hover:underline text-sm">
+                        <Link to={rutaCon('LUGARES', n.destination_id)} className="inline-flex items-center gap-1.5 text-primary-700 hover:underline text-sm">
                           <MapPin className="w-3.5 h-3.5" />
                           {n.destino}
                         </Link>
@@ -171,7 +172,7 @@ export default function AdminNegocios() {
                           </button>
                         ))}
                         <Link
-                          to={`/negocios/${n.id}`}
+                          to={rutaCon('NEGOCIOS_PUBLICOS', n.id)}
                           className="p-1.5 rounded-lg text-dark-400 hover:text-ocean-600 hover:bg-ocean-50 transition-colors cursor-pointer"
                           title="Ver detalle"
                         >

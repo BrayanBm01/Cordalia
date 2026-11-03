@@ -5,6 +5,7 @@ import { AlertCircle, Loader2, RotateCw } from 'lucide-react'
 import { GOOGLE_CLIENT_ID } from '../services/api'
 import { renderGoogleButton } from '../services/google'
 import { useAuth } from '../context/AuthContext'
+import { obtenerRuta } from '../routes/offuscatedRoutes.js'
 
 /**
  * Botón de registro / inicio de sesión con Google.
@@ -63,7 +64,7 @@ function describirError(err) {
 export default function GoogleButton({
   rol = 'TOURIST',
   onSuccess,
-  redirectTo = '/',
+  redirectTo = obtenerRuta('INICIO'),
   label = 'Continuar con Google',
   text,
   className = '',

@@ -1,3 +1,5 @@
+import { obtenerRuta } from '../routes/offuscatedRoutes.js'
+
 // Constantes de sesión (cliente). El auto-logout por inactividad
 // solo cuenta interacción humana real (no renders/fetch/polling).
 export const SESION_INACTIVIDAD_MS = 8 * 60 * 1000
@@ -11,11 +13,16 @@ export const EVENTO_SESION_INVALIDA = 'cordalia:sesion-invalida'
 // las vistas montadas deben mostrar el mensaje. Se emite UNA vez por cierre.
 export const EVENTO_SESION_EXPIRADA = 'cordalia:sesion-expirada'
 
-// Página pública real de Cordalia (ruta declarada en App.jsx).
-export const RUTA_INICIO = '/'
+// Página pública real de Cordalia (ruta ofuscada declarada en App.jsx).
+// La raíz "/" existe además como alias neutro de la misma página.
+export const RUTA_INICIO = obtenerRuta('INICIO')
 
 // Rutas públicas del router de React (declaradas en App.jsx).
-export const RUTAS_PUBLICAS = ['/', '/login', '/registro']
+export const RUTAS_PUBLICAS = [
+  obtenerRuta('INICIO'),
+  obtenerRuta('LOGIN'),
+  obtenerRuta('REGISTRO'),
+]
 
 export function rutaActual() {
   if (typeof window === 'undefined') return RUTA_INICIO

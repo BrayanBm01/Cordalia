@@ -11,6 +11,7 @@ import { consumirAvisoSesion, suscribirAvisoSesion, SESION_INACTIVIDAD_MS } from
 import GoogleButton from '../components/GoogleButton'
 import { rutaInicioPorRol } from '../utils/roles'
 import { EMAIL_MAX, isEmail } from '../utils/validation'
+import { obtenerRuta } from '../routes/offuscatedRoutes.js'
 
 const loginSchema = z.object({
   email: z
@@ -76,7 +77,7 @@ export default function Login() {
             'Entra con "Continuar con Google" o establece tu propia contraseña para entrar con correo.',
           action: {
             label: 'Establecer contraseña',
-            onClick: () => navigate('/restablecer-contrasena'),
+            onClick: () => navigate(obtenerRuta('RESET_PASSWORD')),
           },
         })
       } else {

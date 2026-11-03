@@ -144,10 +144,41 @@ Archivo creado: `frontend/src/routes/offuscatedRoutes.js`
 
 - **Backend:** `192 PASS, 0 FAIL` (20 suites, incluyendo `19-validaciones-seguridad.test.js`)
 - **Frontend:** Todas las suites pass (formatoMoney, googleAuth, session, apiInterceptor,
-  vendedorApi, registroVendedor, validation.test.mjs)
-- **Build de producción:** `vite build` exitoso (advertencia de chunk size > 500 kB, no crítico)
-- **Lint:** Sin errores; 47 advertencias (preexistentes + 2 intencionales por expresiones
-  regulares de control chars en `validation.js`)
+  vendedorApi, registroVendedor, validation.test.mjs y **offuscatedRoutes.test.mjs**):
+  `171 aserciones PASS, 0 FAIL`
+- **Build de producción:** `vite build` + `checkBundle` exitoso (advertencia de chunk size > 500 kB, no crítico)
+- **Lint:** Sin errores; advertencias preexistentes de estilo (sin cambios)
+
+### 5.1 Incidencia post-despliegue y su resolución (registro de la corrección)
+
+Tras la primera integración de la ofuscación, producción mostró
+`obtenerRuta is not defined` (capturado por el AppErrorBoundary con el
+mensaje "Algo salió mal"). Auditoría posterior:
+
+- **Causa exacta:** el `dist/` de producción se había generado con una
+  versión intermedia de las fuentes en la que varios archivos usaban
+  `obtenerRuta(...)` **sin importarlo**. Rollup/ESBuild deja los
+  identificadores no resueltos como globals **sin fallar el build**, de
+  modo que el bundle roto se desplegó y el ReferenceError solo apareció
+  en el navegador.
+- **Correcciones aplicadas (sin eliminar la ofuscación):**
+  1. Todos los archivos que usan `obtenerRuta` importan desde
+     `routes/offuscatedRoutes.js`. Verificado estáticamente por la suite
+     `tests/offuscatedRoutes.test.mjs`.
+  2. Las importaciones incluyen la extensión (`.js`) para resolver igual
+     en Vite y en Node ESM (los tests no necesitan transformaciones).
+  3. `dist/` regenerado desde el código fuente correcto; verificado por
+     `frontend/scripts/checkBundle.mjs`, que **falla el build** si queda
+     alguna `obtenerRuta(` no resuelta en el bundle (evita que esta clase
+     de error vuelva a llegar silenciosamente a producción).
+  4. Las suite `session.test.mjs` y `registroVendedor.test.mjs` fueron
+     actualizadas para codificar el contrato con rutas ofuscadas (ya no
+     comparan contra `/` o `/login` literales).
+- **Verificación de la recuperación:** el bundle de producción final se
+  ejecutó REALmente (DOM + React render, backend vivo): la página de
+  inicio renderiza en `/` y en `KJRkky3o`, el guard ADMIN redirige sin
+  sesión al login ofuscado, y no hay errores de consola ni referencias
+  crudas a `obtenerRuta` en el DOM.
 
 ## 6. Vulnerabilidades encontradas y corregidas
 
@@ -181,7 +212,10 @@ Archivo creado: `frontend/src/routes/offuscatedRoutes.js`
   pasando sin errores.
 - Si se añaden nuevas rutas, deben añadirse tanto a `RUTAS_OFUSCADAS` en
   `offuscatedRoutes.js` como a todos los `Link`/`NavLink`/`navigate()` en el
-  código, o el build advertirá sobre rutas no declaradas.
+  código (`npm test` verifica declaraciones y claves).
+- El chequeo post-build (`frontend/scripts/checkBundle.mjs`, integrado a
+  `npm run build`) debe mantenerse: es la red de seguridad que impide
+  desplegar un bundle con llamadas a `obtenerRuta` no resueltas.
 
 ## 9. Resumen
 

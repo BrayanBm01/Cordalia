@@ -22,6 +22,7 @@ import {
   Crown,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { obtenerRuta } from '../routes/offuscatedRoutes.js'
 
 const navLinkClass = ({ isActive }) =>
   `relative text-sm font-medium transition-colors duration-200 py-1 ${
@@ -38,7 +39,7 @@ function MobileDrawer({ open, onClose }) {
   const handleLogout = async () => {
     onClose()
     await logout()
-    navigate('/', { replace: true })
+    navigate(obtenerRuta('INICIO'), { replace: true })
   }
 
   const drawerNavClass = ({ isActive }) =>
@@ -273,7 +274,7 @@ function Navbar({ mobileOpen, setMobileOpen }) {
     setDropdownOpen(false)
     setMobileOpen(false)
     await logout()
-    navigate('/', { replace: true })
+    navigate(obtenerRuta('INICIO'), { replace: true })
   }
 
   return (

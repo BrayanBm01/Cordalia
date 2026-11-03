@@ -20,6 +20,7 @@ import {
 import { lugaresAPI, planesAPI } from '../services/api'
 import { getDestinoImagen, getPlanImagen } from '../utils/media'
 import { consumirAvisoSesion, suscribirAvisoSesion, SESION_INACTIVIDAD_MS } from '../utils/session'
+import { obtenerRuta, rutaCon } from '../routes/offuscatedRoutes.js'
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
@@ -391,7 +392,7 @@ export default function Home() {
                   className="group bg-white rounded-[22px] border border-cream-200 overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300 flex flex-col"
                 >
                   <Link
-                    to={`/lugares/${dest.id || dest._id}`}
+                    to={rutaCon('LUGARES', dest.id || dest._id)}
                     className="relative block aspect-[16/11] overflow-hidden bg-cream-200"
                   >
                     <img
@@ -410,7 +411,7 @@ export default function Home() {
                         <span>{dest.municipio || dest.ubicacion || 'Córdoba, Colombia'}</span>
                       </div>
                       <h3 className="font-[family-name:var(--font-display)] text-xl font-bold text-dark-900 group-hover:text-moss-900 transition-colors">
-                        <Link to={`/lugares/${dest.id || dest._id}`}>{dest.nombre}</Link>
+                        <Link to={rutaCon('LUGARES', dest.id || dest._id)}>{dest.nombre}</Link>
                       </h3>
                       <p className="text-dark-500 text-xs sm:text-sm mt-2 line-clamp-2 leading-relaxed">
                         {dest.descripcion || 'Explora este destino emblemático de Córdoba y sus atractivos naturales.'}
@@ -422,7 +423,7 @@ export default function Home() {
                         Descubrir lugar
                       </span>
                       <Link
-                        to={`/lugares/${dest.id || dest._id}`}
+                        to={rutaCon('LUGARES', dest.id || dest._id)}
                         aria-label={`Ver detalles de ${dest.nombre}`}
                         className="w-9 h-9 rounded-full bg-moss-900 group-hover:bg-moss-800 text-white flex items-center justify-center transition-transform group-hover:scale-110 shadow-sm"
                       >
@@ -495,7 +496,7 @@ export default function Home() {
                   <div className="p-3 pt-5 flex-1 flex flex-col justify-between">
                     <div>
                       <h3 className="font-[family-name:var(--font-display)] text-xl font-bold text-dark-900 group-hover:text-moss-900 transition-colors leading-snug">
-                        <Link to={`/planes/${plan.id}`}>{plan.nombre}</Link>
+                        <Link to={rutaCon('PLANES_PUBLICOS', plan.id)}>{plan.nombre}</Link>
                       </h3>
 
                       {/* Meta info tags */}
@@ -526,7 +527,7 @@ export default function Home() {
                       </div>
 
                       <Link
-                        to={`/planes/${plan.id}`}
+                        to={rutaCon('PLANES_PUBLICOS', plan.id)}
                         aria-label={`Ver detalles del plan ${plan.nombre}`}
                         className="w-10 h-10 rounded-full bg-moss-900 group-hover:bg-moss-800 text-white flex items-center justify-center transition-transform group-hover:scale-110 shadow-sm"
                       >

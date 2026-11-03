@@ -18,6 +18,7 @@ import ResenasSection from './ResenasSection'
 import PlanesNegocio from './PlanesNegocio'
 import ImageUploader from '../../components/ImageUploader'
 import { toast } from 'sonner'
+import { obtenerRuta, rutaCon } from '../../routes/offuscatedRoutes.js'
 
 const inputClass =
   'w-full px-3 py-2 rounded-lg border border-dark-200 text-sm bg-white text-dark-900 placeholder:text-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors'
@@ -235,7 +236,7 @@ function PublicPlanesSection({ businessId }) {
           return (
             <Link
               key={plan.id}
-              to={`/planes/${plan.id}`}
+              to={rutaCon('PLANES_PUBLICOS', plan.id)}
               className="group flex gap-4 rounded-xl border border-dark-100 p-3 hover:shadow-md hover:border-primary-200 transition-all"
             >
               <div className="w-28 h-24 shrink-0 rounded-lg overflow-hidden bg-dark-100">
@@ -298,7 +299,7 @@ export default function NegocioDetalle({ manage = false }) {
       fetchChildren(res.data.id)
     } catch (err) {
       toast.error(err.message || 'No se pudo cargar el negocio')
-      navigate(manage ? '/mis-negocios' : '/negocios')
+      navigate(manage ? obtenerRuta('MIS_NEGOCIOS') : obtenerRuta('NEGOCIOS_PUBLICOS'))
     } finally {
       setLoading(false)
     }
@@ -406,7 +407,7 @@ export default function NegocioDetalle({ manage = false }) {
     >
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
         <button
-          onClick={() => navigate(manage ? '/mis-negocios' : '/negocios')}
+          onClick={() => navigate(manage ? obtenerRuta('MIS_NEGOCIOS') : obtenerRuta('NEGOCIOS_PUBLICOS'))}
           className="inline-flex items-center gap-2 text-sm text-dark-600 hover:text-moss-700 mb-5 transition-colors cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -449,7 +450,7 @@ export default function NegocioDetalle({ manage = false }) {
             {manage && (
               <div className="mt-4 flex items-center gap-2">
                 <Link
-                  to={`/mis-negocios/${business.id}/editar`}
+                  to={rutaCon('MIS_NEGOCIOS', business.id, 'editar')}
                   className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 transition-colors"
                 >
                   <Pencil className="w-4 h-4" /> Editar
@@ -596,7 +597,7 @@ export default function NegocioDetalle({ manage = false }) {
                 {destinos.length > 0 && (
                   <div className="mt-4 flex items-center gap-2 text-sm text-dark-700 bg-primary-50 border border-primary-100 rounded-xl p-3">
                     <MapPin className="w-4 h-4 text-primary-600" />
-                    <Link to={`/lugares/${destinos[0].id}`} className="flex-1 text-primary-700 hover:underline">
+                    <Link to={rutaCon('LUGARES', destinos[0].id)} className="flex-1 text-primary-700 hover:underline">
                       {destinos[0].nombre}
                     </Link>
                   </div>
@@ -708,7 +709,7 @@ function PublicInfo({ business, horarios, redes, servicios, imagenes, destinos }
       {destinos && destinos.length > 0 ? (
         <Section title="Destinos">
           <Link
-            to={`/lugares/${destinos[0].id}`}
+            to={rutaCon('LUGARES', destinos[0].id)}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary-50 text-primary-700 text-sm font-medium hover:bg-primary-100 transition-colors"
           >
             <MapPin className="w-4 h-4" />

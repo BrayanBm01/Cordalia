@@ -15,6 +15,7 @@ import {
   validatePassword,
 } from '../utils/validation'
 import { formatMoney } from './negocios/businessUtils'
+import { obtenerRuta, rutaCon } from '../routes/offuscatedRoutes.js'
 
 const inputBase =
   'w-full pl-10 pr-4 py-3 rounded-xl border border-dark-200 text-dark-900 placeholder:text-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition bg-white'
@@ -87,7 +88,7 @@ function InscripcionCard({ insc, onCancelar }) {
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <Link to={`/planes/${insc.plan_id}`} className="font-semibold text-dark-900 hover:text-primary-700 transition-colors">
+          <Link to={rutaCon('PLANES_PUBLICOS', insc.plan_id)} className="font-semibold text-dark-900 hover:text-primary-700 transition-colors">
             {insc.plan_nombre}
           </Link>
           <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${ESTADO_BADGE[estado] || 'bg-dark-100 text-dark-500'}`}>
@@ -129,7 +130,7 @@ function InscripcionCard({ insc, onCancelar }) {
           </button>
         )}
         <Link
-          to={`/planes/${insc.plan_id}`}
+          to={rutaCon('PLANES_PUBLICOS', insc.plan_id)}
           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
             ['pendiente', 'fallida'].includes(estado)
               ? 'bg-primary-600 text-white hover:bg-primary-700'

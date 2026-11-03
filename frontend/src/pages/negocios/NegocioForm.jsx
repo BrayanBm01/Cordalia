@@ -17,6 +17,7 @@ import {
   isValidPhone,
 } from '../../utils/validation'
 import { toast } from 'sonner'
+import { obtenerRuta, rutaCon } from '../../routes/offuscatedRoutes.js'
 
 const MONEDAS = ['COP', 'USD', 'EUR', 'MXN', 'PEN']
 
@@ -186,11 +187,11 @@ export default function NegocioForm() {
       if (isEdit) {
         const res = await businessesAPI.update(id, body)
         toast.success(res.message || 'Negocio actualizado')
-        navigate(`/mis-negocios/${id}`)
+        navigate(rutaCon('MIS_NEGOCIOS', id))
       } else {
         const res = await businessesAPI.create(body)
         toast.success(res.message || 'Negocio creado')
-        navigate('/mis-negocios')
+        navigate(obtenerRuta('MIS_NEGOCIOS'))
       }
     } catch (err) {
       toast.error(err.message || 'Error al guardar el negocio')
@@ -210,7 +211,7 @@ export default function NegocioForm() {
     >
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-14">
         <button
-          onClick={() => navigate(isEdit ? `/mis-negocios/${id}` : '/mis-negocios')}
+          onClick={() => navigate(isEdit ? rutaCon('MIS_NEGOCIOS', id) : obtenerRuta('MIS_NEGOCIOS'))}
           className="inline-flex items-center gap-2 text-sm text-dark-600 hover:text-primary-700 mb-6 transition-colors cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -363,7 +364,7 @@ export default function NegocioForm() {
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-dark-100">
             <button
               type="button"
-              onClick={() => navigate(isEdit ? `/mis-negocios/${id}` : '/mis-negocios')}
+              onClick={() => navigate(isEdit ? rutaCon('MIS_NEGOCIOS', id) : obtenerRuta('MIS_NEGOCIOS'))}
               className="px-4 py-2.5 rounded-lg text-sm font-medium text-dark-600 hover:bg-dark-100 transition-colors cursor-pointer"
             >
               Cancelar

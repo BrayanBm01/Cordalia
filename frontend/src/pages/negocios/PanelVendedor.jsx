@@ -8,6 +8,7 @@ import { vendedorAPI } from '../../services/api'
 import { formatMoney } from './businessUtils'
 import { toast } from 'sonner'
 import LoadingSpinner from '../../components/LoadingSpinner'
+import { obtenerRuta } from '../../routes/offuscatedRoutes.js'
 
 // ------------------------------------------------------------
 // Estado comercial del vendedor

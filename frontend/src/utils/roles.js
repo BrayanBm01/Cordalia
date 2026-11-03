@@ -12,6 +12,8 @@
 // interpreta de forma coherente en el cliente.
 // ============================================================
 
+import { obtenerRuta } from '../routes/offuscatedRoutes.js'
+
 export const ROL_ADMIN = 'ADMIN'
 export const ROL_BUSINESS = 'BUSINESS'
 export const ROL_TOURIST = 'TOURIST'
@@ -75,11 +77,11 @@ export function normalizarUsuario(usuario) {
 export function rutaInicioPorRol(rol) {
   switch (normalizarRol(rol)) {
     case ROL_BUSINESS:
-      return '/panel-vendedor'
+      return obtenerRuta('PANEL_VENDEDOR')
     case ROL_ADMIN:
-      return '/'
+      return obtenerRuta('INICIO')
     default:
-      return '/'
+      return obtenerRuta('INICIO')
   }
 }
 
@@ -99,7 +101,7 @@ export function rutaInicioPorRol(rol) {
  */
 export function destinoRutaProtegida({ rol, rolesPermitidos, autenticado }) {
   if (!autenticado) {
-    return { destino: '/login', permitido: false }
+    return { destino: obtenerRuta('LOGIN'), permitido: false }
   }
   const canonico = normalizarRol(rol)
   if (rolesPermitidos && rolesPermitidos.length > 0) {

@@ -9,6 +9,7 @@ import SearchInput from '../../components/SearchInput'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { rutaCon } from '../../routes/offuscatedRoutes.js'
 
 const ESTADO_LABEL = {
   active: 'Visible',
@@ -171,7 +172,7 @@ export default function AdminResenas() {
                     <td className="px-5 py-3.5 text-dark-800 font-medium">{r.autor_nombre}</td>
                     <td className="px-5 py-3.5">
                       <Link
-                        to={`/negocios/${r.business_id}`}
+                        to={rutaCon('NEGOCIOS_PUBLICOS', r.business_id)}
                         className="text-primary-700 hover:underline"
                       >
                         {r.negocio_nombre}

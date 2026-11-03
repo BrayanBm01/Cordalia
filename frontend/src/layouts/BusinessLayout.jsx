@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { obtenerRuta } from '../routes/offuscatedRoutes'
+import { obtenerRuta } from '../routes/offuscatedRoutes.js'
 import {
   LayoutDashboard,
   Store,
@@ -47,7 +47,7 @@ function SidebarContent({ onNavigate, collapsed }) {
   const handleLogout = async () => {
     onNavigate?.()
     await logout()
-    navigate('/', { replace: true })
+    navigate(obtenerRuta('INICIO'), { replace: true })
   }
 
   return (
@@ -85,10 +85,10 @@ function SidebarContent({ onNavigate, collapsed }) {
       <div className="border-t border-dark-800 my-3" />
 
       <a
-        href="/negocios"
+        href={obtenerRuta('NEGOCIOS_PUBLICOS')}
         onClick={(e) => {
           onNavigate?.()
-          navigate('/negocios')
+          navigate(obtenerRuta('NEGOCIOS_PUBLICOS'))
           e.preventDefault()
         }}
         className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-400 hover:text-white hover:bg-dark-700/50 transition-all duration-200"
@@ -168,7 +168,7 @@ function MobileDrawer({ open, onClose }) {
   const handleLogout = async () => {
     onClose()
     await logout()
-    navigate('/', { replace: true })
+    navigate(obtenerRuta('INICIO'), { replace: true })
   }
 
   useEffect(() => {
@@ -245,10 +245,10 @@ function MobileDrawer({ open, onClose }) {
             <div className="border-t border-dark-800 my-3" />
 
             <a
-              href="/negocios"
+              href={obtenerRuta('NEGOCIOS_PUBLICOS')}
               onClick={(e) => {
                 onClose()
-                navigate('/negocios')
+                navigate(obtenerRuta('NEGOCIOS_PUBLICOS'))
                 e.preventDefault()
               }}
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-400 hover:text-white hover:bg-dark-700/50 transition-all duration-200"
@@ -295,11 +295,14 @@ export default function BusinessLayout() {
   const location = useLocation()
 
   const pageTitle = (() => {
-    if (location.pathname === '/mis-negocios') return 'Mis negocios'
-    if (location.pathname === '/mis-negocios/resumen') return 'Dashboard del negocio'
-    if (location.pathname === '/mis-negocios/nuevo') return 'Nuevo negocio'
-    if (/^\/mis-negocios\/[^/]+\/editar$/.test(location.pathname)) return 'Editar negocio'
-    if (/^\/mis-negocios\/[^/]+$/.test(location.pathname)) return 'Detalle del negocio'
+    const baseMisNegocios = obtenerRuta('MIS_NEGOCIOS')
+    if (location.pathname === baseMisNegocios) return 'Mis negocios'
+    if (location.pathname === obtenerRuta('MIS_NEGOCIOS_RESUMEN')) return 'Dashboard del negocio'
+    if (location.pathname === obtenerRuta('NEGOCIO_NUEVO')) return 'Nuevo negocio'
+    if (location.pathname.startsWith(`${baseMisNegocios}/`) && location.pathname.endsWith('/editar')) {
+      return 'Editar negocio'
+    }
+    if (location.pathname.startsWith(`${baseMisNegocios}/`)) return 'Detalle del negocio'
     return 'Panel del negocio'
   })()
 

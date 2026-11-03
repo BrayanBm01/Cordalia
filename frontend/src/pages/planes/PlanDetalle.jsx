@@ -16,6 +16,7 @@ import {
   TIPO_PLAN_LABEL, TIPO_PLAN_BADGE, TIPO_PRECIO_LABEL, formatDuracion,
   planPrecios, buildWhatsAppText, whatsappLink, whatsappNumber, telLink, diaActividades,
 } from '../negocios/planUtils'
+import { obtenerRuta, rutaCon } from '../../routes/offuscatedRoutes.js'
 
 function formatFechaInscripcion(fecha) {
   if (!fecha) return null
@@ -165,7 +166,7 @@ export default function PlanDetalle() {
       <div className="min-h-screen bg-cream-50 flex flex-col items-center justify-center py-24">
         <p className="text-dark-500 mb-4">{error || 'Plan no encontrado'}</p>
         <button
-          onClick={() => navigate('/planes')}
+          onClick={() => navigate(obtenerRuta('PLANES_PUBLICOS'))}
           className="inline-flex items-center gap-2 px-5 py-2.5 bg-moss-900 text-white rounded-full text-sm font-semibold hover:bg-moss-800 transition-colors cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" /> Volver a planes
@@ -180,7 +181,7 @@ export default function PlanDetalle() {
   const waHref = whatsappLink(plan, whatsapp)
   const waNumber = whatsappNumber(plan)
   const telHref = telLink(plan)
-  const negocioLink = plan.business_id ? `/negocios/${plan.business_id}` : null
+  const negocioLink = plan.business_id ? rutaCon('NEGOCIOS_PUBLICOS', plan.business_id) : null
   const isAdmin = user?.rol === 'ADMIN'
   const salidaElegida = salidas.find((s) => String(s.id) === salidaSel) || null
   const salidaAgotada = salidaElegida ? Number(salidaElegida.cupo_disponible) <= 0 : false
@@ -640,7 +641,7 @@ export default function PlanDetalle() {
                           </p>
                         )}
                         <button
-                          onClick={() => (user ? setConfirmando(true) : navigate('/login'))}
+                          onClick={() => (user ? setConfirmando(true) : navigate(obtenerRuta('LOGIN')))}
                           className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-full bg-moss-900 text-white text-sm font-bold hover:bg-moss-800 transition-colors cursor-pointer shadow-sm"
                         >
                           <Ticket className="w-4 h-4" /> Inscribirme

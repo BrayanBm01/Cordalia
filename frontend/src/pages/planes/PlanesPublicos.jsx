@@ -6,6 +6,7 @@ import { planesAPI, lugaresAPI } from '../../services/api'
 import { getPlanImagen } from '../../utils/media'
 import { formatMoney } from '../negocios/businessUtils'
 import { TIPO_PLAN_LABEL, formatDuracion, planPrecios } from '../negocios/planUtils'
+import { rutaCon } from '../../routes/offuscatedRoutes.js'
 
 const DURACION_OPCIONES = [
   { label: 'Cualquier duración', dias_min: null, dias_max: null },
@@ -38,7 +39,7 @@ export function PlanCard({ plan, index = 0 }) {
       <div>
         {/* Photo Container */}
         <div className="relative aspect-[16/10] rounded-[18px] overflow-hidden bg-cream-200">
-          <Link to={`/planes/${plan.id}`} className="block w-full h-full">
+          <Link to={rutaCon('PLANES_PUBLICOS', plan.id)} className="block w-full h-full">
             <img
               src={imagen}
               alt={plan.nombre}
@@ -64,7 +65,7 @@ export function PlanCard({ plan, index = 0 }) {
         {/* Content */}
         <div className="p-3 pt-4">
           <h3 className="font-[family-name:var(--font-display)] text-xl font-bold text-dark-900 group-hover:text-moss-900 transition-colors leading-snug">
-            <Link to={`/planes/${plan.id}`}>{plan.nombre}</Link>
+            <Link to={rutaCon('PLANES_PUBLICOS', plan.id)}>{plan.nombre}</Link>
           </h3>
 
           {/* Meta Info */}
@@ -89,7 +90,7 @@ export function PlanCard({ plan, index = 0 }) {
                 onClick={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
-                  navigate(`/negocios/${plan.business_id}`)
+                  navigate(rutaCon('NEGOCIOS_PUBLICOS', plan.business_id))
                 }}
               >
                 <Users className="w-3.5 h-3.5 text-moss-700" />
@@ -117,7 +118,7 @@ export function PlanCard({ plan, index = 0 }) {
         </div>
 
         <Link
-          to={`/planes/${plan.id}`}
+          to={rutaCon('PLANES_PUBLICOS', plan.id)}
           aria-label={`Ver detalles del plan ${plan.nombre}`}
           className="w-10 h-10 rounded-full bg-moss-900 group-hover:bg-moss-800 text-white flex items-center justify-center transition-transform group-hover:scale-110 shadow-sm"
         >

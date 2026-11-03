@@ -21,15 +21,16 @@ import { useAuth } from '../context/AuthContext'
 import { adminAPI } from '../services/api'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { obtenerRuta } from '../routes/offuscatedRoutes.js'
 
 const sidebarLinks = [
-  { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
-  { to: '/admin/usuarios', icon: Users, label: 'Usuarios' },
-  { to: '/admin/vendedores', icon: Crown, label: 'Vendedores' },
-  { to: '/admin/lugares', icon: MapPin, label: 'Destinos' },
-  { to: '/admin/negocios', icon: Store, label: 'Negocios' },
-  { to: '/admin/resenas', icon: MessageSquare, label: 'Reseñas' },
-  { to: '/admin/historial', icon: History, label: 'Historial' },
+  { to: obtenerRuta('ADMIN'), icon: LayoutDashboard, label: 'Dashboard', end: true },
+  { to: obtenerRuta('ADMIN_USUARIOS'), icon: Users, label: 'Usuarios' },
+  { to: obtenerRuta('ADMIN_VENDEDORES'), icon: Crown, label: 'Vendedores' },
+  { to: obtenerRuta('ADMIN_LUGARES'), icon: MapPin, label: 'Destinos' },
+  { to: obtenerRuta('ADMIN_NEGOCIOS'), icon: Store, label: 'Negocios' },
+  { to: obtenerRuta('ADMIN_RESEÑAS'), icon: MessageSquare, label: 'Reseñas' },
+  { to: obtenerRuta('ADMIN_HISTORIAL'), icon: History, label: 'Historial' },
 ]
 
 const sidebarLinkClass = ({ isActive }) =>
@@ -45,7 +46,7 @@ function Sidebar({ collapsed, onToggle }) {
 
   const handleLogout = async () => {
     await logout()
-    navigate('/', { replace: true })
+    navigate(obtenerRuta('INICIO'), { replace: true })
   }
 
   return (
@@ -136,7 +137,7 @@ function MobileDrawer({ open, onClose }) {
   const handleLogout = async () => {
     onClose()
     await logout()
-    navigate('/', { replace: true })
+    navigate(obtenerRuta('INICIO'), { replace: true })
   }
 
   useEffect(() => {
@@ -280,14 +281,15 @@ function buildNotifications(history) {
   })
 }
 
+// Los títulos se indexan por la ruta ofuscada real (location.pathname).
 const pageTitles = {
-  '/admin': 'Dashboard',
-  '/admin/usuarios': 'Gestion de Usuarios',
-  '/admin/vendedores': 'Estado comercial de vendedores',
-  '/admin/lugares': 'Gestion de Destinos',
-  '/admin/negocios': 'Gestion de Negocios',
-  '/admin/resenas': 'Gestion de Reseñas',
-  '/admin/historial': 'Historial de Sesiones',
+  [obtenerRuta('ADMIN')]: 'Dashboard',
+  [obtenerRuta('ADMIN_USUARIOS')]: 'Gestion de Usuarios',
+  [obtenerRuta('ADMIN_VENDEDORES')]: 'Estado comercial de vendedores',
+  [obtenerRuta('ADMIN_LUGARES')]: 'Gestion de Destinos',
+  [obtenerRuta('ADMIN_NEGOCIOS')]: 'Gestion de Negocios',
+  [obtenerRuta('ADMIN_RESEÑAS')]: 'Gestion de Reseñas',
+  [obtenerRuta('ADMIN_HISTORIAL')]: 'Historial de Sesiones',
 }
 
 export default function AdminLayout() {

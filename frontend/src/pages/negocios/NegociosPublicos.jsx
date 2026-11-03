@@ -5,6 +5,7 @@ import { Store, MapPin, ArrowRight, Search } from 'lucide-react'
 import { businessesAPI } from '../../services/api'
 import { esImagenDeRelleno } from '../../utils/media'
 import { formatRango } from './businessUtils'
+import { rutaCon } from '../../routes/offuscatedRoutes.js'
 
 function SkeletonCard() {
   return (
@@ -31,7 +32,7 @@ function BusinessCard({ business, index }) {
       transition={{ duration: 0.45, delay: index * 0.06, ease: [0.22, 1, 0.36, 1] }}
     >
       <Link
-        to={`/negocios/${business.id}`}
+        to={rutaCon('NEGOCIOS_PUBLICOS', business.id)}
         className="group block bg-white rounded-[22px] overflow-hidden shadow-card border border-cream-200 hover:shadow-card-hover transition-all duration-300"
       >
         <div className="aspect-[16/10] overflow-hidden bg-cream-200 relative">

@@ -34,6 +34,7 @@ import {
 } from '../utils/validation'
 import { vendedorAPI } from '../services/api'
 import { formatMoney } from './negocios/businessUtils'
+import { obtenerRuta } from '../routes/offuscatedRoutes.js'
 
 const registerSchema = z
   .object({

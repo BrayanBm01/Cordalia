@@ -6,7 +6,8 @@
  * Verifican la causa raíz del 404 de Vercel y el contrato del cierre de sesión:
  *   - No existe ninguna redirección por `window.location.href` (recarga dura):
  *     en Vercel esa recarga a una ruta client-side devuelve 404 NOT_FOUND.
- *   - El destino de la expiración es una ruta PÚBLICA REAL del router ('/').
+ *   - El destino de la expiración es una ruta PÚBLICA REAL del router
+ *     (la página de inicio, declarada vía obtenerRuta('INICIO')).
  *   - El aviso de expiración se consume una sola vez (sin duplicados).
  *   - El cierre manual NO marca aviso de inactividad.
  *   - Solo el 401 cierra la sesión: 403/429/5xx/red NO lo hacen.
@@ -16,6 +17,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { obtenerRuta } from '../src/routes/offuscatedRoutes.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const SRC = path.resolve(__dirname, '../src')
@@ -205,7 +207,7 @@ async function main() {
       const s = await importarSesion()
       let eventos = 0
       globalThis.window.addEventListener(s.EVENTO_SESION_EXPIRADA, () => { eventos++ })
-      assert.equal(s.marcarSesionExpirada(), '/')
+      assert.equal(s.marcarSesionExpirada(), obtenerRuta('INICIO'))
       assert.equal(eventos, 1, 'debe emitir el evento una vez')
       assert.equal(s.consumirAvisoSesion(), true, 'debe dejar bandera consumible')
     } finally {
@@ -235,12 +237,14 @@ async function main() {
     }
   })
 
-  await checkAsync('expiración: destino es la ruta pública real "/"', async () => {
+  await checkAsync('expiración: destino es la ruta pública real del router (INICIO ofuscado)', async () => {
     const g = instalarGlobals()
     try {
       const s = await importarSesion()
-      assert.equal(s.RUTA_INICIO, '/')
-      assert.equal(s.marcarSesionExpirada(), '/')
+      // La expiración lleva a la página de inicio pública declarada en
+      // App.jsx vía obtenerRuta('INICIO') (raíz "/" incluida como alias).
+      assert.equal(s.RUTA_INICIO, obtenerRuta('INICIO'))
+      assert.equal(s.marcarSesionExpirada(), obtenerRuta('INICIO'))
     } finally {
       g.restaurar()
     }
@@ -282,11 +286,22 @@ async function main() {
     try {
       const s = await importarSesion()
       const app = leer('App.jsx')
+      // Las rutas públicas viven en utils/session.js (identificadores
+      // ofuscados) y deben tener su equivalente declarado en App.jsx
+      // vía obtenerRuta.
+      const clavePorRuta = {
+        [obtenerRuta('INICIO')]: 'INICIO',
+        [obtenerRuta('LOGIN')]: 'LOGIN',
+        [obtenerRuta('REGISTRO')]: 'REGISTRO',
+      }
       for (const ruta of s.RUTAS_PUBLICAS) {
-        const pathLiteral = ruta === '/' ? 'path="/"' : `path="${ruta}"`
-        // Comprobar tanto la forma literal como la ofuscada (identificador)
-        const pathOfuscado = ruta === '/' ? `obtenerRuta('INICIO')` : `obtenerRuta('${ruta.replace(/\//g, '_').toUpperCase()}')`
-        assert.ok(app.includes(pathLiteral) || app.includes(pathOfuscado), `App.jsx debe declarar ${pathLiteral} o ${pathOfuscado}`)
+        const clave = clavePorRuta[ruta]
+        assert.ok(clave, `No hay clave ofuscada registrada para ${ruta}`)
+        const pathOfuscado = `obtenerRuta('${clave}')`
+        assert.ok(
+          app.includes(pathOfuscado),
+          `App.jsx debe declarar path={${pathOfuscado}} para ${ruta}`
+        )
       }
     } finally {
       g.restaurar()
@@ -395,9 +410,12 @@ async function main() {
         src.includes("await logout()"),
         `${layout} debe cerrar la sesión`
       )
+      // Tras el cierre vuelve a la página de inicio pública (INICIO) usando
+      // el identificador ofuscado declarado en App.jsx, con replace: true
+      // (protector del botón Atrás).
       assert.ok(
-        src.includes("navigate('/', { replace: true })"),
-        `${layout} debe volver al inicio con replace (protector del botón Atrás)`
+        src.includes(`navigate(${`obtenerRuta('INICIO')`}, { replace: true })`),
+        `${layout} debe volver a ${obtenerRuta('INICIO')} (INICIO) con replace (protector del botón Atrás)`
       )
       assert.ok(!/window\.location/.test(src), `${layout} no debe recargar la página`)
     }
@@ -408,8 +426,8 @@ async function main() {
     // y AdminRoute) y las rutas la consumen con <Navigate replace>.
     const roles = leer('utils/roles.js')
     assert.ok(
-      roles.includes("destino: '/login'"),
-      'utils/roles.js debe enviar a /login cuando no hay sesión'
+      roles.includes("destino: obtenerRuta('LOGIN')"),
+      `utils/roles.js debe enviar a ${obtenerRuta('LOGIN')} (LOGIN) cuando no hay sesión`
     )
     assert.ok(
       roles.includes('autenticado'),

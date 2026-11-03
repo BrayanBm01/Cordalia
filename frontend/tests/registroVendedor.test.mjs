@@ -101,6 +101,7 @@ const importarApi = () => {
 }
 
 const importRoles = () => import('../src/utils/roles.js')
+const importRutas = () => import('../src/routes/offuscatedRoutes.js')
 
 async function main() {
   console.log('\n=== Registro y acceso del vendedor (frontend) ===\n')
@@ -136,19 +137,21 @@ async function main() {
   // --- 2/3. Ruta por rol y normalización --------------------------------
   await check('cada rol entra a SU panel tras registrarse o iniciar sesión', async () => {
     const { rutaInicioPorRol, normalizarRol } = await importRoles()
-    assert.equal(rutaInicioPorRol('BUSINESS'), '/panel-vendedor', 'el vendedor va a su panel')
-    assert.equal(rutaInicioPorRol('ADMIN'), '/', 'el administrador entra a la pagina publica')
-    assert.equal(rutaInicioPorRol('TOURIST'), '/', 'el turista va a la home')
+    const { obtenerRuta } = await importRutas()
+    assert.equal(rutaInicioPorRol('BUSINESS'), obtenerRuta('PANEL_VENDEDOR'), 'el vendedor va a su panel')
+    assert.equal(rutaInicioPorRol('ADMIN'), obtenerRuta('INICIO'), 'el administrador entra a la pagina publica')
+    assert.equal(rutaInicioPorRol('TOURIST'), obtenerRuta('INICIO'), 'el turista va a la home')
     // Sin rol o con rol desconocido -> home (nunca a un panel restringido).
-    assert.equal(rutaInicioPorRol(null), '/')
-    assert.equal(rutaInicioPorRol('DESCONOCIDO'), '/')
+    assert.equal(rutaInicioPorRol(null), obtenerRuta('INICIO'))
+    assert.equal(rutaInicioPorRol('DESCONOCIDO'), obtenerRuta('INICIO'))
   })
 
   await check('el rol se normaliza desde cualquier variante', async () => {
     const { normalizarRol, rutaInicioPorRol } = await importRoles()
+    const { obtenerRuta } = await importRutas()
     for (const variante of ['VENDEDOR', 'vendedor', 'VENDOR', 'SELLER', 'NEGOCIO', 'business']) {
       assert.equal(normalizarRol(variante), 'BUSINESS', `${variante} -> BUSINESS`)
-      assert.equal(rutaInicioPorRol(variante), '/panel-vendedor', `${variante} -> panel`)
+      assert.equal(rutaInicioPorRol(variante), obtenerRuta('PANEL_VENDEDOR'), `${variante} -> panel`)
     }
     for (const variante of ['ADMINISTRATOR', 'admin', 0]) {
       assert.equal(normalizarRol(variante), 'ADMIN', `${variante} -> ADMIN`)
@@ -197,6 +200,8 @@ async function main() {
   // --- 5/6/7/8. Decisiones de la ruta protegida -------------------------
   await check('la ruta protegida: vendedor accede, turista y admin no', async () => {
     const { destinoRutaProtegida } = await importRoles()
+    const { obtenerRuta } = await importRutas()
+    const inicio = obtenerRuta('INICIO')
     const panel = ['BUSINESS', 'ADMIN']
 
     // Vendedor -> permitido.
@@ -223,21 +228,21 @@ async function main() {
       rol: 'TOURIST', rolesPermitidos: panel, autenticado: true,
     })
     assert.equal(turista.permitido, false, 'el turista NO entra al panel del vendedor')
-    assert.equal(turista.destino, '/', 'el turista vuelve a la home')
+    assert.equal(turista.destino, inicio, 'el turista vuelve a la home')
 
     // Vendedor en el panel de ADMIN -> no permitido; va a SU panel.
     const vendedorEnAdmin = destinoRutaProtegida({
       rol: 'BUSINESS', rolesPermitidos: ['ADMIN'], autenticado: true,
     })
     assert.equal(vendedorEnAdmin.permitido, false, 'el vendedor NO entra al panel de administración')
-    assert.equal(vendedorEnAdmin.destino, '/panel-vendedor', 'vuelve a su panel')
+    assert.equal(vendedorEnAdmin.destino, obtenerRuta('PANEL_VENDEDOR'), 'vuelve a su panel')
 
-    // Sin sesión -> /login.
+    // Sin sesión -> login (identificador ofuscado).
     const anonimo = destinoRutaProtegida({
       rol: null, rolesPermitidos: panel, autenticado: false,
     })
     assert.equal(anonimo.permitido, false)
-    assert.equal(anonimo.destino, '/login', 'sin sesión va a /login')
+    assert.equal(anonimo.destino, obtenerRuta('LOGIN'), 'sin sesión va al login')
   })
 
   // --- 9/10. El panel muestra la prueba y permite contratar ------------
@@ -285,38 +290,40 @@ async function main() {
 
   await check('el administrador entra a la página pública y el panel sigue protegido', async () => {
     const { rutaInicioPorRol, destinoRutaProtegida } = await importRoles()
+    const { obtenerRuta } = await importRutas()
+    const inicio = obtenerRuta('INICIO')
 
     // 1) Tras iniciar sesión, el administrador llega a la home pública.
-    assert.equal(rutaInicioPorRol('ADMIN'), '/', 'el admin va a la home, no al panel')
+    assert.equal(rutaInicioPorRol('ADMIN'), inicio, 'el admin va a la home, no al panel')
 
     // 2) La sesión del administrador es válida y sus permisos se conservan:
-    //    puede abrir /admin (guard con roles ['ADMIN']).
+    //    puede abrir el panel admin (guard con roles ['ADMIN']).
     const adminEnPanel = destinoRutaProtegida({
       rol: 'ADMIN', rolesPermitidos: ['ADMIN'], autenticado: true,
     })
-    assert.equal(adminEnPanel.permitido, true, 'el admin SÍ puede abrir /admin')
+    assert.equal(adminEnPanel.permitido, true, 'el admin SÍ puede abrir el panel admin')
     assert.equal(adminEnPanel.destino, null, 'no se redirige al panel desde el panel')
 
-    // 3) Un vendedor NO puede abrir /admin: se le envía a SU panel.
+    // 3) Un vendedor NO puede abrir el panel admin: se le envía a SU panel.
     const vendedorEnAdmin = destinoRutaProtegida({
       rol: 'BUSINESS', rolesPermitidos: ['ADMIN'], autenticado: true,
     })
     assert.equal(vendedorEnAdmin.permitido, false, 'el vendedor no entra al panel admin')
-    assert.equal(vendedorEnAdmin.destino, '/panel-vendedor', 'el vendedor vuelve a su panel')
+    assert.equal(vendedorEnAdmin.destino, obtenerRuta('PANEL_VENDEDOR'), 'el vendedor vuelve a su panel')
 
     // 4) Un turista tampoco.
     const turistaEnAdmin = destinoRutaProtegida({
       rol: 'TOURIST', rolesPermitidos: ['ADMIN'], autenticado: true,
     })
     assert.equal(turistaEnAdmin.permitido, false, 'el turista no entra al panel admin')
-    assert.equal(turistaEnAdmin.destino, '/', 'el turista vuelve a la home')
+    assert.equal(turistaEnAdmin.destino, inicio, 'el turista vuelve a la home')
 
-    // 5) Sin sesión, la ruta protegida sigue lleva a /login.
+    // 5) Sin sesión, la ruta protegida sigue lleva al login.
     const anonimoEnAdmin = destinoRutaProtegida({
       rol: null, rolesPermitidos: ['ADMIN'], autenticado: false,
     })
     assert.equal(anonimoEnAdmin.permitido, false, 'sin sesión no se entra')
-    assert.equal(anonimoEnAdmin.destino, '/login', 'sin sesión va a /login')
+    assert.equal(anonimoEnAdmin.destino, obtenerRuta('LOGIN'), 'sin sesión va al login')
   })
 
   await check('el catálogo de planes es público y devuelve el precio real del sistema', async () => {

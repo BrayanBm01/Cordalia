@@ -8,6 +8,7 @@ import LoadingSpinner from '../../components/LoadingSpinner'
 import EmptyState from '../../components/EmptyState'
 import PieChartCard from '../../components/PieChartCard'
 import { toast } from 'sonner'
+import { obtenerRuta, rutaCon } from '../../routes/offuscatedRoutes.js'
 
 const estadoStats = [
   { estado: 'approved', label: 'Publicados', className: 'bg-emerald-50 text-emerald-700 border-emerald-100' },
@@ -300,13 +301,13 @@ export default function ResumenNegocios() {
                     </span>
                     <div className="flex items-center gap-2">
                       <Link
-                        to={`/mis-negocios/${n.id}`}
+                        to={rutaCon('MIS_NEGOCIOS', n.id)}
                         className="px-3 py-1.5 rounded-lg text-xs font-medium bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors"
                       >
                         Gestionar
                       </Link>
                       <Link
-                        to={`/negocios/${n.id}`}
+                        to={rutaCon('NEGOCIOS_PUBLICOS', n.id)}
                         className="p-1.5 rounded-lg text-dark-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
                         title="Ver público"
                       >
