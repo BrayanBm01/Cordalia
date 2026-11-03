@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -25,7 +25,6 @@ import {
 import { useAuth } from '../context/AuthContext'
 import GoogleButton from '../components/GoogleButton'
 import { VENDOR_MEMBERSHIP_PLAN } from '../services/mercadoPago'
-import { rutaInicioPorRol } from '../utils/roles'
 import {
   EMAIL_MAX,
   isEmail,
@@ -90,6 +89,33 @@ export default function Registro() {
   // documentado en el frontend como respaldo.
   const [precioMembresia, setPrecioMembresia] = useState(null)
   const { register: registerUser, user } = useAuth()
+  const navigate = useNavigate()
+
+  // Candado anti-duplicados: el éxito del registro (formulario o Google)
+  // navega al inicio UNA sola vez, aunque una respuesta tardía vuelva a
+  // disparar el callback.
+  const registroNavegadoRef = useRef(false)
+
+  /**
+   * Redirección de éxito del registro, ejecutada una sola vez.
+   *
+   * Destino: la página de inicio con la ruta absoluta devuelta por el
+   * módulo oficial de rutas ofuscadas. Es navegable desde CUALQUIER
+   * punto del árbol (React Router trata los `to` sin "/" como relativos
+   * y los concatena con la ruta actual, produciendo 404).
+   * El vendedor puede abrir su panel comercial desde el menú cuando lo
+   * necesite; el registro NO le arrebata a una página que no solicitó.
+   */
+  function navegarAlInicioTrasRegistro() {
+    if (registroNavegadoRef.current) return
+    registroNavegadoRef.current = true
+    const destino = obtenerRuta('INICIO')
+    if (typeof destino !== 'string' || !destino.startsWith('/') || destino.length < 2) {
+      toast.error('No se pudo redirigir a la página de inicio')
+      return
+    }
+    navigate(destino, { replace: true })
+  }
 
   useEffect(() => {
     let activo = true
@@ -109,7 +135,6 @@ export default function Registro() {
       activo = false
     }
   }, [])
-  const navigate = useNavigate()
 
   const {
     register,
@@ -128,7 +153,7 @@ export default function Registro() {
       const rolRegistro = tipo === 'BUSINESS' ? 'BUSINESS' : 'TOURIST'
 
       // El registro devuelve la sesión (token + usuario): el usuario
-      // queda autenticado y entra directo a su panel.
+      // queda autenticado desde este momento (el rol lo fija el backend).
       const res = await registerUser(data.nombre, data.email, data.password, rolRegistro)
       const rol = res?.data?.usuario?.rol || rolRegistro
 
@@ -143,10 +168,12 @@ export default function Registro() {
         })
       }
 
-      // El vendedor entra a SU panel comercial (prueba gratuita, planes
-      // y pagos); el turista, a la home.
-      navigate(rutaInicioPorRol(rol), { replace: true })
+      // Redirección ÚNICA al inicio, con la ruta absoluta oficial
+      // (vendedor incluido: su panel queda accesible desde el menú).
+      navegarAlInicioTrasRegistro()
     } catch (err) {
+      // Error del registro: NO se navega, el formulario permanece y
+      // el usuario ve el motivo del fallo.
       toast.error(err.message || 'Error al crear la cuenta')
     } finally {
       setIsSubmitting(false)
@@ -155,8 +182,8 @@ export default function Registro() {
 
   function handleGoogleSuccess(res) {
     // GoogleButton ya inició la sesión y devuelve la respuesta: el rol
-    // lo decide el backend. El vendedor debe llegar a su panel
-    // comercial, no a la home pública.
+    // lo decide el backend. Tras el registro con Google, el destino es
+    // también la página de inicio (ruta absoluta, una sola vez).
     const rol = res?.data?.usuario?.rol || user?.rol || tipo
     if (rol === 'BUSINESS') {
       toast.success('¡Bienvenido a Cordalia!', {
@@ -167,7 +194,7 @@ export default function Registro() {
         description: 'Ya puedes comenzar tu viaje por Córdoba.',
       })
     }
-    navigate(rutaInicioPorRol(rol), { replace: true })
+    navegarAlInicioTrasRegistro()
   }
 
   return (

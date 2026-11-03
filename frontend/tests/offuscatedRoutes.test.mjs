@@ -17,6 +17,7 @@ import {
   RUTAS_OFUSCADAS,
   RUTAS_INVERSA,
   obtenerRuta,
+  rutaCon,
   nombreRuta,
   esRutaOfuscada,
 } from '../src/routes/offuscatedRoutes.js'
@@ -111,9 +112,29 @@ check('el mapa inverso coincide con el directo', () => {
 
 /* ── 2. Contrato de los helpers ──────────────────────────────────────── */
 
-check('obtenerRuta devuelve el identificador correcto', () => {
-  assert.equal(obtenerRuta('INICIO'), RUTAS_OFUSCADAS.INICIO)
-  assert.equal(obtenerRuta('ADMIN_USUARIOS'), RUTAS_OFUSCADAS.ADMIN_USUARIOS)
+check('obtenerRuta devuelve la ruta absoluta correcta', () => {
+  // Contrato: el mapa guarda el identificador crudo, pero obtenerRuta
+  // SIEMPRE devuelve la ruta absoluta ("/identificador"), blindada
+  // contra la resolución relativa de React Router.
+  assert.equal(obtenerRuta('INICIO'), `/${RUTAS_OFUSCADAS.INICIO}`)
+  assert.equal(obtenerRuta('ADMIN_USUARIOS'), `/${RUTAS_OFUSCADAS.ADMIN_USUARIOS}`)
+})
+
+check('todas las rutas devueltas por obtenerRuta son absolutas', () => {
+  for (const clave of Object.keys(RUTAS_OFUSCADAS)) {
+    const ruta = obtenerRuta(clave)
+    assert.ok(
+      ruta.startsWith('/') && ruta.length === RUTAS_OFUSCADAS[clave].length + 1,
+      `${clave} -> "${ruta}" no es la ruta absoluta del identificador`
+    )
+    assert.ok(!ruta.includes('//'), `${clave} -> "${ruta}" contiene barras dobles`)
+  }
+})
+
+check('rutaCon devuelve rutas absolutas con segmentos', () => {
+  assert.equal(rutaCon('LUGARES', 12), `/${RUTAS_OFUSCADAS.LUGARES}/12`)
+  assert.equal(rutaCon('MIS_NEGOCIOS', 7, 'editar'), `/${RUTAS_OFUSCADAS.MIS_NEGOCIOS}/7/editar`)
+  assert.equal(rutaCon('INICIO'), `/${RUTAS_OFUSCADAS.INICIO}`, 'sin segmentos = solo la base')
 })
 
 check('obtenerRuta rechaza claves inexistentes o inválidas', () => {
@@ -125,9 +146,11 @@ check('obtenerRuta rechaza claves inexistentes o inválidas', () => {
 
 check('nombreRuta y esRutaOfuscada funcionan', () => {
   assert.equal(nombreRuta(RUTAS_OFUSCADAS.ADMIN), 'ADMIN')
+  assert.equal(nombreRuta(`/${RUTAS_OFUSCADAS.ADMIN}`), 'ADMIN', 'acepta ruta absoluta')
   assert.equal(nombreRuta('no-existe'), null)
   assert.equal(nombreRuta(null), null)
   assert.equal(esRutaOfuscada(RUTAS_OFUSCADAS.PERFIL), true)
+  assert.equal(esRutaOfuscada(obtenerRuta('PERFIL')), true, 'acepta la ruta absoluta')
   assert.equal(esRutaOfuscada('no-existe'), false)
   assert.equal(esRutaOfuscada(''), false)
 })

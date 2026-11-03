@@ -13,6 +13,16 @@
 //   * Los mapas están congelados: nadie puede modificarlos en runtime.
 //   * La ofuscación es una capa de obscurity: NO sustituye la
 //     autenticación ni la autorización, que se validan en el backend.
+//
+// CONTRATO DE NAVEGACIÓN (devuelve SIEMPRE rutas absolutas):
+//   * React Router interpreta un `to` que NO empieza por "/" como
+//     una ruta RELATIVA a la ruta actual dentro del árbol de
+//     `<Route>`: navegar "F8HgnHJz" desde "/y8o5rdAd" (login) produce
+//     "/y8o5rdAd/F8HgnHJz" (404 por concatenación). Por eso el
+//     resolutor antepone SIEMPRE la barra: cada salida es una ruta
+//     absoluta y válida desde cualquier punto del árbol
+//     (registro, login, paneles, detalle, 404...)
+//     — corrección del 404 tras completar el registro.
 // ============================================================
 
 // Identificadores de 8 caracteres generados con aleatoriedad
@@ -61,12 +71,30 @@ export const RUTAS_INVERSA = Object.freeze(
 // de usarlas como destino de una navegación.
 const IDS_VALIDOS = new Set(Object.values(RUTAS_OFUSCADAS))
 
+// Antepone "/" a un identificador: TODAS las rutas devueltas por este
+// módulo son absolutas, para que navigate()/Link/Navigate nunca las
+// resuelvan como relativas (causa del 404 tras completar el registro).
+function ABSOLUTA(id) {
+  return typeof id === 'string' ? `/${id.replace(/^\/+/, '')}` : id
+}
+
+/** Normaliza un destinatario de ruta quitando la(s) barra(s) inicial(es). */
+function sinBarra(valor) {
+  return typeof valor === 'string' ? valor.replace(/^\/+/, '') : null
+}
+
 /**
- * Devuelve el identificador ofuscado correspondiente a un nombre de ruta.
+ * Devuelve la ruta ABSOLUTA correspondiente a un nombre de ruta.
  * Lanza si la clave no existe (error de programación: ruta no registrada).
  *
+ * La ruta se antepone con "/" para blindarla contra la resolución
+ * RELATIVA de React Router (que concatenaría el destino con la ruta
+ * actual si la cadena no empezara por "/", produciendo 404 tras el
+ * registro/login y en cualquier redirección ejecutada desde páginas
+ * con segmento en la URL).
+ *
  * @param {string} nombre - Clave canónica (p. ej. 'ADMIN_USUARIOS').
- * @returns {string} Identificador ofuscado.
+ * @returns {string} Ruta absoluta ("KJRkky3o" -> "/KJRkky3o").
  */
 export function obtenerRuta(nombre) {
   if (typeof nombre !== 'string' || nombre.length === 0) {
@@ -74,7 +102,7 @@ export function obtenerRuta(nombre) {
   }
   const id = RUTAS_OFUSCADAS[nombre]
   if (!id) throw new Error(`Ruta ofuscada no definida: ${nombre}`)
-  return id
+  return ABSOLUTA(id)
 }
 
 /**
@@ -94,30 +122,33 @@ export function rutaCon(nombre, ...partes) {
   const base = obtenerRuta(nombre)
   const segmentos = partes
     .filter((p) => p !== undefined && p !== null && p !== '')
-    .map((p) => encodeURIComponent(String(p)))
-  return segmentos.length > 0 ? `${base}/${segmentos.join('/')}` : base
+    .map((p) => String(p))
+  return segmentos.length > 0 ? `${base}/${segmentos.map(encodeURIComponent).join('/')}` : base
 }
 
 /**
- * Devuelve el nombre legible para un identificador (solo depuración)
- * o `null` si el identificador no corresponde a ninguna ruta.
+ * Devuelve el nombre legible para un identificador (con o sin "/" inicial;
+ * solo depuración) o `null` si el identificador no corresponde a ninguna ruta.
  *
- * @param {string} id - Identificador ofuscado.
+ * @param {string} id - Identificador ofuscado (acepta "/KJRkky3o" o "KJRkky3o").
  * @returns {string|null}
  */
 export function nombreRuta(id) {
-  if (typeof id !== 'string') return null
-  return RUTAS_INVERSA[id] || null
+  const limpio = sinBarra(id)
+  if (!limpio) return null
+  return RUTAS_INVERSA[limpio] || null
 }
 
 /**
  * Indica si un segmento corresponde a un identificador de ruta conocido.
- * No lanza: devuelve `false` ante valores inválidos.
+ * Acepta "/identificador" o "identificador". No lanza: devuelve `false`
+ * ante valores inválidos.
  *
  * @param {string} id - Identificador a comprobar.
  * @returns {boolean}
  */
 export function esRutaOfuscada(id) {
-  if (typeof id !== 'string' || id.length === 0) return false
-  return IDS_VALIDOS.has(id)
+  const limpio = sinBarra(id)
+  if (!limpio) return false
+  return IDS_VALIDOS.has(limpio)
 }

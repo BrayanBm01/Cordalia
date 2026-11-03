@@ -144,12 +144,17 @@ Archivo creado: `frontend/src/routes/offuscatedRoutes.js`
 
 - **Backend:** `192 PASS, 0 FAIL` (20 suites, incluyendo `19-validaciones-seguridad.test.js`)
 - **Frontend:** Todas las suites pass (formatoMoney, googleAuth, session, apiInterceptor,
-  vendedorApi, registroVendedor, validation.test.mjs y **offuscatedRoutes.test.mjs**):
-  `171 aserciones PASS, 0 FAIL`
+  vendedorApi, registroVendedor, validation.test.mjs, **navegacion.test.mjs** y
+  **offuscatedRoutes.test.mjs**): `189 aserciones PASS, 0 FAIL`
+- **E2E de registro/login** (bundle de producción ejecutado en DOM + backend real):
+  registro vendedor → `obtenerRuta('INICIO')` exacto; login vendedor →
+  `obtenerRuta('PANEL_VENDEDOR')` exacto; sin 404 ni concatenaciones (ver 5.1.b)
 - **Build de producción:** `vite build` + `checkBundle` exitoso (advertencia de chunk size > 500 kB, no crítico)
 - **Lint:** Sin errores; advertencias preexistentes de estilo (sin cambios)
 
 ### 5.1 Incidencia post-despliegue y su resolución (registro de la corrección)
+
+#### 5.1.a — `obtenerRuta is not defined` en producción
 
 Tras la primera integración de la ofuscación, producción mostró
 `obtenerRuta is not defined` (capturado por el AppErrorBoundary con el
@@ -179,6 +184,52 @@ mensaje "Algo salió mal"). Auditoría posterior:
   inicio renderiza en `/` y en `KJRkky3o`, el guard ADMIN redirige sin
   sesión al login ofuscado, y no hay errores de consola ni referencias
   crudas a `obtenerRuta` en el DOM.
+
+#### 5.1.b — 404 por concatenación de rutas tras el registro (login/registro)
+
+Después de recuperar la home, al completar el registro (vendedor o
+cuenta pública) la app caía en "404 — Página no encontrada" con URLs
+acumuladas como `/y8o5rdAd/F8HgnHJz/KJRkky3o`.
+
+- **Causa exacta:** los identificadores ofuscados (`KJRkky3o`,
+  `F8HgnHJz`, …) **no llevan "/" inicial** y React Router interpreta un
+  `to` sin "/" como una **ruta RELATIVA**, que concatena con la ruta
+  actual del árbol de `<Route>`. Así:
+  1. `Registro.jsx` navegaba a `rutaInicioPorRol(rol)` ("F8HgnHJz"
+     relativo desde `/Myj4MJRB`) → `/Myj4MJRB/F8HgnHJz` (404).
+  2. El botón "Volver al inicio" de la 404 (`NotFound.jsx`) volvía a
+     resolver de forma relativa ("KJRkky3o" desde la URL ya corrupta) →
+     `/y8o5rdAd/F8HgnHJz/KJRkky3o`. El mismo defecto latía en el login,
+     en los guards (`<Navigate to={destino}>`), en la expiración de
+     sesión (`navigate(RUTA_INICIO)` desde páginas privadas) y en todos
+     los enlaces de detalle (`rutaCon(...)`) renderizados dentro de
+     páginas con segmento.
+- **Solución implementada (mapa de 22 identificadores SIN cambios):**
+  1. `offuscatedRoutes.js`: el resolutor oficial `obtenerRuta(nombre)`
+     ahora devuelve **SIEMPRE la ruta absoluta** (`"/" + id`) y
+     `rutaCon()` hereda esa garantía. Una sola fuente de verdad, sin
+     duplicar el mapa ni crear un segundo resolutor.
+  2. `Registro.jsx`: tras un registro EXITOSO (formulario o Google) la
+     redirección es **siempre al INICIO** con la ruta absoluta oficial,
+     ejecutada **una sola vez** (candado `registroNavegadoRef` contra
+     respuestas tardías/duplicadas); el registro fallido NO navega y
+     muestra el error en el formulario; el registro público sigue sin
+     ofrecer cuentas ADMIN (solo TOURIST/BUSINESS, lo fija el backend).
+  3. `nombreRuta`/`esRutaOfuscada` toleran la "/" inicial.
+  4. Nueva suite `tests/navegacion.test.mjs` que navega con el **motor
+     real de React Router** (`createMemoryRouter`) y comprueba: destinos
+     sin concatenación desde login/registro/páginas privadas, destinos
+     reales (no 404), login por rol, detalle sin segmentos duplicados,
+     destino único del registro y rechazo de destinos vacíos.
+- **Verificación E2E (bundle real + backend real, usuario registrado y
+  luego borrado con el convenio `f21test.` del proyecto):**
+  - Registro de VENDEDOR → `POST /api/auth/register` 201 → URL final
+    **exactamente `obtenerRuta('INICIO')`** (`/KJRkky3o`), sin 404, con
+    sesión y rol BUSINESS conservados y toast de éxito.
+  - Login del VENDEDOR → URL final **exactamente
+    `obtenerRuta('PANEL_VENDEDOR')`** (`/F8HgnHJz`), sin 404.
+  - Un registro con datos inválidos muestra el error de validación y NO
+    navega (se comprobó en el mismo E2E).
 
 ## 6. Vulnerabilidades encontradas y corregidas
 
@@ -216,6 +267,10 @@ mensaje "Algo salió mal"). Auditoría posterior:
 - El chequeo post-build (`frontend/scripts/checkBundle.mjs`, integrado a
   `npm run build`) debe mantenerse: es la red de seguridad que impide
   desplegar un bundle con llamadas a `obtenerRuta` no resueltas.
+- Las rutas devueltas por el módulo son SIEMPRE absolutas (`/identificador`);
+  es lo que blinda `navigate`/`Link`/`Navigate` contra la resolución
+  relativa de React Router. NO convertir la salida de `obtenerRuta` de
+  vuelta a identificadores crudos.
 
 ## 9. Resumen
 
