@@ -198,9 +198,9 @@ export default function Registro() {
   }
 
   return (
-    <div className="min-h-screen bg-cream-50 flex flex-col lg:flex-row">
+    <div className="min-h-screen min-h-dvh bg-cream-50 flex flex-col lg:flex-row">
       {/* ── Left side: Editorial Brand Showcase (Desktop) ─────────────── */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-moss-950 flex-col justify-between p-12 xl:p-16">
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-moss-950 flex-col justify-between p-12 lg:p-10 xl:p-16">
         {/* Background Image con overlay TerraGo */}
         <div
           className="absolute inset-0 bg-cover bg-center transition-transform duration-1000 scale-105"
@@ -213,7 +213,7 @@ export default function Registro() {
         {/* Brand header */}
         <div className="relative z-10">
           <Link to={obtenerRuta('INICIO')} className="inline-flex items-center gap-3 group">
-            <div className="w-11 h-11 rounded-full bg-moss-900 border border-moss-700/60 text-white flex items-center justify-center shadow-md transition-transform duration-300 group-hover:scale-105">
+            <div className="w-11 h-11 lg:w-9 lg:h-9 rounded-full bg-moss-900 border border-moss-700/60 text-white flex items-center justify-center shadow-md transition-transform duration-300 group-hover:scale-105">
               <Sprout className="w-5 h-5 text-moss-200" />
             </div>
             <div>
@@ -228,13 +228,13 @@ export default function Registro() {
         </div>
 
         {/* Hero editorial message */}
-        <div className="relative z-10 max-w-lg my-auto py-12">
+        <div className="relative z-10 max-w-lg my-auto py-12 lg:py-4 xl:py-10">
           <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-moss-300 mb-4">
             <Sparkles className="w-4 h-4 text-moss-400" />
             FORMA PARTE DEL CAMBIO
           </span>
           <h2
-            className="text-4xl xl:text-5xl font-bold text-white mb-5 leading-[1.12] tracking-tight"
+            className="text-4xl lg:text-3xl xl:text-4xl 2xl:text-5xl font-bold text-white leading-[1.12] tracking-tight mb-5 lg:mb-4"
             style={{ fontFamily: 'var(--font-display)' }}
           >
             Conecta con la riqueza natural de Córdoba{' '}
@@ -242,12 +242,12 @@ export default function Registro() {
               y apoya a su gente
             </span>
           </h2>
-          <p className="text-stone-300 text-base leading-relaxed mb-8">
+          <p className="text-stone-300 text-base lg:text-sm xl:text-base leading-relaxed mb-8 lg:mb-6">
             Regístrate hoy para reservar experiencias comunitarias, guardar tus destinos favoritos y formar parte de una red turística responsable.
           </p>
 
           {/* Trust bullets */}
-          <div className="space-y-3 pt-4 border-t border-white/10">
+          <div className="space-y-3 lg:space-y-2 pt-4 lg:pt-3 border-t border-white/10">
             <div className="flex items-center gap-3 text-sm text-stone-200">
               <span className="w-5 h-5 rounded-full bg-moss-800/90 text-moss-300 flex items-center justify-center shrink-0">
                 <CheckCircle2 className="w-3.5 h-3.5" />
@@ -279,8 +279,8 @@ export default function Registro() {
       </div>
 
       {/* ── Right side: Registration Form (Responsive) ────────────────── */}
-      <div className="flex-1 min-h-screen flex flex-col justify-center px-6 sm:px-10 lg:px-16 py-16 sm:py-20">
-        <div className="w-full max-w-md mx-auto">
+      <div className="flex-1 min-h-screen min-h-dvh flex flex-col justify-center px-6 sm:px-10 lg:px-16 py-16 sm:py-20 md:py-6 lg:py-4 xl:py-5 2xl:py-6">
+        <div className="w-full max-w-md md:max-w-xl mx-auto">
           {/* Mobile brand header */}
           <div className="lg:hidden flex items-center gap-2.5 mb-8">
             <div className="w-10 h-10 rounded-full bg-moss-900 text-white flex items-center justify-center shadow-sm">
@@ -301,24 +301,24 @@ export default function Registro() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
           >
-            <div className="mb-6">
+            <div className="mb-6 md:mb-4 xl:mb-3">
               <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.18em] text-moss-700 mb-2">
                 <Sprout className="w-3.5 h-3.5" />
                 NUEVA CUENTA
               </span>
               <h1
-                className="text-3xl sm:text-4xl font-bold text-dark-900 tracking-tight"
+                className="text-3xl sm:text-4xl md:text-3xl font-bold text-dark-900 tracking-tight"
                 style={{ fontFamily: 'var(--font-display)' }}
               >
                 Crear cuenta
               </h1>
-              <p className="text-dark-500 text-sm sm:text-base mt-2">
+              <p className="text-dark-500 text-sm sm:text-base mt-2 md:mt-1.5">
                 Selecciona tu tipo de perfil y completa tus datos.
               </p>
             </div>
 
             {/* Selector de Tipo de Cuenta */}
-            <div className="grid grid-cols-2 gap-3 mb-6">
+            <div className="grid grid-cols-2 gap-3 md:gap-2.5 mb-6 md:mb-4 xl:mb-3">
               {TIPOS_CUENTA.map((t) => {
                 const Icon = t.icon
                 const selected = tipo === t.id
@@ -327,7 +327,7 @@ export default function Registro() {
                     key={t.id}
                     type="button"
                     onClick={() => setTipo(t.id)}
-                    className={`p-3.5 sm:p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
+                    className={`p-3.5 sm:p-4 md:p-3 rounded-2xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
                       selected
                         ? 'border-moss-800 bg-moss-50/70 shadow-sm'
                         : 'border-cream-300 bg-white hover:border-moss-300 hover:bg-cream-100/50'
@@ -336,7 +336,7 @@ export default function Registro() {
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                          className={`w-8 h-8 lg:w-7 lg:h-7 rounded-full flex items-center justify-center ${
                             selected ? 'bg-moss-900 text-white' : 'bg-cream-100 text-dark-600'
                           }`}
                         >
@@ -376,11 +376,15 @@ export default function Registro() {
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
                   transition={{ duration: 0.3 }}
-                  className="mb-6 overflow-hidden"
+                  className="mb-6 md:mb-4 xl:mb-3 overflow-hidden"
                 >
-                  <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-cream-100 to-cream-200/70 border border-moss-300/70 shadow-sm">
+                  <div className="p-4 sm:p-5 md:p-3.5 xl:p-3 rounded-2xl bg-gradient-to-br from-cream-100 to-cream-200/70 border border-moss-300/70 shadow-sm">
+                    {/* En lg+ el aviso aprovecha el ancho en 2 columnas:
+                        título/precio/detalle | caja informativa. Reduce el
+                        alto del registro para caber sin scroll. */}
+                    <div className="md:grid md:grid-cols-[1.25fr_1fr] md:gap-4 md:items-start">
                     <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-full bg-moss-900 text-white flex items-center justify-center shrink-0 mt-0.5">
+                      <div className="w-9 h-9 md:w-7 md:h-7 rounded-full bg-moss-900 text-white flex items-center justify-center shrink-0 mt-0.5">
                         <CreditCard className="w-4 h-4 text-moss-200" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -397,17 +401,19 @@ export default function Registro() {
                               : `${formatMoney(VENDOR_MEMBERSHIP_PLAN.precioCOP)} / mes`}
                           </span>
                         </div>
-                        <p className="text-xs text-dark-600 leading-relaxed mb-3">
+                        <p className="text-xs text-dark-600 leading-relaxed md:leading-snug md:text-[11px]">
                           Tu cuenta de vendedor se activa <strong>de inmediato</strong> con una{' '}
                           <strong>prueba gratuita de 7 días</strong>. Durante la prueba puedes
                           publicar tus planes turísticos, tours y experiencias.{' '}
                           <strong>No necesitas pagar nada para empezar</strong>: al terminar la
                           prueba podrás contratar la membresía mensual.
                         </p>
+                      </div>
+                    </div>
 
-                        <div className="p-2.5 rounded-xl bg-white/80 border border-cream-300/80 text-[11px] text-dark-700 flex items-start gap-2">
+                        <div className="p-2.5 md:p-2 rounded-xl bg-white/80 border border-cream-300/80 text-[11px] text-dark-700 flex items-start gap-2">
                           <Info className="w-4 h-4 text-moss-700 shrink-0 mt-0.5" />
-                          <span>
+                          <span className="md:leading-snug">
                             <strong>Sin tarjeta ahora:</strong> la prueba se activa sola al crear la
                             cuenta y <strong>no se reinicia</strong> al volver a iniciar sesión. Tu
                             perfil y tus datos se conservan aunque decidas no contratar.{' '}
@@ -416,15 +422,17 @@ export default function Registro() {
                             para empezar.
                           </span>
                         </div>
-                      </div>
                     </div>
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
 
-            {/* Formulario */}
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {/* Formulario: 2 columnas en tabletas/escritorio (una en móvil).
+                Los 4 campos quedan en 2 filas compactas para que todo el
+                formulario y su botón quepan sin scroll en escritorio. */}
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 md:space-y-3 xl:space-y-2.5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-x-4 md:gap-y-3">
               <div>
                 <label htmlFor="nombre" className="block text-xs sm:text-sm font-semibold text-dark-800 mb-1.5">
                   Nombre completo
@@ -436,7 +444,7 @@ export default function Registro() {
                     type="text"
                     autoComplete="name"
                     placeholder="Tu nombre y apellido"
-                    className={`w-full pl-11 pr-4 py-3 rounded-2xl border bg-white text-dark-900 text-sm placeholder:text-dark-400 focus:outline-none focus:ring-2 focus:ring-moss-600/20 focus:border-moss-700 transition-colors shadow-sm ${
+                    className={`w-full pl-11 pr-4 py-3 md:py-2.5 rounded-2xl border bg-white text-dark-900 text-sm placeholder:text-dark-400 focus:outline-none focus:ring-2 focus:ring-moss-600/20 focus:border-moss-700 transition-colors shadow-sm ${
                       errors.nombre ? 'border-red-300 ring-2 ring-red-100' : 'border-cream-300'
                     }`}
                     {...register('nombre')}
@@ -458,7 +466,7 @@ export default function Registro() {
                     type="email"
                     autoComplete="email"
                     placeholder="tu@correo.com"
-                    className={`w-full pl-11 pr-4 py-3 rounded-2xl border bg-white text-dark-900 text-sm placeholder:text-dark-400 focus:outline-none focus:ring-2 focus:ring-moss-600/20 focus:border-moss-700 transition-colors shadow-sm ${
+                    className={`w-full pl-11 pr-4 py-3 md:py-2.5 rounded-2xl border bg-white text-dark-900 text-sm placeholder:text-dark-400 focus:outline-none focus:ring-2 focus:ring-moss-600/20 focus:border-moss-700 transition-colors shadow-sm ${
                       errors.email ? 'border-red-300 ring-2 ring-red-100' : 'border-cream-300'
                     }`}
                     {...register('email')}
@@ -480,7 +488,7 @@ export default function Registro() {
                     type={showPassword ? 'text' : 'password'}
                     autoComplete="new-password"
                     placeholder="••••••••"
-                    className={`w-full pl-11 pr-11 py-3 rounded-2xl border bg-white text-dark-900 text-sm placeholder:text-dark-400 focus:outline-none focus:ring-2 focus:ring-moss-600/20 focus:border-moss-700 transition-colors shadow-sm ${
+                    className={`w-full pl-11 pr-11 py-3 md:py-2.5 rounded-2xl border bg-white text-dark-900 text-sm placeholder:text-dark-400 focus:outline-none focus:ring-2 focus:ring-moss-600/20 focus:border-moss-700 transition-colors shadow-sm ${
                       errors.password ? 'border-red-300 ring-2 ring-red-100' : 'border-cream-300'
                     }`}
                     {...register('password')}
@@ -513,7 +521,7 @@ export default function Registro() {
                     type={showConfirmPassword ? 'text' : 'password'}
                     autoComplete="new-password"
                     placeholder="••••••••"
-                    className={`w-full pl-11 pr-11 py-3 rounded-2xl border bg-white text-dark-900 text-sm placeholder:text-dark-400 focus:outline-none focus:ring-2 focus:ring-moss-600/20 focus:border-moss-700 transition-colors shadow-sm ${
+                    className={`w-full pl-11 pr-11 py-3 md:py-2.5 rounded-2xl border bg-white text-dark-900 text-sm placeholder:text-dark-400 focus:outline-none focus:ring-2 focus:ring-moss-600/20 focus:border-moss-700 transition-colors shadow-sm ${
                       errors.confirmPassword
                         ? 'border-red-300 ring-2 ring-red-100'
                         : 'border-cream-300'
@@ -535,11 +543,12 @@ export default function Registro() {
                   </p>
                 )}
               </div>
+              </div>
 
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-3.5 px-6 bg-moss-900 hover:bg-moss-800 disabled:bg-moss-700 text-white font-semibold text-sm sm:text-base rounded-full transition-all duration-300 shadow-pill hover:shadow-xl hover:-translate-y-0.5 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer mt-2"
+                className="w-full py-3.5 md:py-3 px-6 bg-moss-900 hover:bg-moss-800 disabled:bg-moss-700 text-white font-semibold text-sm sm:text-base rounded-full transition-all duration-300 shadow-pill hover:shadow-xl hover:-translate-y-0.5 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer mt-2 md:mt-0.5"
               >
                 {isSubmitting ? (
                   <>
@@ -552,7 +561,7 @@ export default function Registro() {
               </button>
             </form>
 
-            <div className="flex items-center gap-3 my-6">
+            <div className="flex items-center gap-3 my-6 md:my-4 xl:my-3">
               <div className="flex-1 h-px bg-cream-300" />
               <span className="text-xs font-medium text-dark-400 uppercase tracking-wider">o</span>
               <div className="flex-1 h-px bg-cream-300" />
@@ -564,7 +573,7 @@ export default function Registro() {
               label={tipo === 'BUSINESS' ? 'Registrarme como vendedor con Google' : 'Registrarme con Google'}
             />
 
-            <div className="mt-8 text-center pt-6 border-t border-cream-200">
+            <div className="mt-8 md:mt-5 xl:mt-4 text-center pt-6 md:pt-4 xl:pt-3 border-t border-cream-200">
               <p className="text-xs sm:text-sm text-dark-600">
                 ¿Ya tienes una cuenta registrada?{' '}
                 <Link

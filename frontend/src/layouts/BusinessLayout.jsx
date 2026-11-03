@@ -332,7 +332,12 @@ export default function BusinessLayout() {
         </header>
 
         <main className="flex-1 overflow-y-auto">
-          <Outlet />
+          {/* Ancho máximo razonable en pantallas muy grandes: el contenido
+              crece de forma proporcional (raíz rem) sin estirarse. Las
+              páginas ya traen sus propios contenedores con padding. */}
+          <div className="mx-auto w-full max-w-[1700px]">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

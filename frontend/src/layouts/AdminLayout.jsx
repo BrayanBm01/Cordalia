@@ -439,7 +439,12 @@ export default function AdminLayout() {
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-          <Outlet />
+          {/* Ancho máximo razonable: en pantallas muy grandes el contenido
+              crece de forma proporcional (raíz rem) pero no se estira de
+              manera desproporcionada. */}
+          <div className="mx-auto w-full max-w-[1700px]">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

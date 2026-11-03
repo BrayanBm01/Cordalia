@@ -104,6 +104,25 @@
     scroll-padding-top: 5rem;
     color-scheme: light;
   }
+  /* ── Escalado proporcional en pantallas grandes ───────────────────────
+     Tailwind dimensiona tipografía, espaciados y contenedores en `rem`,
+     por lo que aumentar la raíz escala TODA la interfaz de forma
+     proporcional (equivalente a un zoom real hecho con CSS responsivo,
+     sin zoom/transform). Los breakpoints empiezan por encima del tamaño
+     de portátil (1366px) para no alterar las vistas que ya caben, y son
+     moderados para evitar desbordes en pantallas ultrapanorámicas. */
+  @media (min-width: 1600px) {
+    html { font-size: 112.5%; } /* 18px en monitores grandes */
+  }
+  @media (min-width: 1920px) {
+    html { font-size: 118.75%; } /* 19px en 1920+ */
+  }
+  @media (min-width: 2560px) {
+    html { font-size: 131.25%; } /* 21px en alta resolución */
+  }
+  @media (min-width: 3200px) {
+    html { font-size: 140.625%; } /* 22.5px ultrapanorámicas (los max-w-* limitan el estiramiento) */
+  }
   body {
     font-family: var(--font-body);
     color: var(--color-dark-900);

@@ -145,7 +145,11 @@ Archivo creado: `frontend/src/routes/offuscatedRoutes.js`
 - **Backend:** `192 PASS, 0 FAIL` (20 suites, incluyendo `19-validaciones-seguridad.test.js`)
 - **Frontend:** Todas las suites pass (formatoMoney, googleAuth, session, apiInterceptor,
   vendedorApi, registroVendedor, validation.test.mjs, **navegacion.test.mjs** y
-  **offuscatedRoutes.test.mjs**): `189 aserciones PASS, 0 FAIL`
+  **responsive.test.mjs** y **offuscatedRoutes.test.mjs**): `199 aserciones PASS, 0 FAIL`
+- **Responsive real (navegador Firefox):** 80 aserciones PASS en 6 resoluciones
+  (360×800, 390×844, 768×1024, 1366×768, 1920×1080, 2560×1440) — login y
+  registro sin scroll vertical en escritorio, sin desbordes horizontales,
+  escalado proporcional verificado (ver 5.1.c)
 - **E2E de registro/login** (bundle de producción ejecutado en DOM + backend real):
   registro vendedor → `obtenerRuta('INICIO')` exacto; login vendedor →
   `obtenerRuta('PANEL_VENDEDOR')` exacto; sin 404 ni concatenaciones (ver 5.1.b)
@@ -230,6 +234,57 @@ acumuladas como `/y8o5rdAd/F8HgnHJz/KJRkky3o`.
     `obtenerRuta('PANEL_VENDEDOR')`** (`/F8HgnHJz`), sin 404.
   - Un registro con datos inválidos muestra el error de validación y NO
     navega (se comprobó en el mismo E2E).
+
+### 5.1.c — Responsive: escalado proporcional en pantallas grandes y login/registro sin scroll
+
+- **Síntomas:** en monitores grandes el contenido quedaba pequeño (no
+  aprovechaba el espacio) y login/registro ocupaban demasiado alto
+  vertical, con scroll para llegar al botón.
+- **Corrección (CSS responsivo real, sin zoom/transform):**
+  1. `index.css`: escalado proporcional por **raíz rem** con media
+     queries — 18px @1600, 19px @1920, 21px @2560, 22.5px @3200. Como
+     Tailwind v4 dimensiona tipografía, espaciados y contenedores en
+     `rem`, toda la interfaz crece proporcionalmente (equivalente a un
+     zoom bien hecho) sin tocar componente por componente. Los contenedores
+     `max-w-*` limitan el estiramiento en ultrapanorámicas.
+  2. `Login.jsx`/`Registro.jsx`: compactación vertical solo en escritorio
+     (`md:`/`xl:`/`2xl:`), altura con `min-h-dvh` (fallback `min-h-screen`),
+     título moderado, inputs y botón más bajos, divisor y pie compactos.
+  3. `Registro.jsx`: los 4 campos pasan a **2 columnas desde `md`**
+     (1 columna en móvil), formulario `md:max-w-xl`, y el aviso de
+     membresía se reorganiza en **2 columnas desde `md`** (título/precio/
+     detalle | caja informativa) para reducir su alto.
+  4. `AdminLayout.jsx`/`BusinessLayout.jsx`: `max-w-[1700px]` en el
+     `<main>` para que las tablas/dashboards no se estiren de forma
+     desproporcionada en pantallas muy grandes.
+  5. Auditoría: las 7 tablas de admin/vendedor ya usan `overflow-x-auto`
+     (desplazamiento horizontal propio); ninguna raíz de página usa
+     `overflow-hidden`; `Modal.jsx` ya limita a `max-h-[85vh]` con scroll
+     interno. Sin estilos duplicados: todo en el origen común.
+- **Verificación REAL con navegador (Firefox headless + selenium-webdriver,
+  bundle de producción + backend real, 80 aserciones — 0 fallos):**
+  - Resoluciones: 360×800, 390×844, 768×1024, 1366×768, 1920×1080,
+    2560×1440.
+  - **Login sin scroll vertical** en 768/1366/1920/2560 (682/682 exacto en
+    portátil; medido con `scrollHeight` vs `innerHeight`).
+  - **Registro (turista) sin scroll vertical** en 768/1366/1920/2560.
+  - **Registro vendedor (aviso abierto)**: formulario y botón VISIBLES sin
+    scroll en 768/1366; todo cabe sin scroll en 1920/2560. Nunca se
+    bloquea el scroll ni se oculta contenido.
+  - **Sin desborde horizontal** en login/registro/home/admin/vendedor en
+    TODAS las resoluciones (exceso 0px en paneles autenticados).
+  - **Escalado verificado con el navegador**: font-size raíz real 16px
+    @1366, 18px @1600, 19px @1920, 21px @2560.
+  - Sesión restaurada y paneles reales renderizados (admin y vendedor)
+    antes de cada medición (con aserción explícita anti-falso-positivo).
+  - Capturas guardadas (login/registro/home/admin/vendedor por resolución).
+- **Nota sobre el entorno de medición:** sin `VITE_GOOGLE_CLIENT_ID` el
+  botón de Google muestra un respaldo ~110px más alto que el botón
+  oficial de producción. Las medidas definitivas se tomaron reconstruyendo
+  con un Client ID de prueba (mismo footprint que producción: botón
+  oficial de 46px). El `dist` final del repositorio se reconstruyó limpio
+  (sin id de prueba); en Vercel el Client ID real proviene de variables de
+  entorno.
 
 ## 6. Vulnerabilidades encontradas y corregidas
 

@@ -89,9 +89,9 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-cream-50 flex flex-col lg:flex-row">
+    <div className="min-h-screen min-h-dvh bg-cream-50 flex flex-col lg:flex-row">
       {/* ── Left side: Editorial Brand Showcase (Desktop) ─────────────── */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-moss-950 flex-col justify-between p-12 xl:p-16">
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-moss-950 flex-col justify-between p-12 lg:p-10 xl:p-16">
         {/* Background Image con overlay TerraGo */}
         <div
           className="absolute inset-0 bg-cover bg-center transition-transform duration-1000 scale-105"
@@ -104,7 +104,7 @@ export default function Login() {
         {/* Brand header */}
         <div className="relative z-10">
           <Link to={obtenerRuta('INICIO')} className="inline-flex items-center gap-3 group">
-            <div className="w-11 h-11 rounded-full bg-moss-900 border border-moss-700/60 text-white flex items-center justify-center shadow-md transition-transform duration-300 group-hover:scale-105">
+            <div className="w-11 h-11 lg:w-9 lg:h-9 rounded-full bg-moss-900 border border-moss-700/60 text-white flex items-center justify-center shadow-md transition-transform duration-300 group-hover:scale-105">
               <Sprout className="w-5 h-5 text-moss-200" />
             </div>
             <div>
@@ -119,13 +119,13 @@ export default function Login() {
         </div>
 
         {/* Hero editorial message */}
-        <div className="relative z-10 max-w-lg my-auto py-12">
+        <div className="relative z-10 max-w-lg my-auto py-12 lg:py-4 xl:py-10">
           <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-moss-300 mb-4">
             <Compass className="w-4 h-4 text-moss-400" />
             VIAJA CON PROPÓSITO
           </span>
           <h2
-            className="text-4xl xl:text-5xl font-bold text-white mb-5 leading-[1.12] tracking-tight"
+            className="text-4xl lg:text-3xl xl:text-4xl 2xl:text-5xl font-bold text-white leading-[1.12] tracking-tight mb-5 lg:mb-4"
             style={{ fontFamily: 'var(--font-display)' }}
           >
             Descubre la magia de Córdoba{' '}
@@ -133,12 +133,12 @@ export default function Login() {
               de forma consciente
             </span>
           </h2>
-          <p className="text-stone-300 text-base leading-relaxed mb-8">
+          <p className="text-stone-300 text-base lg:text-sm xl:text-base leading-relaxed mb-8 lg:mb-6">
             Accede a tu cuenta para gestionar tus favoritos, reservar planes con operadores locales verificados y proteger la riqueza natural de nuestro territorio.
           </p>
 
           {/* Trust bullets */}
-          <div className="space-y-3 pt-4 border-t border-white/10">
+          <div className="space-y-3 lg:space-y-2 pt-4 lg:pt-3 border-t border-white/10">
             <div className="flex items-center gap-3 text-sm text-stone-200">
               <span className="w-5 h-5 rounded-full bg-moss-800/90 text-moss-300 flex items-center justify-center shrink-0">
                 <CheckCircle2 className="w-3.5 h-3.5" />
@@ -170,7 +170,7 @@ export default function Login() {
       </div>
 
       {/* ── Right side: Login Form (Responsive) ───────────────────────── */}
-      <div className="flex-1 min-h-screen flex flex-col justify-center px-6 sm:px-10 lg:px-16 py-16 sm:py-20">
+      <div className="flex-1 min-h-screen min-h-dvh flex flex-col justify-center px-6 sm:px-10 lg:px-16 py-16 sm:py-20 md:py-6 xl:py-5 2xl:py-6">
         <div className="w-full max-w-md mx-auto">
           {/* Mobile brand header */}
           <div className="lg:hidden flex items-center gap-2.5 mb-8">
@@ -192,23 +192,23 @@ export default function Login() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
           >
-            <div className="mb-8">
+            <div className="mb-8 md:mb-5">
               <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.18em] text-moss-700 mb-2">
                 <Sprout className="w-3.5 h-3.5" />
                 BIENVENIDO DE VUELTA
               </span>
               <h1
-                className="text-3xl sm:text-4xl font-bold text-dark-900 tracking-tight"
+                className="text-3xl sm:text-4xl md:text-3xl font-bold text-dark-900 tracking-tight"
                 style={{ fontFamily: 'var(--font-display)' }}
               >
                 Iniciar sesión
               </h1>
-              <p className="text-dark-500 text-sm sm:text-base mt-2">
+              <p className="text-dark-500 text-sm sm:text-base mt-2 md:mt-1.5">
                 Ingresa tus credenciales para acceder a tu cuenta de viajero.
               </p>
             </div>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 md:space-y-3 xl:space-y-2.5">
               <div>
                 <label htmlFor="email" className="block text-xs sm:text-sm font-semibold text-dark-800 mb-1.5">
                   Correo electrónico
@@ -220,7 +220,7 @@ export default function Login() {
                     type="email"
                     autoComplete="email"
                     placeholder="tu@correo.com"
-                    className={`w-full pl-11 pr-4 py-3 rounded-2xl border bg-white text-dark-900 text-sm placeholder:text-dark-400 focus:outline-none focus:ring-2 focus:ring-moss-600/20 focus:border-moss-700 transition-colors shadow-sm ${
+                    className={`w-full pl-11 pr-4 py-3 md:py-2.5 rounded-2xl border bg-white text-dark-900 text-sm placeholder:text-dark-400 focus:outline-none focus:ring-2 focus:ring-moss-600/20 focus:border-moss-700 transition-colors shadow-sm ${
                       errors.email ? 'border-red-300 ring-2 ring-red-100' : 'border-cream-300'
                     }`}
                     {...register('email')}
@@ -244,7 +244,7 @@ export default function Login() {
                     type={showPassword ? 'text' : 'password'}
                     autoComplete="current-password"
                     placeholder="••••••••"
-                    className={`w-full pl-11 pr-11 py-3 rounded-2xl border bg-white text-dark-900 text-sm placeholder:text-dark-400 focus:outline-none focus:ring-2 focus:ring-moss-600/20 focus:border-moss-700 transition-colors shadow-sm ${
+                    className={`w-full pl-11 pr-11 py-3 md:py-2.5 rounded-2xl border bg-white text-dark-900 text-sm placeholder:text-dark-400 focus:outline-none focus:ring-2 focus:ring-moss-600/20 focus:border-moss-700 transition-colors shadow-sm ${
                       errors.password ? 'border-red-300 ring-2 ring-red-100' : 'border-cream-300'
                     }`}
                     {...register('password')}
@@ -266,7 +266,7 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-3.5 px-6 bg-moss-900 hover:bg-moss-800 disabled:bg-moss-700 text-white font-semibold text-sm sm:text-base rounded-full transition-all duration-300 shadow-pill hover:shadow-xl hover:-translate-y-0.5 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer mt-2"
+                className="w-full py-3.5 md:py-3 px-6 bg-moss-900 hover:bg-moss-800 disabled:bg-moss-700 text-white font-semibold text-sm sm:text-base rounded-full transition-all duration-300 shadow-pill hover:shadow-xl hover:-translate-y-0.5 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer mt-2 md:mt-1"
               >
                 {isSubmitting ? (
                   <>
@@ -279,7 +279,7 @@ export default function Login() {
               </button>
             </form>
 
-            <div className="flex items-center gap-3 my-6">
+            <div className="flex items-center gap-3 my-6 md:my-4 xl:my-3">
               <div className="flex-1 h-px bg-cream-300" />
               <span className="text-xs font-medium text-dark-400 uppercase tracking-wider">o</span>
               <div className="flex-1 h-px bg-cream-300" />
@@ -296,7 +296,7 @@ export default function Login() {
               }}
             />
 
-            <div className="mt-8 text-center pt-6 border-t border-cream-200">
+            <div className="mt-8 md:mt-5 xl:mt-4 text-center pt-6 md:pt-4 xl:pt-3 border-t border-cream-200">
               <p className="text-xs sm:text-sm text-dark-600">
                 ¿Aún no tienes una cuenta?{' '}
                 <Link
