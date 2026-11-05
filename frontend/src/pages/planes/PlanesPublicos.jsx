@@ -19,7 +19,7 @@ const DURACION_OPCIONES = [
 function SkeletonCard() {
   return (
     <div className="bg-white rounded-[24px] p-4 overflow-hidden shadow-card border border-cream-200">
-      <div className="aspect-[16/10] rounded-[18px] bg-cream-200 animate-pulse" />
+      <div className="card-media rounded-[18px] bg-cream-200 animate-pulse" />
       <div className="p-4 space-y-3">
         <div className="h-5 bg-cream-200 rounded-full w-3/4 animate-pulse" />
         <div className="h-4 bg-cream-200 rounded-full w-1/2 animate-pulse" />
@@ -35,10 +35,10 @@ export function PlanCard({ plan, index = 0 }) {
   const { efectivo, anterior, descuento } = planPrecios(plan)
 
   return (
-    <div className="group bg-white rounded-[24px] p-4 border border-cream-200/90 shadow-card hover:shadow-card-hover transition-all duration-300 flex flex-col justify-between">
+    <div className="group h-full bg-white rounded-[24px] p-4 border border-cream-200/90 shadow-card hover:shadow-card-hover transition-all duration-300 flex flex-col justify-between">
       <div>
         {/* Photo Container */}
-        <div className="relative aspect-[16/10] rounded-[18px] overflow-hidden bg-cream-200">
+        <div className="card-media rounded-[18px]">
           <Link to={rutaCon('PLANES_PUBLICOS', plan.id)} className="block w-full h-full">
             <img
               src={imagen}
@@ -64,7 +64,7 @@ export function PlanCard({ plan, index = 0 }) {
 
         {/* Content */}
         <div className="p-3 pt-4">
-          <h3 className="font-[family-name:var(--font-display)] text-xl font-bold text-dark-900 group-hover:text-moss-900 transition-colors leading-snug">
+          <h3 className="font-[family-name:var(--font-display)] card-title font-bold text-dark-900 group-hover:text-moss-900 transition-colors leading-snug">
             <Link to={rutaCon('PLANES_PUBLICOS', plan.id)}>{plan.nombre}</Link>
           </h3>
 
@@ -112,7 +112,7 @@ export function PlanCard({ plan, index = 0 }) {
           <span className="text-[11px] uppercase tracking-wider text-dark-400 font-semibold block">
             Precio
           </span>
-          <span className="text-lg font-bold text-moss-950 font-[family-name:var(--font-display)]">
+          <span className="card-price font-bold text-moss-950 font-[family-name:var(--font-display)]">
             {efectivo ? formatMoney(efectivo) : 'Consultar'}
           </span>
         </div>
@@ -232,7 +232,7 @@ export default function PlanesPublicos() {
       </section>
 
       {/* Filter Toolbar & Listings */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-14">
+      <main className="public-shell px-4 sm:px-6 lg:px-8 py-10 md:py-14">
         {/* Filter Card */}
         <div className="bg-white rounded-[24px] border border-cream-200 p-6 mb-10 shadow-card">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -310,7 +310,7 @@ export default function PlanesPublicos() {
         )}
 
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7">
+          <div className="card-grid">
             {[0, 1, 2, 3, 4, 5].map((i) => (
               <SkeletonCard key={i} />
             ))}
@@ -338,7 +338,7 @@ export default function PlanesPublicos() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7">
+          <div className="card-grid">
             {filtrados.map((plan, index) => (
               <PlanCard key={plan.id || index} plan={plan} index={index} />
             ))}

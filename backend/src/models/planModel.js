@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const { publicBusinessSql } = require("../utils/publicacion");
 
 // NOTA: los planes turisticos de Cordalia NO tienen pagos. Las inscripciones
 // son gratuitas (estado 'confirmada') y el precio es solo informativo.
@@ -22,12 +23,15 @@ const BelongsToQuery = `
   SELECT p.*,
          l.nombre AS destino_lugar, l.slug AS destino_slug,
          b.nombre AS negocio_nombre, b.slug AS negocio_slug, b.estado AS negocio_estado,
+         b.owner_id AS negocio_owner_id,
+         b.publicacion_estado AS negocio_publicacion_estado,
          b.whatsapp AS negocio_whatsapp, b.telefono AS negocio_telefono,
          b.email_contacto AS negocio_email, b.website AS negocio_website,
          b.portada_url AS negocio_portada, b.direccion AS negocio_direccion
   FROM tour_plans p
   LEFT JOIN lugares l ON l.id = p.destination_id
   LEFT JOIN businesses b ON b.id = p.business_id
+  LEFT JOIN usuarios u ON u.id = b.owner_id
 `;
 
 async function withImages(plan) {
@@ -76,8 +80,11 @@ const PlanModel = {
       params.push(businessId);
     }
     if (visible) {
+      // Vision publica: plan activo + negocio aprobado + publicacion
+      // comercial vigente (prueba/suscripcion comprobadas con NOW() de
+      // PostgreSQL). Un negocio vencido desaparece de TODOS los listados.
       where.push(`p.estado = 'activo'`);
-      where.push(`b.estado = 'approved'`);
+      where.push(publicBusinessSql("b", "u"));
     } else if (businessId) {
       where.push(`(p.estado = 'activo' OR p.estado = 'inactivo')`);
     }
@@ -131,10 +138,12 @@ const PlanModel = {
     const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
     const { rows } = await pool.query(
       `SELECT ${BASE_COLUMNS}, l.nombre AS destino_lugar,
-              b.nombre AS negocio_nombre, b.slug AS negocio_slug, b.estado AS negocio_estado
+              b.nombre AS negocio_nombre, b.slug AS negocio_slug, b.estado AS negocio_estado,
+              b.publicacion_estado AS negocio_publicacion_estado
        FROM tour_plans p
        LEFT JOIN lugares l ON l.id = p.destination_id
        LEFT JOIN businesses b ON b.id = p.business_id
+       LEFT JOIN usuarios u ON u.id = b.owner_id
        ${whereSql}
        ORDER BY p.id DESC
        LIMIT $${v++}`,
@@ -178,7 +187,9 @@ const PlanModel = {
     let query = `${BelongsToQuery} WHERE p.id = $1`;
     const params = [id];
     if (visible) {
-      query += ` AND p.estado = 'activo' AND b.estado = 'approved'`;
+      // Vision publica: un plan de un negocio vencido no es accesible
+      // ni por ID directo.
+      query += ` AND p.estado = 'activo' AND ${publicBusinessSql("b", "u")}`;
     }
     const { rows } = await pool.query(query, params);
     return withImages(rows[0] || null);
@@ -372,8 +383,8 @@ if (promo.tipo_descuento === "porcentaje") {
    },
 
   // ---------- Sugerencia de transporte según personas ----------
-  async sugerirTransporte(planId, personas) {
-    const plan = await this.findById(planId);
+  async sugerirTransporte(planId, personas, visible = false) {
+    const plan = await this.findById(planId, visible);
     if (!plan) return null;
     const n = Number(personas) || 1;
 
@@ -440,6 +451,17 @@ if (promo.tipo_descuento === "porcentaje") {
     const params = [planId];
     if (visible) {
       where += ` AND s.estado = 'activa' AND s.fecha >= CURRENT_DATE`;
+      // Vision publica: la salida solo se lista si su plan pertenece a un
+      // negocio aprobado con publicacion comercial vigente. Una consulta
+      // directa a las salidas de un negocio vencido devuelve vacio.
+      where += ` AND EXISTS (
+        SELECT 1 FROM tour_plans p
+          JOIN businesses b ON b.id = p.business_id
+          JOIN usuarios u ON u.id = b.owner_id
+         WHERE p.id = s.plan_id
+           AND p.estado = 'activo'
+           AND ${publicBusinessSql("b", "u")}
+      )`;
     }
     const { rows } = await pool.query(
       `SELECT s.id, s.plan_id, to_char(s.fecha, 'YYYY-MM-DD')::text AS fecha,
@@ -591,6 +613,27 @@ if (promo.tipo_descuento === "porcentaje") {
       );
       const salida = salidas[0];
       if (!salida) throw { status: 404, message: "Salida no encontrada" };
+      // Un visitante NUNCA puede inscribirse en un plan oculto (negocio
+      // sin prueba/suscripcion vigente, no aprobado o publicacion
+      // oculta). El dueño y el admin si pueden hacer pruebas internas.
+      // La comprobacion ocurre DENTRO de la transaccion, con la misma
+      // regla SQL de las consultas publicas.
+      if (!data.es_owner_admin) {
+        const { rows: publicos } = await client.query(
+          `SELECT 1
+             FROM tour_plans p
+             JOIN businesses b ON b.id = p.business_id
+             JOIN usuarios u ON u.id = b.owner_id
+            WHERE p.id = $1
+              AND p.estado = 'activo'
+              AND ${publicBusinessSql("b", "u")}
+            LIMIT 1`,
+          [planId]
+        );
+        if (publicos.length === 0) {
+          throw { status: 404, message: "Salida no encontrada" };
+        }
+      }
       if (salida.estado !== "activa") throw { status: 400, message: "La salida no está activa" };
       const hoy = new Date();
       const hoyLocal = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
@@ -843,10 +886,10 @@ if (promo.tipo_descuento === "porcentaje") {
   // Usa el TOTAL de personas inscritas en la salida, elige el vehículo
   // disponible con la capacidad mínima suficiente y un conductor libre.
   // No asigna un vehículo/conductor ya ocupado en otra salida del mismo día.
-  async recomendarTransporteSalida(salidaId, planId, personas = null) {
+  async recomendarTransporteSalida(salidaId, planId, personas = null, visible = false) {
     const salida = await this.findSalidaById(planId, salidaId);
     if (!salida) return null;
-    const plan = await this.findById(planId);
+    const plan = await this.findById(planId, visible);
     if (!plan) return null;
 
     const n = personas != null ? Math.max(1, Number(personas) || 1) : (Number(salida.cupo_ocupado) || 0);

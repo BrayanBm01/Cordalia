@@ -362,7 +362,7 @@ export default function Home() {
           </svg>
         </div>
 
-        <div className="max-w-7xl mx-auto relative z-10">
+        <div className="public-shell relative z-10">
           {/* Header de sección con botón de acción lateral */}
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
             <div>
@@ -393,7 +393,7 @@ export default function Home() {
                 >
                   <Link
                     to={rutaCon('LUGARES', dest.id || dest._id)}
-                    className="relative block aspect-[16/11] overflow-hidden bg-cream-200"
+                    className="card-media block"
                   >
                     <img
                       src={imgUrl}
@@ -410,10 +410,10 @@ export default function Home() {
                         <MapPin className="w-3.5 h-3.5 text-moss-700" />
                         <span>{dest.municipio || dest.ubicacion || 'Córdoba, Colombia'}</span>
                       </div>
-                      <h3 className="font-[family-name:var(--font-display)] text-xl font-bold text-dark-900 group-hover:text-moss-900 transition-colors">
+                      <h3 className="font-[family-name:var(--font-display)] card-title font-bold text-dark-900 group-hover:text-moss-900 transition-colors">
                         <Link to={rutaCon('LUGARES', dest.id || dest._id)}>{dest.nombre}</Link>
                       </h3>
-                      <p className="text-dark-500 text-xs sm:text-sm mt-2 line-clamp-2 leading-relaxed">
+                      <p className="text-dark-500 card-text mt-2 line-clamp-2 leading-relaxed">
                         {dest.descripcion || 'Explora este destino emblemático de Córdoba y sus atractivos naturales.'}
                       </p>
                     </div>
@@ -442,7 +442,7 @@ export default function Home() {
       {/* 3. SUSTAINABLE TOUR PACKAGES — Planes y Paquetes Turísticos   */}
       {/* ============================================================ */}
       <section className="relative py-20 md:py-24 px-4 sm:px-6 lg:px-8 bg-cream-100/60 overflow-hidden">
-        <div className="max-w-7xl mx-auto">
+        <div className="public-shell">
           {/* Header de sección */}
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
             <div>
@@ -475,7 +475,7 @@ export default function Home() {
                   className="group bg-white rounded-[24px] p-4 border border-cream-200/90 shadow-card hover:shadow-card-hover transition-all duration-300 flex flex-col"
                 >
                   {/* Photo Container with rounded-[18px] */}
-                  <div className="relative aspect-[16/10] rounded-[18px] overflow-hidden bg-cream-200">
+                  <div className="card-media rounded-[18px]">
                     <img
                       src={imgUrl}
                       alt={plan.nombre}
@@ -495,7 +495,7 @@ export default function Home() {
                   {/* Body content */}
                   <div className="p-3 pt-5 flex-1 flex flex-col justify-between">
                     <div>
-                      <h3 className="font-[family-name:var(--font-display)] text-xl font-bold text-dark-900 group-hover:text-moss-900 transition-colors leading-snug">
+                      <h3 className="font-[family-name:var(--font-display)] card-title font-bold text-dark-900 group-hover:text-moss-900 transition-colors leading-snug">
                         <Link to={rutaCon('PLANES_PUBLICOS', plan.id)}>{plan.nombre}</Link>
                       </h3>
 
@@ -517,7 +517,7 @@ export default function Home() {
                         <span className="text-[11px] uppercase tracking-wider text-dark-400 font-semibold block">
                           Desde
                         </span>
-                        <span className="text-lg font-bold text-moss-950 font-[family-name:var(--font-display)]">
+                        <span className="card-price font-bold text-moss-950 font-[family-name:var(--font-display)]">
                           ${' '}
                           {Number(plan.precio || 120000).toLocaleString('es-CO', {
                             maximumFractionDigits: 0,

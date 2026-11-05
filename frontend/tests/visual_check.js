@@ -85,7 +85,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     return false;
   });
   ok('PlanesNegocio: tab "Planes y promociones"', tabClicked);
-  await sleep(1200(all));
+  await sleep(1200);
   const planBtn = await page.evaluate(() => {
     const bts = Array.from(document.querySelectorAll('button'));
     const b = bts.find((x) => /nuevo plan|nuevo servicio/i.test(x.innerText));

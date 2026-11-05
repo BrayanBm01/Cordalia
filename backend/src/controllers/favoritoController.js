@@ -1,6 +1,7 @@
 const FavoritoModel = require("../models/favoritoModel");
 const LugarModel = require("../models/lugarModel");
 const BusinessModel = require("../models/businessModel");
+const { esVisiblePublicamente } = require("../utils/publicacion");
 
 function parseId(val) {
   const n = Number(val);
@@ -71,9 +72,11 @@ exports.addNegocio = async (req, res) => {
     if (!businessId) {
       return res.status(400).json({ success: false, message: "ID de negocio inválido" });
     }
-    // Solo negocios visiblemente públicos pueden guardarse como favorito.
+    // Solo negocios PUBLICOS (aprobados y con publicacion comercial
+    // vigente) pueden guardarse como favorito. Un negocio oculto por
+    // vencimiento responde igual que uno inexistente.
     const business = await BusinessModel.findById(businessId);
-    if (!business || business.estado !== "approved") {
+    if (!esVisiblePublicamente(business)) {
       return res.status(404).json({ success: false, message: "Negocio no encontrado" });
     }
     if (await FavoritoModel.existsNegocio(req.usuario.id, businessId)) {

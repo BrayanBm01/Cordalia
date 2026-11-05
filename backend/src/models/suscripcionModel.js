@@ -11,8 +11,17 @@
 //   (TRIALING | ACTIVE | EXPIRED | SUSPENDED | NULL = anterior).
 // ============================================================
 const pool = require("../config/db");
+const { ownerEntitledSql } = require("../utils/publicacion");
 
-// Dias de prueba gratuita (7 dias consecutivos, no habiles).
+// Duracion EXACTA de la prueba gratuita: 168 horas (7 dias de 24 horas).
+//
+// IMPORTANTE: `make_interval(hours => 168)` sobre TIMESTAMPTZ suma horas
+// ABSOLUTAS. No se usa `interval '7 days'`: esa aritmetica es de
+// calendario y, en zonas con horario de verano, siete "dias" pueden ser
+// 167 o 169 horas. Tampoco se redondea a medianoche ni se confia en la
+// hora del navegador: el vencimiento es un instante UTC calculado por
+// PostgreSQL (NOW()).
+const HORAS_PRUEBA = 168;
 const DIAS_PRUEBA = 7;
 
 // Estados comerciales.
@@ -25,6 +34,7 @@ const ESTADOS = {
 
 const SuscripcionModel = {
   DIAS_PRUEBA,
+  HORAS_PRUEBA,
   ESTADOS,
 
   // ------------------------------------------------------------
@@ -33,12 +43,12 @@ const SuscripcionModel = {
   /**
    * Asigna la prueba gratuita de 7 dias a un vendedor recien creado.
    *
-   * - Se calcula en el SERVIDOR: inicio = NOW(), fin = NOW() + 7 dias.
+   * - Se calcula en el SERVIDOR: inicio = NOW(), fin = NOW() + 168 horas.
    * - Se asigna UNA SOLA VEZ por cuenta: si ya tiene prueba, no se
    *   reinicia (llamar de nuevo no cambia las fechas).
    * - Si el administrador crea la cuenta, aplica la misma regla.
-   * - Los vendedores anteriores (sin trial) no se tocan: se les
-   *   asigna la prueba solo si nunca la tuvieron.
+   * - Los vendedores anteriores (sin trial) no se tocan: conservan su
+   *   publicacion (politica de compatibilidad; ver migracion 023).
    *
    * @param {object} [client] - Cliente de una transaccion en curso, para
    *   que la asignacion sea atomica con la creacion de la cuenta.
@@ -47,17 +57,19 @@ const SuscripcionModel = {
     const { rows } = await client.query(
       `UPDATE usuarios
           SET trial_inicio = NOW(),
-              trial_fin = NOW() + ($2 || ' days')::interval,
+              trial_fin = NOW() + make_interval(hours => $2),
               estado_cuenta = 'TRIALING',
               updated_at = NOW()
         WHERE id = $1
           AND trial_inicio IS NULL
           AND rol_id = 2
       RETURNING id, trial_inicio, trial_fin, estado_cuenta`,
-      [usuarioId, String(DIAS_PRUEBA)]
+      [usuarioId, HORAS_PRUEBA]
     );
     if (rows.length > 0) return rows[0];
     // Ya tenia prueba (o no es vendedor): se devuelve el estado actual.
+    // Este camino es el que impide que repetir la solicitud reinicie la
+    // prueba: la condicion `trial_inicio IS NULL` es atomica en SQL.
     const { rows: actual } = await client.query(
       `SELECT id, trial_inicio, trial_fin, estado_cuenta FROM usuarios WHERE id = $1`,
       [usuarioId]
@@ -84,6 +96,13 @@ const SuscripcionModel = {
           AND trial_fin <= NOW()`,
       [usuarioId]
     );
+    // La publicacion comercial se sincroniza en el mismo instante en que
+    // la prueba vence (ocultar/restaurar segun el derecho VIGENTE). Las
+    // consultas publicas comprueban el derecho en vivo, asi que esto es
+    // coherencia de datos, no la unica proteccion.
+    if (rowCount > 0) {
+      await this.ocultarNegociosDeUsuario(usuarioId);
+    }
     return rowCount > 0;
   },
 
@@ -108,6 +127,8 @@ const SuscripcionModel = {
     const { rows } = await pool.query(
       `SELECT u.id, u.rol_id, u.estado_cuenta, u.trial_inicio, u.trial_fin,
               u.suspension_motivo, u.suspension_fecha,
+              (u.trial_fin IS NOT NULL AND u.trial_fin > NOW()) AS trial_vigente,
+              GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (u.trial_fin - NOW()))))::bigint AS segundos_restantes,
               (SELECT COUNT(*)::int FROM subscriptions s
                 WHERE s.usuario_id = u.id AND s.estado = 'active'
                   AND s.ends_at IS NOT NULL AND s.ends_at > NOW()) AS suscripciones_activas,
@@ -122,7 +143,12 @@ const SuscripcionModel = {
               (SELECT s.ends_at FROM subscriptions s
                 WHERE s.usuario_id = u.id AND s.estado = 'active'
                   AND s.ends_at IS NOT NULL AND s.ends_at > NOW()
-                ORDER BY s.ends_at DESC LIMIT 1) AS fin_suscripcion_activa
+                ORDER BY s.ends_at DESC LIMIT 1) AS fin_suscripcion_activa,
+              (SELECT COUNT(*)::int FROM businesses b
+                WHERE b.owner_id = u.id) AS negocios_total,
+              (SELECT COUNT(*)::int FROM businesses b
+                WHERE b.owner_id = u.id
+                  AND b.publicacion_estado = 'oculto_suscripcion') AS negocios_ocultos
          FROM usuarios u
         WHERE u.id = $1`,
       [usuarioId]
@@ -131,22 +157,33 @@ const SuscripcionModel = {
     if (!u) return null;
 
     const estado = this.resolverEstado(u);
-    const diasRestantes = estado === "TRIALING" && u.trial_fin
-      ? Math.max(0, Math.ceil((new Date(u.trial_fin) - new Date()) / 86400000))
-      : 0;
+    // Tiempo restante INFORMATIVO calculado por PostgreSQL (no por el
+    // navegador). La autorizacion real es `estado`, que viene de la
+    // misma consulta con NOW() de la base.
+    const segundosRestantes = estado === "TRIALING" ? Number(u.segundos_restantes || 0) : 0;
+    const diasRestantes = estado === "TRIALING" ? Math.max(0, Math.ceil(segundosRestantes / 86400)) : 0;
 
     return {
       usuario_id: u.id,
       estado,
       trial_inicio: u.trial_inicio,
       trial_fin: u.trial_fin,
+      trial_vigente: Boolean(u.trial_vigente),
       dias_prueba: DIAS_PRUEBA,
+      horas_prueba: HORAS_PRUEBA,
       dias_restantes: diasRestantes,
+      segundos_restantes: segundosRestantes,
       plan_activo_id: u.plan_activo_id || null,
       suscripcion_activa_id: u.suscripcion_activa_id || null,
       fin_suscripcion_activa: u.fin_suscripcion_activa || null,
       suspension_motivo: u.suspension_motivo || null,
       suspension_fecha: u.suspension_fecha || null,
+      // Publicacion comercial: cuantos negocios tiene y cuantos quedaron
+      // ocultos por falta de derecho. El panel del vendedor lo usa para
+      // avisar con claridad sin exponer datos internos.
+      negocios_total: Number(u.negocios_total || 0),
+      negocios_ocultos: Number(u.negocios_ocultos || 0),
+      publicacion_oculta: Number(u.negocios_ocultos || 0) > 0,
       // Un vendedor anterior (sin poliza de prueba) NO se restringe.
       sin_polica: u.estado_cuenta === null && !u.trial_inicio,
     };
@@ -154,12 +191,25 @@ const SuscripcionModel = {
 
   // Resuelve el estado a partir de la fila cruda (regla unica, usada
   // por estadoComercial y por las consultas de listado).
+  //
+  // Si la consulta trae `trial_vigente` (calculado con NOW() de
+  // PostgreSQL) se usa ese valor: el vencimiento lo decide el reloj del
+  // servidor de base de datos, nunca el del navegador. El fallback con
+  // `new Date()` solo aplica a filas construidas a mano (pruebas).
   resolverEstado(u) {
     if (u.estado_cuenta === "SUSPENDED") return "SUSPENDED";
     if (Number(u.suscripciones_activas || 0) > 0) return "ACTIVE";
-    if (u.trial_fin && new Date(u.trial_fin) > new Date()) return "TRIALING";
+    const trialVigente =
+      typeof u.trial_vigente === "boolean"
+        ? u.trial_vigente
+        : Boolean(u.trial_fin && new Date(u.trial_fin) > new Date());
+    if (trialVigente) return "TRIALING";
     if (u.trial_inicio) return "EXPIRED";
-    // Sin poliza aplicada (vendedor anterior): no se restringe.
+    // Cuenta que alguna vez tuvo estado comercial (por ejemplo una
+    // suscripcion sin prueba registrada) y ya no tiene derecho vigente:
+    // se considera vencida. Solo el vendedor anterior REAL (sin estado y
+    // sin prueba) queda fuera de la politica y no se restringe.
+    if (u.estado_cuenta) return "EXPIRED";
     return null;
   },
 
@@ -333,13 +383,28 @@ const SuscripcionModel = {
         ]
       );
 
-      // La cuenta del vendedor queda ACTIVA.
+      // La cuenta del vendedor queda ACTIVA, salvo que exista una
+      // suspension administrativa: la suspension solo la levanta un
+      // administrador y un pago no debe borrarla.
       await client.query(
         `UPDATE usuarios
-            SET estado_cuenta = 'ACTIVE', updated_at = NOW()
+            SET estado_cuenta = CASE
+                  WHEN estado_cuenta = 'SUSPENDED' THEN 'SUSPENDED'
+                  ELSE 'ACTIVE'
+                END,
+                updated_at = NOW()
           WHERE id = $1`,
         [sub.usuario_id]
       );
+
+      // Restablecer la PUBLICACION de los negocios que estaban ocultos
+      // EXCLUSIVAMENTE por falta de prueba/suscripcion. La restauracion
+      // usa la MISMA regla en vivo que las consultas publicas
+      // (ownerEntitledSql), asi que un vendedor suspendido no recupera
+      // publicacion con un pago. No se toca `estado` (moderacion): un
+      // negocio pendiente sigue pendiente y uno suspendido por
+      // moderacion sigue suspendido.
+      await this.restaurarNegociosDeUsuario(sub.usuario_id, client);
 
       await client.query("COMMIT");
       return { suscripcion: await this.findSuscripcion(sub.id), yaActiva: false };
@@ -373,22 +438,171 @@ const SuscripcionModel = {
     return rowCount;
   },
 
-  /** Cancela la suscripcion vigente del vendedor. */
-  async cancelarSuscripcion(usuarioId) {
-    const { rows } = await pool.query(
-      `UPDATE subscriptions
-          SET estado = 'cancelled', cancelada_at = NOW(), updated_at = NOW()
-        WHERE usuario_id = $1 AND estado = 'active'
-      RETURNING id, estado`,
+  /** Vence en bloque las pruebas gratuitas cuya fecha de fin ya paso. */
+  async marcarPruebasVencidas() {
+    const { rowCount } = await pool.query(
+      `UPDATE usuarios
+          SET estado_cuenta = 'EXPIRED', updated_at = NOW()
+        WHERE estado_cuenta = 'TRIALING'
+          AND trial_fin IS NOT NULL
+          AND trial_fin <= NOW()`
+    );
+    return rowCount;
+  },
+
+  /**
+   * Oculta (bandera `publicacion_estado`) los negocios cuyo propietario
+   * YA NO tiene prueba vigente ni suscripcion activa. No toca
+   * `estado` (aprobacion/moderacion). La consulta publica comprueba el
+   * derecho EN VIVO igualmente, por lo que esta bandera es el espejo
+   * persistido que permite restaurar despues, no la unica proteccion.
+   */
+  async ocultarNegociosSinDerecho() {
+    const { rowCount } = await pool.query(
+      `UPDATE businesses b
+          SET publicacion_estado = 'oculto_suscripcion',
+              updated_at = NOW()
+         FROM usuarios u
+        WHERE u.id = b.owner_id
+          AND b.publicacion_estado = 'visible'
+          AND NOT ${ownerEntitledSql("u")}`
+    );
+    return rowCount;
+  },
+
+  /**
+   * Restaura la bandera de publicacion de los negocios cuyo propietario
+   * SI tiene derecho comercial (prueba vigente o suscripcion activa).
+   * Solo mueve la bandera comercial: la aprobacion (`estado`) no se
+   * cambia, asi que un negocio pendiente o suspendido por moderacion
+   * jamas se vuelve publico por si solo.
+   */
+  async restaurarNegociosConDerecho() {
+    const { rowCount } = await pool.query(
+      `UPDATE businesses b
+          SET publicacion_estado = 'visible',
+              updated_at = NOW()
+         FROM usuarios u
+        WHERE u.id = b.owner_id
+          AND b.publicacion_estado = 'oculto_suscripcion'
+          AND ${ownerEntitledSql("u")}`
+    );
+    return rowCount;
+  },
+
+  /**
+   * Version por usuario de `ocultarNegociosSinDerecho`: oculta SOLO los
+   * negocios de un vendedor que perdio su derecho comercial. Se usa en
+   * vencimientos perezosos, suspension y cancelacion. Acepta un cliente
+   * de transaccion para que el cambio sea atomico con el flujo que lo
+   * provoca (renovacion/cancelacion).
+   */
+  async ocultarNegociosDeUsuario(usuarioId, client = pool) {
+    const { rowCount } = await client.query(
+      `UPDATE businesses b
+          SET publicacion_estado = 'oculto_suscripcion',
+              updated_at = NOW()
+         FROM usuarios u
+        WHERE u.id = b.owner_id
+          AND u.id = $1
+          AND b.publicacion_estado = 'visible'
+          AND NOT ${ownerEntitledSql("u")}`,
       [usuarioId]
     );
-    if (rows.length > 0) {
-      await pool.query(
-        `UPDATE usuarios SET estado_cuenta = 'EXPIRED', updated_at = NOW() WHERE id = $1`,
+    return rowCount;
+  },
+
+  /**
+   * Version por usuario de `restaurarNegociosConDerecho`: vuelve a
+   * 'visible' los negocios de un vendedor que recupero su derecho
+   * comercial. Solo toca la bandera de publicacion; `estado`
+   * (moderacion) nunca cambia. Si el vendedor sigue suspendido o sin
+   * derecho, no restaura nada.
+   */
+  async restaurarNegociosDeUsuario(usuarioId, client = pool) {
+    const { rowCount } = await client.query(
+      `UPDATE businesses b
+          SET publicacion_estado = 'visible',
+              updated_at = NOW()
+         FROM usuarios u
+        WHERE u.id = b.owner_id
+          AND u.id = $1
+          AND b.publicacion_estado = 'oculto_suscripcion'
+          AND ${ownerEntitledSql("u")}`,
+      [usuarioId]
+    );
+    return rowCount;
+  },
+
+  /**
+   * Sincronizacion completa de vencimientos (perezosa o programada):
+   *   1. suscripciones vencidas -> 'expired'
+   *   2. pruebas vencidas       -> estado_cuenta 'EXPIRED'
+   *   3. negocios sin derecho   -> 'oculto_suscripcion'
+   *   4. negocios con derecho   -> 'visible' (auto-reparacion)
+   *
+   * Es idempotente y no borra datos. Todas las operaciones publicas
+   * VUELVEN a comprobar el derecho en vivo, de modo que un retraso del
+   * cron nunca deja un negocio vencido visible.
+   */
+  async sincronizarVencimientosComerciales() {
+    const suscripcionesVencidas = await this.expirarSuscripcionesVencidas();
+    const pruebasVencidas = await this.marcarPruebasVencidas();
+    const ocultos = await this.ocultarNegociosSinDerecho();
+    const restaurados = await this.restaurarNegociosConDerecho();
+    return { suscripcionesVencidas, pruebasVencidas, ocultos, restaurados };
+  },
+
+  // Alias retrocompatible.
+  async sincronizarVencimientos() {
+    return this.sincronizarVencimientosComerciales();
+  },
+
+  /**
+   * Cancela la suscripcion vigente del vendedor.
+   *
+   * - La cuenta pasa a EXPIRED, salvo que este SUSPENDED (la suspension
+   *   solo la levanta el administrador).
+   * - La publicacion se sincroniza: si no queda prueba vigente, los
+   *   negocios quedan ocultos; si la prueba sigue viva, no se oculta
+   *   nada porque el derecho comercial continua.
+   * - Transaccion: suscripcion, cuenta y publicacion cambian juntas.
+   */
+  async cancelarSuscripcion(usuarioId) {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const { rows } = await client.query(
+        `UPDATE subscriptions
+            SET estado = 'cancelled', cancelada_at = NOW(), updated_at = NOW()
+          WHERE usuario_id = $1 AND estado = 'active'
+        RETURNING id, estado`,
         [usuarioId]
       );
+      if (rows.length > 0) {
+        await client.query(
+          `UPDATE usuarios
+              SET estado_cuenta = CASE
+                    WHEN estado_cuenta = 'SUSPENDED' THEN 'SUSPENDED'
+                    ELSE 'EXPIRED'
+                  END,
+                  updated_at = NOW()
+            WHERE id = $1`,
+          [usuarioId]
+        );
+        // Sin derecho vigente -> ocultos; con prueba aun vigente ->
+        // restauracion (no-op si ya estaban visibles).
+        await this.ocultarNegociosDeUsuario(usuarioId, client);
+        await this.restaurarNegociosDeUsuario(usuarioId, client);
+      }
+      await client.query("COMMIT");
+      return rows[0] || null;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
     }
-    return rows[0] || null;
   },
 
   // ------------------------------------------------------------
@@ -449,6 +663,8 @@ const SuscripcionModel = {
       `SELECT u.id, u.nombre, u.email, u.rol_id, u.estado_cuenta,
               u.trial_inicio, u.trial_fin, u.suspension_motivo, u.suspension_fecha,
               u.created_at,
+              (u.trial_fin IS NOT NULL AND u.trial_fin > NOW()) AS trial_vigente,
+              GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (u.trial_fin - NOW()))))::bigint AS segundos_restantes,
               (SELECT COUNT(*)::int FROM subscriptions s
                 WHERE s.usuario_id = u.id AND s.estado = 'active'
                   AND s.ends_at IS NOT NULL AND s.ends_at > NOW()) AS suscripciones_activas,
@@ -459,7 +675,10 @@ const SuscripcionModel = {
               (SELECT s.ends_at FROM subscriptions s
                 WHERE s.usuario_id = u.id AND s.estado = 'active'
                   AND s.ends_at IS NOT NULL AND s.ends_at > NOW()
-                ORDER BY s.ends_at DESC LIMIT 1) AS fin_suscripcion
+                ORDER BY s.ends_at DESC LIMIT 1) AS fin_suscripcion,
+              (SELECT COUNT(*)::int FROM businesses b
+                WHERE b.owner_id = u.id
+                  AND b.publicacion_estado = 'oculto_suscripcion') AS negocios_ocultos
          FROM usuarios u
         WHERE u.rol_id = 2
         ORDER BY u.created_at DESC`
@@ -467,10 +686,11 @@ const SuscripcionModel = {
     return rows.map((u) => ({
       ...u,
       estado_resuelto: this.resolverEstado(u),
-      dias_restantes:
-        u.trial_fin && new Date(u.trial_fin) > new Date()
-          ? Math.max(0, Math.ceil((new Date(u.trial_fin) - new Date()) / 86400000))
-          : 0,
+      // Dias restantes calculados con el reloj de PostgreSQL (misma
+      // regla que la autorizacion); nunca con el reloj del navegador.
+      dias_restantes: u.trial_vigente
+        ? Math.max(0, Math.ceil(Number(u.segundos_restantes || 0) / 86400))
+        : 0,
     }));
   },
 
@@ -487,24 +707,41 @@ const SuscripcionModel = {
         RETURNING id, estado_cuenta, suspension_motivo, suspension_fecha`,
         [usuarioId, motivo || null]
       );
+      // Un vendedor suspendido deja de ser publico de inmediato.
+      if (rows[0]) await this.ocultarNegociosDeUsuario(usuarioId);
       return rows[0] || null;
     }
-    // Reactivar: vuelve a TRIALING si la prueba sigue vigente; si ya
-    // vencio, a EXPIRED (debe contratar un plan para recuperar el acceso).
+    // Reactivar: recupera el estado que corresponda al derecho VIGENTE.
+    // Prioridad: suscripcion activa -> ACTIVE; prueba vigente -> TRIALING;
+    // prueba vencida -> EXPIRED; vendedor anterior -> NULL (sin politica).
     const { rows } = await pool.query(
-      `UPDATE usuarios
+      `UPDATE usuarios u
           SET estado_cuenta = CASE
-                WHEN trial_fin IS NOT NULL AND trial_fin > NOW() THEN 'TRIALING'
-                WHEN trial_inicio IS NOT NULL THEN 'EXPIRED'
+                WHEN EXISTS (
+                  SELECT 1 FROM subscriptions s
+                   WHERE s.usuario_id = u.id
+                     AND s.estado = 'active'
+                     AND s.ends_at IS NOT NULL
+                     AND s.ends_at > NOW()
+                ) THEN 'ACTIVE'
+                WHEN u.trial_fin IS NOT NULL AND u.trial_fin > NOW() THEN 'TRIALING'
+                WHEN u.trial_inicio IS NOT NULL THEN 'EXPIRED'
                 ELSE NULL
               END,
               suspension_motivo = NULL,
               suspension_fecha = NULL,
               updated_at = NOW()
-        WHERE id = $1 AND rol_id = 2
-        RETURNING id, estado_cuenta`,
+        WHERE u.id = $1 AND u.rol_id = 2
+        RETURNING u.id, u.estado_cuenta`,
       [usuarioId]
     );
+    // Al reactivar se recalcula la publicacion con el derecho vigente:
+    // si la prueba sigue activa (o hay suscripcion) vuelve a ser
+    // visible; si ya vencio, permanece oculto.
+    if (rows[0]) {
+      await this.ocultarNegociosDeUsuario(usuarioId);
+      await this.restaurarNegociosDeUsuario(usuarioId);
+    }
     return rows[0] || null;
   },
 };

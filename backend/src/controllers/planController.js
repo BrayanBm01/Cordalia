@@ -548,6 +548,12 @@ exports.listSalidas = async (req, res) => {
   try {
     const planId = Number(req.params.planId);
     const ownerView = getBusinessId(req) ? isOwnerView(req, req.business) : false;
+    // Vision publica: si el plan no es publico (negocio vencido, no
+    // aprobado u oculto), la ruta directa responde 404.
+    if (!ownerView) {
+      const plan = await PlanModel.findById(planId, true);
+      if (!plan) return res.status(404).json({ success: false, message: "Plan no encontrado" });
+    }
     const salidas = await PlanModel.listSalidas(planId, !ownerView);
     return res.json({ success: true, data: salidas });
   } catch (error) {
@@ -639,12 +645,22 @@ exports.createInscripcion = async (req, res) => {
         email = usuario.email || null;
       }
     }
+    // Dueño del negocio o ADMIN: pueden inscribir aunque el plan esté
+    // oculto (pruebas internas). Cualquier otro visitante solo en planes
+    // PUBLICOS; el modelo comprueba la regla dentro de su transacción.
+    const empresaId = getBusinessId(req) ? Number(getBusinessId(req)) : null;
+    let esOwnerAdmin = req.usuario?.rol === "ADMIN";
+    if (!esOwnerAdmin && empresaId && req.usuario?.rol === "BUSINESS") {
+      const plan = await PlanModel.findByBusinessAndId(empresaId, planId);
+      esOwnerAdmin = Boolean(plan && plan.negocio_owner_id === req.usuario.id);
+    }
     const inscripcion = await PlanModel.createInscripcion(salidaId, planId, {
       personas: p,
       mensaje: sanitizeString(mensaje).slice(0, 2000) || null,
       user_id: req.usuario?.id || null,
       nombre,
       email,
+      es_owner_admin: esOwnerAdmin,
     });
     return res.status(201).json({ success: true, message: "Inscripción registrada correctamente", data: inscripcion });
   } catch (error) {
@@ -687,7 +703,8 @@ exports.sugerirTransporte = async (req, res) => {
     if (!Number.isInteger(personas) || personas < 1 || personas > MAX_PERSONAS) {
       return res.status(400).json({ success: false, message: `Las personas deben ser un entero entre 1 y ${MAX_PERSONAS}` });
     }
-    const sugerencia = await PlanModel.sugerirTransporte(planId, personas);
+    const ownerView = getBusinessId(req) ? isOwnerView(req, req.business) : false;
+    const sugerencia = await PlanModel.sugerirTransporte(planId, personas, !ownerView);
     if (!sugerencia) return res.status(404).json({ success: false, message: "Plan no encontrado" });
     return res.json({ success: true, data: sugerencia });
   } catch (error) {
@@ -734,7 +751,10 @@ exports.sugerirTransporteSalida = async (req, res) => {
   try {
     const planId = Number(req.params.planId);
     const salidaId = Number(req.params.salidaId);
-    const sugerencia = await PlanModel.recomendarTransporteSalida(salidaId, planId);
+    // En el router anidado (con id de negocio) la ruta es del dueño o
+    // admin; en el router público la visibilidad se exige en vivo.
+    const ownerView = Boolean(getBusinessId(req));
+    const sugerencia = await PlanModel.recomendarTransporteSalida(salidaId, planId, null, !ownerView);
     if (!sugerencia) return res.status(404).json({ success: false, message: "Salida no encontrada" });
     return res.json({ success: true, data: sugerencia });
   } catch (error) {

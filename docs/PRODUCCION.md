@@ -109,6 +109,7 @@ destructivas**. Orden de aplicación (las nuevas al final):
 020_password_reset_tokens.sql            ← Recuperación de contraseña
 021_restaurar_catalogo_cordoba.sql       ← Catálogo demo de Córdoba (solo inserta)
 022_indices_rendimiento.sql              ← Índices de lectura (solo índices)
+023_publicacion_suscripcion.sql          ← Publicación comercial y vigencias en UTC
 ```
 
 ### Cómo aplicarlas (con revisión previa)
@@ -124,10 +125,12 @@ SELECT
   EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public'
             AND table_name='usuarios' AND column_name='trial_inicio')     AS "019_ok",
   EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public'
-            AND table_name='password_reset_tokens')                        AS "020_ok";
+            AND table_name='password_reset_tokens')                        AS "020_ok",
+  EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public'
+            AND table_name='businesses' AND column_name='publicacion_estado') AS "023_ok";
 ```
 
-Si `018_ok`, `019_ok` o `020_ok` son `false`, hay migraciones pendientes.
+Si `018_ok`, `019_ok`, `020_ok` o `023_ok` son `false`, hay migraciones pendientes.
 Sin ellas, el backend responde **503 `ESQUEMA_INCOMPLETO`** (y lo
 detalla en el log de arranque).
 
@@ -141,8 +144,9 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/019_prueba_gratui
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/020_password_reset_tokens.sql
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/021_restaurar_catalogo_cordoba.sql
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/022_indices_rendimiento.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/023_publicacion_suscripcion.sql
 
-# 3. Verificar (las tres columnas deben salir en true)
+# 3. Verificar (las columnas deben salir en true)
 psql "$DATABASE_URL" -f database/COMPROBACIONES-PRODUCCION.sql
 ```
 
@@ -168,11 +172,19 @@ Qué hace cada una (resumen, sin datos destructivos):
   (es idempotente y solo inserta lo que falta).
 - **022** — añade índices compuestos para listados de negocios, reseñas e
   historial de accesos. **No modifica datos ni columnas.**
+- **023** — añade `businesses.publicacion_estado` (visible / oculto por
+  suscripción) y convierte `trial_inicio`, `trial_fin`, `suspension_fecha`,
+  `subscriptions.starts_at/ends_at/cancelada_at` a `TIMESTAMPTZ`
+  (instantes UTC; los valores existentes se interpretan como hora de
+  Bogotá). Hace *backfill* de los negocios cuyo vendedor ya no tiene
+  prueba ni suscripción vigente a `oculto_suscripcion`. **No toca la
+  moderación (`businesses.estado`), no borra filas y es idempotente.**
 
-> Las migraciones 018–022 ya están aplicadas en la base de datos **local**
+> Las migraciones 018–023 ya están aplicadas en la base de datos **local**
 > de desarrollo. En producción deben aplicarse **una vez**, revisando el
-> SQL. La 022 puede aplicarse en caliente, aunque en tablas muy grandes
-> conviene hacerlo en una ventana de mantenimiento.
+> SQL. La 022 puede aplicarse en caliente; en la 023 el `ALTER TYPE` de
+> columnas toma un bloqueo breve de cada tabla: en tablas muy grandes
+> conviene aplicarla en una ventana de mantenimiento.
 
 ---
 

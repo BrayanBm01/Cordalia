@@ -15,7 +15,9 @@ SELECT
   EXISTS (SELECT 1 FROM information_schema.tables
             WHERE table_schema='public' AND table_name='suscripcion_pagos')                        AS "019_suscripcion_pagos",
   EXISTS (SELECT 1 FROM information_schema.tables
-            WHERE table_schema='public' AND table_name='password_reset_tokens')                    AS "020_password_reset_tokens";
+            WHERE table_schema='public' AND table_name='password_reset_tokens')                    AS "020_password_reset_tokens",
+  EXISTS (SELECT 1 FROM information_schema.columns
+            WHERE table_schema='public' AND table_name='businesses' AND column_name='publicacion_estado') AS "023_publicacion_estado";
 
 \echo '--- 2) Tablas base que exigen las 3 migraciones ---'
 SELECT table_name FROM information_schema.tables

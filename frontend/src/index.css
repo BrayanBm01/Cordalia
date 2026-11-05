@@ -174,4 +174,92 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+
+  /* ── Contenedor público ancho ────────────────────────────────────────
+     En portatiles y monitores grandes las páginas públicas usan TODO el
+     ancho disponible (96rem y 100rem) en vez de quedarse encogidas en
+     72rem, con límite final para no estirar en ultrapanorámicas. */
+  .public-shell {
+    width: 100%;
+    max-width: 96rem;
+    margin-inline: auto;
+  }
+  @media (min-width: 1920px) {
+    .public-shell {
+      max-width: 100rem;
+    }
+  }
+
+  /* ── Rejilla pública de tarjetas (destinos, planes y negocios) ───────
+     Móvil: una columna real (min(100%, ...) evita desbordes).
+     Tableta: dos columnas. Portatil y monitores grandes: `auto-fit` con
+     columnas más anchas (--card-min sube por breakpoint) para que cada
+     tarjeta crezca y reparta el ancho en vez de dejar huecos laterales.
+     `align-items: stretch` mantiene las filas parejas. */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--card-min)), 1fr));
+    gap: var(--card-gap);
+    align-items: stretch;
+    --card-min: clamp(16rem, 42vw, 20rem);
+    --card-gap: 1.5rem;
+  }
+  .card-grid > * {
+    height: 100%;
+  }
+  @media (min-width: 768px) {
+    .card-grid {
+      --card-min: 19rem;
+      --card-gap: 1.5rem;
+    }
+  }
+  @media (min-width: 1366px) {
+    .card-grid {
+      --card-min: 21rem;
+      --card-gap: 1.75rem;
+    }
+  }
+  @media (min-width: 1920px) {
+    .card-grid {
+      --card-min: 23rem;
+      --card-gap: 2rem;
+    }
+  }
+  @media (min-width: 2560px) {
+    .card-grid {
+      --card-min: 25rem;
+      --card-gap: 2.25rem;
+    }
+  }
+
+  /* ── Piezas de tarjeta con tamaño fluido ─────────────────────────────
+     La imagen conserva SIEMPRE la misma proporción (16/10) y recorte
+     (object-fit: cover); el texto y el precio escalan con el ancho de la
+     tarjeta usando clamp(). */
+  .card-media {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    overflow: hidden;
+    background: var(--color-cream-200);
+  }
+  .card-media img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .card-title {
+    font-size: clamp(1.125rem, 1rem + 0.45vw, 1.6rem);
+    line-height: 1.25;
+  }
+  .card-text {
+    font-size: clamp(0.8125rem, 0.78rem + 0.22vw, 1.05rem);
+  }
+  .card-price {
+    font-size: clamp(1.05rem, 0.95rem + 0.45vw, 1.55rem);
+  }
+  .card-pad {
+    padding: clamp(1.1rem, 0.9rem + 0.7vw, 1.9rem);
+  }
 }

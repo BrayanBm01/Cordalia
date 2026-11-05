@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
   BadgeCheck, CalendarClock, CreditCard, Crown, Hourglass, Loader2, Store,
-  AlertTriangle, CheckCircle2, XCircle, Sparkles, History, ShieldAlert,
+  AlertTriangle, CheckCircle2, XCircle, Sparkles, History, ShieldAlert, EyeOff,
 } from 'lucide-react'
 import { vendedorAPI } from '../../services/api'
 import { formatMoney } from './businessUtils'
@@ -174,6 +174,33 @@ export default function PanelVendedor() {
                     Fin de la prueba: <strong>{fechaHora(estado.trial_fin)}</strong>
                   </p>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Aviso de publicación oculta al público (prueba/suscripción
+            vencidas). El backend indica cuántos negocios quedaron
+            ocultos; se restauran solos al renovar. */}
+        {estado?.publicacion_oculta && (
+          <div className="mb-8 rounded-2xl border border-amber-200 bg-amber-50 p-5 md:p-6">
+            <div className="flex items-start gap-3">
+              <EyeOff className="w-6 h-6 shrink-0 text-amber-600" />
+              <div>
+                <h2 className="font-bold text-amber-900">Publicación oculta al público</h2>
+                <p className="text-sm text-amber-800/90 mt-1">
+                  {Number(estado.negocios_ocultos) === 1
+                    ? '1 negocio tuyo está oculto'
+                    : `${estado.negocios_ocultos} negocios tuyos están ocultos`}{' '}
+                  porque no tienes prueba gratuita ni suscripción vigente. Al renovar tu plan se
+                  restauran automáticamente: tu contenido y la aprobación de Cordalia se conservan.
+                </p>
+                <a
+                  href="#planes-comerciales"
+                  className="inline-flex items-center gap-1.5 mt-3 text-sm font-semibold text-amber-900 underline hover:no-underline"
+                >
+                  <CreditCard className="w-4 h-4" /> Ver planes y renovar
+                </a>
               </div>
             </div>
           </div>

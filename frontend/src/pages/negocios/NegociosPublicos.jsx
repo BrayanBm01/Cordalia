@@ -10,7 +10,7 @@ import { rutaCon } from '../../routes/offuscatedRoutes.js'
 function SkeletonCard() {
   return (
     <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-dark-100">
-      <div className="aspect-[16/10] bg-dark-100 animate-pulse" />
+      <div className="card-media bg-dark-100 animate-pulse" />
       <div className="p-5 space-y-3">
         <div className="h-5 bg-dark-100 rounded-full w-3/4 animate-pulse" />
         <div className="h-4 bg-dark-100 rounded-full w-1/2 animate-pulse" />
@@ -33,9 +33,9 @@ function BusinessCard({ business, index }) {
     >
       <Link
         to={rutaCon('NEGOCIOS_PUBLICOS', business.id)}
-        className="group block bg-white rounded-[22px] overflow-hidden shadow-card border border-cream-200 hover:shadow-card-hover transition-all duration-300"
+        className="group flex h-full flex-col bg-white rounded-[22px] overflow-hidden shadow-card border border-cream-200 hover:shadow-card-hover transition-all duration-300"
       >
-        <div className="aspect-[16/10] overflow-hidden bg-cream-200 relative">
+        <div className="card-media">
           {portada && !imgError && !esImagenDeRelleno(portada) ? (
             <img
               src={portada}
@@ -58,9 +58,9 @@ function BusinessCard({ business, index }) {
           )}
         </div>
 
-        <div className="p-5">
+        <div className="p-5 flex-1 flex flex-col">
           <h3
-            className="text-lg font-semibold text-dark-900 group-hover:text-primary-700 transition-colors"
+            className="card-title font-semibold text-dark-900 group-hover:text-primary-700 transition-colors"
             style={{ fontFamily: 'var(--font-display)' }}
           >
             {business.nombre}
@@ -83,13 +83,13 @@ function BusinessCard({ business, index }) {
           )}
 
           {business.descripcion && (
-            <p className="mt-3 text-dark-500 text-sm leading-relaxed line-clamp-2">
+            <p className="mt-3 text-dark-500 card-text leading-relaxed line-clamp-2">
               {business.descripcion}
             </p>
           )}
 
-          <div className="mt-4 flex items-center justify-between">
-            <span className="text-sm font-semibold text-dark-800">
+          <div className="mt-auto pt-4 flex items-center justify-between">
+            <span className="card-price font-semibold text-dark-800">
               {formatRango(business.precio_min, business.precio_max)}
             </span>
             <span className="inline-flex items-center gap-1.5 text-primary-600 font-medium text-sm group-hover:text-primary-700 transition-colors">
@@ -172,7 +172,7 @@ export default function NegociosPublicos() {
         </div>
       </section>
 
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
+      <section className="public-shell px-4 sm:px-6 lg:px-8 py-12 md:py-16">
         {error && (
           <div className="mb-8 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm text-center">
             {error}
@@ -180,7 +180,7 @@ export default function NegociosPublicos() {
         )}
 
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="card-grid">
             {Array.from({ length: 6 }).map((_, i) => (
               <SkeletonCard key={i} />
             ))}
@@ -204,7 +204,7 @@ export default function NegociosPublicos() {
             <p className="text-dark-500 text-sm mb-8">
               {filtrados.length} negocio{filtrados.length !== 1 ? 's' : ''} disponible{filtrados.length !== 1 ? 's' : ''}
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="card-grid">
               {filtrados.map((business, index) => (
                 <BusinessCard key={business.id} business={business} index={index} />
               ))}

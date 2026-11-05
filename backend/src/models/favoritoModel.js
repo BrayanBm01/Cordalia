@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const { publicBusinessSql } = require("../utils/publicacion");
 
 const FavoritoModel = {
   // ---------- Destinos ----------
@@ -51,9 +52,10 @@ const FavoritoModel = {
               fn.created_at AS favorito_creado
        FROM favorite_negocios fn
        JOIN businesses b ON b.id = fn.business_id
+       JOIN usuarios u ON u.id = b.owner_id
        LEFT JOIN business_categories c ON c.id = b.category_id
        LEFT JOIN lugares l ON l.id = b.destination_id
-       WHERE fn.user_id = $1 AND b.estado = 'approved'
+       WHERE fn.user_id = $1 AND ${publicBusinessSql("b", "u")}
        ORDER BY fn.created_at DESC`,
       [userId]
     );

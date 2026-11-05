@@ -1,9 +1,11 @@
 const pool = require("../config/db");
+const { publicBusinessSql, ownerEntitledSql } = require("../utils/publicacion");
 
 const COLUMNS = `b.id, b.owner_id, b.category_id, b.destination_id, b.nombre, b.slug,
        b.descripcion, b.direccion, b.telefono, b.whatsapp, b.email_contacto,
        b.website, b.precio_min, b.precio_max, b.moneda, b.lat, b.lng,
-       b.portada_url, b.estado, b.is_verified, b.is_featured, b.created_at, b.updated_at`;
+       b.portada_url, b.estado, b.publicacion_estado, b.is_verified, b.is_featured,
+       b.created_at, b.updated_at`;
 
 const BusinessModel = {
   // ---------- Categorías ----------
@@ -31,6 +33,7 @@ const BusinessModel = {
       FROM businesses b
       LEFT JOIN business_categories c ON c.id = b.category_id
       LEFT JOIN lugares l ON l.id = b.destination_id
+      LEFT JOIN usuarios u ON u.id = b.owner_id
     `;
     const params = [];
     if (rol === "ADMIN") {
@@ -39,7 +42,10 @@ const BusinessModel = {
       query += " WHERE b.owner_id = $1";
       params.push(userId);
     } else {
-      query += " WHERE b.estado = 'approved'";
+      // Publico (visitante o turista): aprobado por moderacion Y con
+      // publicacion comercial vigente (prueba/suscripcion). La regla se
+      // evalua en la BASE DE DATOS con NOW(), no en el navegador.
+      query += ` WHERE ${publicBusinessSql("b", "u")}`;
     }
     query += " ORDER BY b.id DESC";
     const { rows } = await pool.query(query, params);
@@ -51,13 +57,16 @@ const BusinessModel = {
       SELECT ${COLUMNS}, c.nombre AS categoria
       FROM businesses b
       LEFT JOIN business_categories c ON c.id = b.category_id
+      LEFT JOIN usuarios u ON u.id = b.owner_id
       WHERE b.destination_id = $1
     `;
     const params = [destinoId];
     if (!rol || rol === "TOURIST") {
-      query += " AND b.estado = 'approved'";
+      query += ` AND ${publicBusinessSql("b", "u")}`;
     } else if (rol === "BUSINESS") {
-      query += " AND (b.estado = 'approved' OR b.owner_id = $2)";
+      // Un vendedor ve los publicos y, ademas, los suyos propios (aunque
+      // esten pendientes u ocultos por vencimiento) para poder gestionarlos.
+      query += ` AND (${publicBusinessSql("b", "u")} OR b.owner_id = $2)`;
       params.push(userId);
     }
     query += " ORDER BY b.id DESC";
@@ -69,7 +78,12 @@ const BusinessModel = {
     const { rows } = await pool.query(
       `SELECT ${COLUMNS}, c.nombre AS categoria,
               l.nombre AS destino, l.slug AS destino_slug,
-              u.nombre AS owner_nombre, u.email AS owner_email
+              u.nombre AS owner_nombre, u.email AS owner_email,
+              u.estado_cuenta AS owner_estado_cuenta,
+              u.trial_inicio AS owner_trial_inicio,
+              u.trial_fin AS owner_trial_fin,
+              ${ownerEntitledSql("u")} AS owner_con_derecho,
+              ${publicBusinessSql("b", "u")} AS es_publico
        FROM businesses b
        LEFT JOIN business_categories c ON c.id = b.category_id
        LEFT JOIN lugares l ON l.id = b.destination_id
@@ -102,7 +116,7 @@ const BusinessModel = {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
        RETURNING id, owner_id, category_id, destination_id, nombre, slug, descripcion, direccion,
                  telefono, whatsapp, email_contacto, website, precio_min, precio_max,
-                 moneda, lat, lng, portada_url, estado, created_at, updated_at`,
+                 moneda, lat, lng, portada_url, estado, publicacion_estado, created_at, updated_at`,
       [owner_id, category_id, destination_id, nombre, slug, descripcion, direccion, telefono,
        whatsapp, email_contacto, website, precio_min, precio_max, moneda,
        lat, lng, portada_url, estado]

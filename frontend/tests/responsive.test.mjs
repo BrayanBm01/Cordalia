@@ -132,7 +132,72 @@ check('AdminLayout y BusinessLayout limitan el ancho en pantallas muy grandes', 
   assert.ok(leer('layouts/BusinessLayout.jsx').includes('max-w-[1700px]'), 'BusinessLayout sin límite de ancho')
 })
 
-/* ── 6. Ninguna raíz de página bloquea el scroll ─────────────────────── */
+/* ── 6. Tarjetas públicas: rejilla fluida y tipografía escalada ──────── */
+
+check('index.css define la rejilla fluida de tarjetas (auto-fit + minmax)', () => {
+  const css = leer('index.css')
+  assert.ok(css.includes('.card-grid'), 'falta la utilidad .card-grid')
+  assert.ok(
+    css.includes('repeat(auto-fit, minmax(min(100%, var(--card-min)), 1fr))'),
+    'la rejilla debe usar auto-fit + minmax(min(100%, --card-min), 1fr)'
+  )
+  assert.ok(css.includes('--card-min'), 'falta el tamaño mínimo de columna --card-min')
+  assert.ok(
+    css.includes('min-width: 1366px') && css.includes('min-width: 1920px') && css.includes('min-width: 2560px'),
+    'la tarjeta debe crecer en portátiles (1366), 1920 y 2560'
+  )
+  // Imagen uniforme y sin deformación; tipografía fluida.
+  assert.ok(css.includes('aspect-ratio: 16 / 10'), 'falta proporción uniforme 16/10')
+  assert.ok(css.includes('.card-media img'), 'falta regla de imagen de tarjeta')
+  assert.ok(css.includes('object-fit: cover'), 'falta object-fit uniforme')
+  assert.ok(css.includes('.card-title') && css.includes('clamp('), 'falta título fluido con clamp')
+  assert.ok(css.includes('.card-price'), 'falta precio fluido')
+  // Contenedor ancho en pantallas grandes.
+  assert.ok(css.includes('.public-shell'), 'falta el contenedor .public-shell')
+  assert.ok(css.includes('max-width: 96rem'), 'el contenedor público debe llegar a 96rem')
+  assert.ok(css.includes('max-width: 100rem'), 'el contenedor público debe llegar a 100rem en 1920+')
+})
+
+check('las páginas públicas usan card-grid/public-shell/card-media', () => {
+  for (const rel of [
+    'pages/negocios/NegociosPublicos.jsx',
+    'pages/Lugares.jsx',
+    'pages/planes/PlanesPublicos.jsx',
+  ]) {
+    const src = leer(rel)
+    assert.ok(src.includes('card-grid'), `${rel}: falta la rejilla card-grid`)
+    assert.ok(src.includes('public-shell'), `${rel}: falta el contenedor ancho public-shell`)
+    assert.ok(src.includes('card-media'), `${rel}: falta la imagen uniforme card-media`)
+  }
+  const home = leer('pages/Home.jsx')
+  assert.ok(home.includes('card-media'), 'Home.jsx: falta card-media')
+  assert.ok(home.includes('card-title'), 'Home.jsx: falta card-title')
+  assert.ok(home.includes('public-shell'), 'Home.jsx: falta public-shell')
+})
+
+check('el panel del vendedor y MisNegocios informan los negocios ocultos', () => {
+  const panel = leer('pages/negocios/PanelVendedor.jsx')
+  assert.ok(panel.includes('publicacion_oculta'), 'PanelVendedor: falta el aviso de publicación oculta')
+  assert.ok(panel.includes('negocios_ocultos'), 'PanelVendedor: falta el conteo de negocios ocultos')
+  const mis = leer('pages/negocios/MisNegocios.jsx')
+  assert.ok(mis.includes('estaOcultoAlPublico'), 'MisNegocios: falta detectar negocios ocultos')
+  assert.ok(mis.includes('PANEL_VENDEDOR'), 'MisNegocios: falta el enlace para renovar')
+  const utils = leer('pages/negocios/businessUtils.js')
+  assert.ok(utils.includes('oculto_suscripcion'), 'businessUtils: falta el estado oculto_suscripcion')
+})
+
+check('el CSS compilado en dist incluye card-grid y public-shell (si dist existe)', () => {
+  const distAssets = path.join(FRONT, 'dist', 'assets')
+  if (!fs.existsSync(distAssets)) return
+  const cssFile = fs.readdirSync(distAssets).find((f) => f.endsWith('.css'))
+  assert.ok(cssFile, 'dist/assets no contiene CSS')
+  const css = fs.readFileSync(path.join(distAssets, cssFile), 'utf8')
+  assert.ok(css.includes('card-grid'), 'el build no incluye .card-grid')
+  assert.ok(css.includes('public-shell'), 'el build no incluye .public-shell')
+  assert.ok(css.includes('auto-fit'), 'el build no incluye la rejilla auto-fit')
+})
+
+/* ── 7. Ninguna raíz de página bloquea el scroll ─────────────────────── */
 
 check('ninguna página o layout raíz usa overflow-hidden como solución al scroll', () => {
   const errores = []

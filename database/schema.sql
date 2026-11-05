@@ -103,6 +103,10 @@ CREATE TABLE IF NOT EXISTS businesses (
     lng             DECIMAL(10,7),
     portada_url     TEXT,
     estado          VARCHAR(20) NOT NULL DEFAULT 'pending',
+    -- 'visible' = publicable si la moderacion lo aprueba;
+    -- 'oculto_suscripcion' = oculto por falta de prueba/suscripcion vigente.
+    -- La moderacion (`estado`) NUNCA se toca al ocultar o restaurar.
+    publicacion_estado VARCHAR(24) NOT NULL DEFAULT 'visible',
     is_verified     BOOLEAN NOT NULL DEFAULT false,
     is_featured     BOOLEAN NOT NULL DEFAULT false,
     created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -117,6 +121,9 @@ CREATE TABLE IF NOT EXISTS businesses (
     CONSTRAINT uq_businesses_slug UNIQUE (slug),
     CONSTRAINT chk_businesses_estado CHECK (estado IN (
         'draft', 'pending', 'approved', 'rejected', 'suspended', 'inactive'
+    )),
+    CONSTRAINT chk_businesses_publicacion_estado CHECK (publicacion_estado IN (
+        'visible', 'oculto_suscripcion'
     ))
 );
 
@@ -124,6 +131,7 @@ CREATE INDEX IF NOT EXISTS idx_businesses_owner ON businesses (owner_id);
 CREATE INDEX IF NOT EXISTS idx_businesses_category ON businesses (category_id);
 CREATE INDEX IF NOT EXISTS idx_businesses_destination ON businesses (destination_id);
 CREATE INDEX IF NOT EXISTS idx_businesses_estado ON businesses (estado);
+CREATE INDEX IF NOT EXISTS idx_businesses_publicacion_estado ON businesses (publicacion_estado, estado, owner_id);
 CREATE INDEX IF NOT EXISTS idx_businesses_is_featured ON businesses (is_featured) WHERE is_featured = true;
 
 -- ============================================================
@@ -233,8 +241,8 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     business_id     INTEGER NOT NULL,
     plan_id         INTEGER NOT NULL,
     estado          VARCHAR(20) NOT NULL DEFAULT 'active',
-    starts_at       TIMESTAMP NOT NULL DEFAULT NOW(),
-    ends_at         TIMESTAMP,
+    starts_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    ends_at         TIMESTAMPTZ,
     created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMP NOT NULL DEFAULT NOW(),
 

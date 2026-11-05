@@ -18,7 +18,7 @@ function useDebounce(value, delay) {
 function SkeletonCard() {
   return (
     <div className="bg-white rounded-[22px] overflow-hidden shadow-card border border-cream-200">
-      <div className="aspect-[16/11] bg-cream-200 animate-pulse" />
+      <div className="card-media bg-cream-200 animate-pulse" />
       <div className="p-5 space-y-3">
         <div className="h-5 bg-cream-200 rounded-full w-3/4 animate-pulse" />
         <div className="h-4 bg-cream-200 rounded-full w-1/2 animate-pulse" />
@@ -35,11 +35,11 @@ function DestinationCard({ lugar, index }) {
   const imagen = getDestinoImagen(lugar)
 
   return (
-    <div className="group bg-white rounded-[22px] border border-cream-200/90 overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300 flex flex-col justify-between">
+    <div className="group h-full bg-white rounded-[22px] border border-cream-200/90 overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300 flex flex-col justify-between">
       <div>
         <Link
           to={rutaCon('LUGARES', lugar._id || lugar.id)}
-          className="relative block aspect-[16/11] overflow-hidden bg-cream-200"
+          className="card-media block"
         >
           <img
             src={imagen}
@@ -56,12 +56,12 @@ function DestinationCard({ lugar, index }) {
             <span>{lugar.municipio || lugar.ubicacion || 'Córdoba, Colombia'}</span>
           </div>
 
-          <h3 className="font-[family-name:var(--font-display)] text-xl font-bold text-dark-900 group-hover:text-moss-900 transition-colors">
+          <h3 className="font-[family-name:var(--font-display)] card-title font-bold text-dark-900 group-hover:text-moss-900 transition-colors">
             <Link to={rutaCon('LUGARES', lugar._id || lugar.id)}>{lugar.nombre}</Link>
           </h3>
 
           {lugar.descripcion && (
-            <p className="mt-2 text-dark-500 text-xs sm:text-sm leading-relaxed line-clamp-2">
+            <p className="mt-2 text-dark-500 card-text leading-relaxed line-clamp-2">
               {lugar.descripcion}
             </p>
           )}
@@ -192,7 +192,7 @@ export default function Lugares() {
       </section>
 
       {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
+      <main className="public-shell px-4 sm:px-6 lg:px-8 py-12 md:py-16">
         {/* Category Filter Pills */}
         <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-4 mb-10 no-scrollbar">
           {CATEGORIAS.map((cat) => {
@@ -222,7 +222,7 @@ export default function Lugares() {
         )}
 
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="card-grid">
             {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
               <SkeletonCard key={i} />
             ))}
@@ -247,7 +247,7 @@ export default function Lugares() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="card-grid">
             {filteredLugares.map((lugar, index) => (
               <DestinationCard key={lugar.id || lugar._id || index} lugar={lugar} index={index} />
             ))}

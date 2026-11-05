@@ -1,4 +1,5 @@
 const BusinessModel = require("../models/businessModel");
+const { esVisiblePublicamente } = require("../utils/publicacion");
 
 function requireBusinessRole(req, res, next) {
   if (!req.usuario || !["ADMIN", "BUSINESS"].includes(req.usuario.rol)) {
@@ -16,13 +17,17 @@ async function loadVisibleBusiness(req, res, next) {
     if (!business) {
       return res.status(404).json({ success: false, message: "Negocio no encontrado" });
     }
-    // Sin sesión se trata como TOURIST: solo negocios aprobados son visibles.
+    // Sin sesión se trata como TOURIST. La visibilidad publica la decide
+    // la MISMA regla del servidor (aprobado + publicacion visible +
+    // prueba/suscripcion vigente comprobada con NOW() de PostgreSQL):
+    // un negocio vencido no es accesible ni por URL directa. El dueño y
+    // el administrador conservan acceso completo.
     const rol = req.usuario?.rol || "TOURIST";
     const userId = req.usuario?.id;
     const visible =
       rol === "ADMIN" ||
       (rol === "BUSINESS" && business.owner_id === userId) ||
-      business.estado === "approved";
+      esVisiblePublicamente(business);
     if (!visible) {
       return res.status(404).json({ success: false, message: "Negocio no encontrado" });
     }

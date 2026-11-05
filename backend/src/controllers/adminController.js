@@ -226,7 +226,9 @@ exports.loginHistory = async (req, res) => {
 // dias restantes, plan contratado y vigencia de la suscripcion.
 exports.vendedores = async (req, res) => {
   try {
-    await SuscripcionModel.expirarSuscripcionesVencidas();
+    // Sincroniza vencimientos y publicacion antes de listar: el
+    // administrador ve el mismo estado que las consultas publicas.
+    await SuscripcionModel.sincronizarVencimientosComerciales();
     const vendedores = await SuscripcionModel.listVendedoresConEstado();
     return res.json({ success: true, data: vendedores });
   } catch (error) {

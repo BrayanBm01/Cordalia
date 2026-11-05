@@ -56,9 +56,10 @@ exports.planesPublicos = async (req, res) => {
 // prueba vencida): el vendedor necesita verlo para contratar.
 exports.estado = async (req, res) => {
   try {
-    // Vencimiento perezoso: una suscripcion cuya vigencia paso queda
-    // expirada aunque el vendedor no haya entrado nunca mas.
-    await SuscripcionModel.expirarSuscripcionesVencidas();
+    // Sincronizacion perezosa: vence suscripciones/pruebas caducadas y
+    // actualiza la publicacion de los negocios aunque el vendedor no
+    // haya vuelto a entrar. El panel sigue disponible siempre.
+    await SuscripcionModel.sincronizarVencimientosComerciales();
 
     const est = await SuscripcionModel.estadoComercial(req.usuario.id);
     if (!est) return res.status(404).json({ success: false, message: "Usuario no encontrado" });

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Plus, Store, Pencil, Trash2, Eye, ImageOff, MapPin } from 'lucide-react'
+import { Plus, Store, Pencil, Trash2, Eye, ImageOff, MapPin, AlertTriangle } from 'lucide-react'
 import { businessesAPI } from '../../services/api'
-import { ESTADO_LABEL, ESTADO_BADGE } from './businessUtils'
+import { ESTADO_LABEL, ESTADO_BADGE, PUBLICACION_LABEL, estaOcultoAlPublico } from './businessUtils'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import EmptyState from '../../components/EmptyState'
 import ConfirmModal from '../../components/ConfirmModal'
@@ -45,6 +45,8 @@ export default function MisNegocios() {
 
   if (loading) return <LoadingSpinner />
 
+  const ocultos = negocios.filter(estaOcultoAlPublico)
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -68,6 +70,30 @@ export default function MisNegocios() {
             Crear negocio
           </button>
         </div>
+
+        {ocultos.length > 0 && (
+          <div className="mb-8 rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-5 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="min-w-0">
+              <p className="font-semibold text-amber-900">
+                {ocultos.length === 1
+                  ? '1 negocio está oculto al público'
+                  : `${ocultos.length} negocios están ocultos al público`}
+              </p>
+              <p className="text-sm text-amber-800/90 mt-1">
+                Se ocultaron porque tu prueba gratuita de 7 días terminó o tu suscripción venció.
+                Tus datos y tu contenido no se pierden: al renovar tu plan vuelven a publicarse
+                automáticamente (la aprobación de Cordalia se conserva).
+              </p>
+              <Link
+                to={obtenerRuta('PANEL_VENDEDOR')}
+                className="inline-flex items-center gap-1.5 mt-3 text-sm font-semibold text-amber-900 underline hover:no-underline"
+              >
+                Ver planes y renovar
+              </Link>
+            </div>
+          </div>
+        )}
 
         {negocios.length === 0 ? (
           <div className="bg-white rounded-2xl border border-dark-100">
@@ -97,6 +123,11 @@ export default function MisNegocios() {
                   >
                     {ESTADO_LABEL[n.estado] || n.estado}
                   </span>
+                  {estaOcultoAlPublico(n) && (
+                    <span className="absolute top-3 right-3 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200 shadow-sm">
+                      {PUBLICACION_LABEL.oculto_suscripcion}
+                    </span>
+                  )}
                 </div>
                 <div className="p-5 flex-1 flex flex-col">
                   <h3 className="font-semibold text-dark-900" style={{ fontFamily: 'var(--font-display)' }}>

@@ -1,5 +1,6 @@
 const ReviewModel = require("../models/reviewModel");
 const BusinessModel = require("../models/businessModel");
+const { esVisiblePublicamente } = require("../utils/publicacion");
 const { parseInteger, validarTexto } = require("../utils/validators");
 
 const ESTADOS_REVIEW = ["active", "hidden", "deleted"];
@@ -21,7 +22,12 @@ async function businessVisible(business, req) {
   if (!business) return false;
   const rol = req.usuario?.rol || null;
   if (rol === "ADMIN") return true;
-  return business.estado === "approved";
+  // El dueño conserva el acceso a las reseñas de su negocio aunque la
+  // publicacion este oculta por vencimiento.
+  if (req.usuario?.id && business.owner_id === req.usuario.id) return true;
+  // Publico: aplica la misma regla que el resto de las vistas
+  // (aprobado + publicacion visible + prueba/suscripcion vigente).
+  return esVisiblePublicamente(business);
 }
 
 // GET /api/reviews/business/:businessId — pública (solo negocios visibles)
@@ -64,6 +70,14 @@ exports.create = async (req, res) => {
       return res.status(409).json({
         success: false,
         message: "Este negocio aún no está aprobado y no puede recibir reseñas",
+      });
+    }
+    // Un negocio aprobado pero OCULTO por vencimiento comercial tampoco
+    // recibe resenas nuevas: dejo de existir publicamente.
+    if (!esVisiblePublicamente(business)) {
+      return res.status(409).json({
+        success: false,
+        message: "Este negocio no está disponible públicamente en este momento",
       });
     }
     // El propietario no puede resenar su propio negocio.
