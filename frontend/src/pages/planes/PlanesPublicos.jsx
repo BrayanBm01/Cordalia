@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Search, Ticket, MapPin, Clock, ArrowRight, Users, Sprout, Tag } from 'lucide-react'
+import { Search, Ticket, MapPin, Clock, ArrowRight, Users, Sprout, Tag, RefreshCw } from 'lucide-react'
 import { planesAPI, lugaresAPI } from '../../services/api'
 import { getPlanImagen } from '../../utils/media'
 import { formatMoney } from '../negocios/businessUtils'
@@ -145,17 +145,32 @@ export default function PlanesPublicos() {
     lugaresAPI.getAll().then((r) => setLugares(Array.isArray(r.data) ? r.data : [])).catch(() => {})
   }, [])
 
-  useEffect(() => {
+  // Reintentable sin recargar la página. Un fallo se muestra como error
+  // (nunca como "no hay planes"), y el aviso de lugares no bloquea la
+  // carga principal de los planes.
+  const cargarPlanes = useCallback(() => {
     setLoading(true)
+    setError(null)
     const params = {
       promos: soloPromos ? '1' : '',
     }
-    planesAPI
+    return planesAPI
       .list(params)
       .then((res) => setPlanes(Array.isArray(res.data) ? res.data : []))
       .catch((err) => setError(err.message || 'Error al cargar los planes'))
       .finally(() => setLoading(false))
   }, [soloPromos])
+
+  useEffect(() => {
+    // Diferido a microtask: evita setState sincrónico dentro del efecto.
+    let vigente = true
+    Promise.resolve().then(() => {
+      if (vigente) cargarPlanes()
+    })
+    return () => {
+      vigente = false
+    }
+  }, [cargarPlanes])
 
   const dur = DURACION_OPCIONES.find((d) => d.label === duracion)
 
@@ -303,13 +318,20 @@ export default function PlanesPublicos() {
           </div>
         </div>
 
-        {error && (
-          <div className="p-4 mb-8 rounded-2xl bg-red-50 border border-red-200 text-red-800 text-sm">
-            {error}
+        {error ? (
+          <div className="p-6 mb-8 rounded-2xl bg-red-50 border border-red-200 text-red-800 text-sm text-center">
+            <p className="font-semibold">No pudimos cargar los planes.</p>
+            <p className="mt-1">{error}</p>
+            <button
+              type="button"
+              onClick={cargarPlanes}
+              className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-700 text-white font-medium hover:bg-red-800 transition-colors cursor-pointer"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Reintentar
+            </button>
           </div>
-        )}
-
-        {loading ? (
+        ) : loading ? (
           <div className="card-grid">
             {[0, 1, 2, 3, 4, 5].map((i) => (
               <SkeletonCard key={i} />

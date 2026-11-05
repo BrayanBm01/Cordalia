@@ -2,6 +2,7 @@ const LugarModel = require("../models/lugarModel");
 const BusinessModel = require("../models/businessModel");
 const { isNonEmptyString, sanitizeString } = require("../utils/validators");
 const { slugify } = require("../utils/slug");
+const { responderErrorServidor } = require("../utils/serverError");
 
 const IMAGEN_MAX_BYTES = 1500 * 1024; // 1.5 MB por imagen
 const IMAGENES_PERMITIDAS = ["image/jpeg", "image/png", "image/webp", "image/gif"];
@@ -36,8 +37,7 @@ exports.getAll = async (req, res) => {
       : await LugarModel.findAll();
     return res.json({ success: true, data: lugares });
   } catch (error) {
-    console.error("Error getAll lugares:", error);
-    return res.status(500).json({ success: false, message: "Error al obtener lugares" });
+    return responderErrorServidor(res, error, "getAll lugares");
   }
 };
 
@@ -81,8 +81,7 @@ exports.getBusinesses = async (req, res) => {
     const negocios = await BusinessModel.listByDestination(id, rol, userId);
     return res.json({ success: true, data: negocios });
   } catch (error) {
-    console.error("Error getBusinesses lugar:", error);
-    return res.status(500).json({ success: false, message: "Error al obtener negocios del lugar" });
+    return responderErrorServidor(res, error, "getBusinesses lugar");
   }
 };
 

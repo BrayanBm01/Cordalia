@@ -1,12 +1,13 @@
 /**
- * Verificación de migraciones 018/019/020 sobre una base de datos
+ * Verificación de migraciones 018..023 sobre una base de datos
  * AISLADA, simulando una instalación limpia real.
  *
- * Cadena probada:  database/schema.sql  +  migraciones 001..017  +  018..020
+ * Cadena probada:  database/schema.sql  +  migraciones 001..017  +  018..023
  * (OJO: `database/schema.sql` NO es una instalación completa: no crea
  *  `tour_plans` ni `inscripciones`; esas vienen de las migraciones.)
  *
- * Comprueba: aplicabilidad, idempotencia (x3) y conservacion de datos.
+ * Comprueba: aplicabilidad en orden, idempotencia (x3), conservación de
+ * datos y que la 023 deje la publicación comercial y las fechas UTC.
  * NO toca `turismo_db` (desarrollo) ni ninguna base remota.
  *
  * Uso:  node scripts/verificar-migraciones.cjs
@@ -23,6 +24,9 @@ const NUEVAS = [
   "018_inscripcion_gratuita.sql",
   "019_prueba_gratuita_suscripciones.sql",
   "020_password_reset_tokens.sql",
+  "021_restaurar_catalogo_cordoba.sql",
+  "022_indices_rendimiento.sql",
+  "023_publicacion_suscripcion.sql",
 ];
 
 const url = new URL(process.env.DATABASE_URL);
@@ -113,11 +117,9 @@ function check(cond, msg) {
   console.log("   constraint previa:", cPrev.rows[0] ? cPrev.rows[0].d : "(no existe)");
 
   // --- 3) Migraciones nuevas ------------------------------------------
-  console.log("\n3) Migraciones 018 -> 019 -> 020 (primera aplicación)");
+  console.log("\n3) Migraciones 018 -> 023 en orden (primera aplicación)");
   for (const m of NUEVAS) {
-    // La cadena historica (001..017) se audita pero NO cuenta como fallo
-    // de las migraciones nuevas: sus problemas son preexistentes.
-    await run(c, fs.readFileSync(path.join(DIR_MIG, m), "utf8"), m, { contar: false });
+    await run(c, fs.readFileSync(path.join(DIR_MIG, m), "utf8"), m);
   }
 
   // --- 4) Verificaciones ----------------------------------------------
@@ -173,6 +175,36 @@ function check(cond, msg) {
   check(!!t.rows[0].b, "tabla password_reset_tokens creada");
   check(!!t.rows[0].c, "tabla inscripciones presente (creada por 001..017)");
 
+  // Migracion 023: publicacion comercial + instantes UTC.
+  const pub = await c.query(
+    "SELECT data_type FROM information_schema.columns WHERE table_schema='public' AND table_name='businesses' AND column_name='publicacion_estado'"
+  );
+  check(pub.rows[0]?.data_type === "character varying", "businesses.publicacion_estado existe (023)");
+  const pubDefault = await c.query(
+    "SELECT column_default, is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name='businesses' AND column_name='publicacion_estado'"
+  );
+  check(
+    pubDefault.rows[0]?.column_default?.includes("visible") &&
+      pubDefault.rows[0]?.is_nullable === "NO",
+    "publicacion_estado es NOT NULL y por defecto 'visible'"
+  );
+  const pubs = await c.query(
+    "SELECT count(*)::int c FROM businesses WHERE publicacion_estado = 'visible'"
+  );
+  check(pubs.rows[0].c >= 1, "los vendedores legados conservan publicacion visible tras el backfill");
+  const tipos = await c.query(
+    `SELECT table_name, column_name, data_type
+       FROM information_schema.columns
+      WHERE table_schema='public'
+        AND ((table_name='usuarios' AND column_name IN ('trial_inicio','trial_fin','suspension_fecha'))
+          OR (table_name='subscriptions' AND column_name IN ('starts_at','ends_at','cancelada_at')))
+      ORDER BY table_name, column_name`
+  );
+  check(
+    tipos.rows.every((r) => r.data_type === "timestamp with time zone"),
+    "las fechas comerciales quedaron como TIMESTAMPTZ (instantes UTC)"
+  );
+
   // --- 5) Idempotencia -------------------------------------------------
   console.log("\n5) Idempotencia: segunda y tercera aplicación");
   for (const m of NUEVAS) {
@@ -213,13 +245,13 @@ function check(cond, msg) {
   console.log(`\nBase de datos aislada ${SCRATCH} eliminada.`);
   console.log(
     fallos === 0
-      ? "\nRESULTADO: migraciones 018/019/020 correctas e idempotentes."
+      ? "\nRESULTADO: migraciones 018..023 correctas e idempotentes."
       : `\nRESULTADO: ${fallos} fallo(s) en las migraciones nuevas`
   );
   if (fallosPrevios > 0) {
     console.log(
       `AVISO: ${fallosPrevios} fallo(s) PREEXISTENTES en la cadena historica 001..017` +
-        " (noinxan en 018/019/020; ver informe)."
+        " (no afectan a 018..023; ver informe)."
     );
   }
   process.exit(fallos === 0 ? 0 : 1);

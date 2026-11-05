@@ -5,6 +5,7 @@ const UsuarioModel = require("../models/usuarioModel");
 const pool = require("../config/db");
 const { slugify } = require("../utils/slug");
 const { isNonEmptyString, sanitizeString } = require("../utils/validators");
+const { responderErrorServidor } = require("../utils/serverError");
 
 const poolQuery = pool.query.bind(pool);
 
@@ -293,8 +294,7 @@ function validarPlan(body, esCreacion = false) {
 }
 
 function serverError(res, error, context) {
-  console.error(`Error ${context}:`, error);
-  return res.status(500).json({ success: false, message: "Error interno del servidor" });
+  return responderErrorServidor(res, error, context);
 }
 
 // Para listados anidados: owner/admin pueden ver todo; el resto solo activo.

@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Store, MapPin, ArrowRight, Search } from 'lucide-react'
+import { Store, MapPin, ArrowRight, Search, RefreshCw } from 'lucide-react'
 import { businessesAPI } from '../../services/api'
 import { esImagenDeRelleno } from '../../utils/media'
 import { formatRango } from './businessUtils'
@@ -109,14 +109,30 @@ export default function NegociosPublicos() {
   const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
 
-  useEffect(() => {
+  // La carga se puede reintentar sin recargar toda la página. Un fallo
+  // del servidor se muestra como error (nunca como lista vacía).
+  const cargarNegocios = useCallback(() => {
     setLoading(true)
-    businessesAPI
+    setError(null)
+    return businessesAPI
       .list()
       .then((res) => setNegocios(Array.isArray(res.data) ? res.data : []))
       .catch((err) => setError(err.message || 'Error al cargar los negocios'))
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    // Se difiere a un microtask para no hacer setState sincrónico dentro
+    // del efecto (evita renderizados en cascada; el esqueleto ya es el
+    // estado inicial).
+    let vigente = true
+    Promise.resolve().then(() => {
+      if (vigente) cargarNegocios()
+    })
+    return () => {
+      vigente = false
+    }
+  }, [cargarNegocios])
 
   const filtrados = negotiosInner()
 
@@ -173,13 +189,20 @@ export default function NegociosPublicos() {
       </section>
 
       <section className="public-shell px-4 sm:px-6 lg:px-8 py-12 md:py-16">
-        {error && (
-          <div className="mb-8 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm text-center">
-            {error}
+        {error ? (
+          <div className="mb-8 p-6 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm text-center">
+            <p className="font-semibold">No pudimos cargar los negocios.</p>
+            <p className="mt-1">{error}</p>
+            <button
+              type="button"
+              onClick={cargarNegocios}
+              className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-700 text-white font-medium hover:bg-red-800 transition-colors cursor-pointer"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Reintentar
+            </button>
           </div>
-        )}
-
-        {loading ? (
+        ) : loading ? (
           <div className="card-grid">
             {Array.from({ length: 6 }).map((_, i) => (
               <SkeletonCard key={i} />

@@ -18,6 +18,48 @@
 -- ============================================================
 
 -- ------------------------------------------------------------
+-- 0) Preflight: la 019 debe estar aplicada ANTES que esta migracion
+-- ------------------------------------------------------------
+-- La 023 reutiliza las columnas de prueba/suscripcion creadas por la
+-- 019. Si se ejecuta primero, el backfill fallaria a mitad y dejaria la
+-- base en un estado parcial (columna nueva sin datos coherentes).
+-- Este bloque aborta ANTES de cualquier DDL con un mensaje claro.
+DO $$
+DECLARE
+  faltan TEXT[] := ARRAY[]::TEXT[];
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'usuarios'
+      AND column_name = 'estado_cuenta'
+  ) THEN
+    faltan := array_append(faltan, 'usuarios.estado_cuenta');
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'usuarios'
+      AND column_name = 'trial_inicio'
+  ) THEN
+    faltan := array_append(faltan, 'usuarios.trial_inicio');
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'subscriptions'
+      AND column_name = 'usuario_id'
+  ) THEN
+    faltan := array_append(faltan, 'subscriptions.usuario_id');
+  END IF;
+
+  IF array_length(faltan, 1) > 0 THEN
+    RAISE EXCEPTION
+      'Migracion 023 requiere la migracion 019 aplicada primero. Faltan: %',
+      array_to_string(faltan, ', ');
+  END IF;
+END $$;
+
+-- ------------------------------------------------------------
 -- 1) Estado de publicacion comercial del negocio
 -- ------------------------------------------------------------
 -- visible             -> puede mostrarse si la moderacion lo aprueba

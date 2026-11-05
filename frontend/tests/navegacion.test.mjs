@@ -273,5 +273,51 @@ check('Registro.jsx: el registro público NO crea cuentas ADMIN', () => {
   )
 })
 
+/* ── 6. Botones de regreso de los layouts (bug: enlaces a sí mismos) ─── */
+
+check('AuthLayout.jsx: el enlace de regreso del login apunta a INICIO', () => {
+  const src = leer('layouts/AuthLayout.jsx')
+  assert.ok(
+    src.includes("to={obtenerRuta('INICIO')}"),
+    'el enlace debe construirse con obtenerRuta(INICIO)'
+  )
+  assert.ok(
+    !src.includes("to={obtenerRuta('LOGIN')}"),
+    "el enlace NO debe apuntar al propio login (bug original: quedaba en '" +
+      RUTAS_OFUSCADAS.LOGIN +
+      "' y parecía no hacer nada)"
+  )
+  assert.ok(src.includes('aria-label='), 'el enlace de regreso debe tener aria-label')
+})
+
+check('AdminLayout.jsx: los dos "Volver al sitio" apuntan a INICIO (no a ADMIN)', () => {
+  const src = leer('layouts/AdminLayout.jsx')
+  const globos = src.split('<Globe').length - 1
+  assert.equal(globos, 2, 'deben existir el enlace de escritorio y el de móvil')
+  const destinos = [...src.matchAll(/to=\{obtenerRuta\('([A-Z_]+)'\)\}/g)].map((m) => m[1])
+  assert.equal(destinos.length, 2, 'cada enlace Volver al sitio usa obtenerRuta')
+  for (const d of destinos) {
+    assert.equal(d, 'INICIO', `el enlace debe regresar al sitio público, no a ${d}`)
+  }
+})
+
+for (const seccion of ['ADMIN', 'ADMIN_USUARIOS', 'ADMIN_VENDEDORES', 'ADMIN_LUGARES', 'ADMIN_NEGOCIOS', 'ADMIN_RESEÑAS', 'ADMIN_HISTORIAL']) {
+  check(`AdminLayout: desde ${seccion}, "Volver al sitio" llega a la home real (sin 404)`, () => {
+    const router = routerDesde(obtenerRuta(seccion))
+    router.navigate(obtenerRuta('INICIO'))
+    const ruta = router.state.location.pathname
+    assert.equal(ruta, obtenerRuta('INICIO'), `quedó en "${ruta}"`)
+    assert.ok(esDestinoReal(ruta), `${ruta} debe ser una ruta declarada`)
+  })
+}
+
+check('AuthLayout: desde el login, el enlace llega a la home real (sin 404)', () => {
+  const router = routerDesde(obtenerRuta('LOGIN'))
+  router.navigate(obtenerRuta('INICIO'))
+  const ruta = router.state.location.pathname
+  assert.equal(ruta, obtenerRuta('INICIO'), `quedó en "${ruta}"`)
+  assert.ok(esDestinoReal(ruta), `${ruta} debe ser una ruta declarada`)
+})
+
 console.log(`\n  Resultado: ${pass} PASS, ${fail} FAIL`)
 process.exit(fail ? 1 : 0)

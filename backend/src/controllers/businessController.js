@@ -1,6 +1,7 @@
 const BusinessModel = require("../models/businessModel");
 const LugarModel = require("../models/lugarModel");
 const { slugify } = require("../utils/slug");
+const { responderErrorServidor } = require("../utils/serverError");
 const {
   isEmail,
   isNonEmptyString,
@@ -249,8 +250,7 @@ function validarBusiness(body, esCreacion = false) {
 }
 
 function serverError(res, error, context) {
-  console.error(`Error ${context}:`, error);
-  return res.status(500).json({ success: false, message: "Error interno del servidor" });
+  return responderErrorServidor(res, error, context);
 }
 
 // Valida el rango de precios según la categoría del negocio:

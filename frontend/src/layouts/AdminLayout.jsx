@@ -91,7 +91,7 @@ function Sidebar({ collapsed, onToggle }) {
         <div className="border-t border-dark-800 my-3" />
 
         <Link
-          to={obtenerRuta('ADMIN')}
+          to={obtenerRuta('INICIO')}
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-400 hover:text-white hover:bg-dark-700/50 transition-all duration-200"
           title={collapsed ? 'Volver al sitio' : undefined}
         >
@@ -197,7 +197,7 @@ function MobileDrawer({ open, onClose }) {
           <div className="border-t border-dark-800 my-3" />
 
           <Link
-            to={obtenerRuta('ADMIN')}
+            to={obtenerRuta('INICIO')}
             onClick={onClose}
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-400 hover:text-white hover:bg-dark-700/50 transition-all duration-200 w-full"
           >
