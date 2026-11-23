@@ -35,6 +35,10 @@ h.test("DEST: crear negocio con/ sin destino y validaciones", async () => {
   const t = await h.createUser(token, { nombre: "Turista Foxtrot", email: emailT, password: pass, rol_id: 1 });
   h.assertStatus(t.status, 201, "crear turista F4");
 
+  // Suite de aprobacion manual: vendedores sin prueba vigente.
+  await h.sinPruebaVigente(a.json.data.id);
+  await h.sinPruebaVigente(b.json.data.id);
+
   const negA = await h.login(emailA, pass);
   h.assertStatus(negA.status, 200, "login A");
   const negB = await h.login(emailB, pass);

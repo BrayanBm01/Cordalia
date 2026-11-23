@@ -31,6 +31,10 @@ h.test("FAV: setup usuarios y negocio aprobado", async () => {
     h.assertStatus((await h.createUser(token, { nombre: n, email: e, password: pass, rol_id: r })).status, 201, `crear ${e}`);
   }
 
+  // Suite de aprobacion manual: el negociante no tiene prueba vigente.
+  const { rows: negRows } = await h.q("SELECT id FROM usuarios WHERE email = $1", [emailNeg]);
+  await h.sinPruebaVigente(negRows[0].id);
+
   const neg = await h.login(emailNeg, pass);
   h.assertStatus(neg.status, 200, "login negociante");
   const t1 = await h.login(emailT1, pass);

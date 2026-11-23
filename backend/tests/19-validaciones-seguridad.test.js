@@ -79,6 +79,9 @@ h.test("SEG: setup de usuarios para validaciones y reseñas", async () => {
     h.assertStatus(creado.status, 201, `crear ${clave}`);
     h.test.sec.userIds.push(creado.json.data.id);
 
+    // Suite de aprobacion manual: los vendedores no tienen prueba vigente.
+    if (rol === 2) await h.sinPruebaVigente(creado.json.data.id);
+
     const sesion = await h.login(email, PASS);
     h.assertStatus(sesion.status, 200, `login ${clave}`);
     h.test.sec[clave] = {

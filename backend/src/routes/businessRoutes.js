@@ -43,7 +43,7 @@ router.use(requireAuth);
 // pantalla de contratacion (/api/vendedor/*).
 router.post("/", requireBusinessRole, requireVendorActive, businessWriteLimiter, businessController.create);
 router.put("/:id", requireOwnedBusiness, requireVendorActive, businessWriteLimiter, businessController.update);
-router.delete("/:id", requireOwnedBusiness, businessController.remove);
+router.delete("/:id", requireOwnedBusiness, requireVendorActive, businessWriteLimiter, businessController.remove);
 router.put("/:id/estado", requireAdmin, businessController.setEstado);
 
 // Asociar/retirar destino (1:N → cada negocio pertenece a un destino)

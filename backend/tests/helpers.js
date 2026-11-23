@@ -62,6 +62,18 @@ async function clearSession(email) {
   await q("UPDATE usuarios SET token_activo = NULL WHERE email = $1", [email]);
 }
 
+// Deja a un vendedor SIN politica comercial (legado): ni prueba ni
+// suscripcion. Se usa en las suites que prueban el flujo de aprobacion
+// MANUAL, para que la publicacion automatica por prueba vigente no
+// interfiera. Un vendedor legado puede crear negocios (requireVendorActive
+// lo permite) pero nacen `pending` hasta que un ADMIN los aprueba.
+async function sinPruebaVigente(usuarioId) {
+  await q(
+    "UPDATE usuarios SET trial_inicio = NULL, trial_fin = NULL, estado_cuenta = NULL WHERE id = $1",
+    [usuarioId]
+  );
+}
+
 // Prefijos de correo usados por TODAS las suites para sus datos de
 // prueba. La limpieza los borra al terminar para no dejar residuos
 // que afecten a otras ejecuciones.
@@ -152,6 +164,7 @@ module.exports = {
   q,
   countAdmins,
   clearSession,
+  sinPruebaVigente,
   cleanupTestData,
   assert,
   assertStatus,

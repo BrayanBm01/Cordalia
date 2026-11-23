@@ -27,6 +27,11 @@ h.test("NEG: BUSINESS crea negocio con estado pending y slug único", async () =
   const t = await h.createUser(token, { nombre: "Turista Vista", email: emailT, password: pass, rol_id: 1 });
   h.assertStatus(t.status, 201, "crear turista");
 
+  // Esta suite prueba el flujo de aprobacion MANUAL: se deja a los
+  // vendedores sin prueba vigente para que los negocios nazcan `pending`.
+  await h.sinPruebaVigente(a.json.data.id);
+  await h.sinPruebaVigente(b.json.data.id);
+
   const negA = await h.login(emailA, pass);
   h.assertStatus(negA.status, 200, "login A");
   const negB = await h.login(emailB, pass);
@@ -49,13 +54,22 @@ h.test("NEG: BUSINESS crea negocio con estado pending y slug único", async () =
   h.assert(creado.json?.data?.estado === "pending", "estado pending");
   h.assert(creado.json?.data?.owner_id === negA.usuario.id, "owner = sesión (no del body)");
 
+  // Nombre duplicado (variacion de mayusculas/espacios) -> 409, no se crea.
+  const duplicado = await h.api("/api/businesses", {
+    method: "POST",
+    token: negB.token,
+    body: { nombre: "HOTEL  los andes", category_id: 2 },
+  });
+  h.assertStatus(duplicado.status, 409, "nombre duplicado normalizado 409");
+  h.assert(duplicado.json?.code === "NOMBRE_DUPLICADO", "codigo NOMBRE_DUPLICADO");
+
   const segundo = await h.api("/api/businesses", {
     method: "POST",
     token: negB.token,
-    body: { nombre: "Hotel Los Andes", category_id: 2 },
+    body: { nombre: "Cabañas del Río", category_id: 2 },
   });
   h.assertStatus(segundo.status, 201, "crear negocio B");
-  h.assert(segundo.json?.data?.slug === "hotel-los-andes-2", `slug B = ${segundo.json?.data?.slug}`);
+  h.assert(segundo.json?.data?.slug === "cabanas-del-rio", `slug B = ${segundo.json?.data?.slug}`);
 
   const sinNombre = await h.api("/api/businesses", {
     method: "POST", token: negB.token, body: { category_id: 2 },
@@ -112,6 +126,13 @@ h.test("NEG: ownership: B no puede editar/borrar negocios de A; turista no puede
   });
   h.assertStatus(promocionar.status, 403, "business no cambia estado");
 
+  // El dueño tampoco puede eliminar su propio negocio (solo ADMIN).
+  const delPropio = await h.api("/api/businesses/" + h.test.negocioA.id, {
+    method: "DELETE", token: h.test.negA.token,
+  });
+  h.assertStatus(delPropio.status, 403, "vendedor no elimina su negocio 403");
+  h.assert(delPropio.json?.code === "ELIMINAR_NO_PERMITIDO", "codigo ELIMINAR_NO_PERMITIDO");
+
   // El listado es lectura pública: sin token se ven únicamente negocios aprobados.
   const sinToken = await h.api("/api/businesses");
   h.assertStatus(sinToken.status, 200, "lista pública sin token 200");
@@ -150,15 +171,35 @@ h.test("NEG: ADMIN cambia estado y el turista pasa a ver el negocio", async () =
   h.assert(detalle.json?.data?.nombre === "Hotel Los Andes", "detalle correcto");
 });
 
-h.test("NEG: dueño edita su negocio y el slug se regenera", async () => {
+h.test("NEG: dueño edita datos pero NO puede renombrar; ADMIN sí", async () => {
+  // El vendedor no puede cambiar el nombre (identidad protegida).
+  const rename = await h.api("/api/businesses/" + h.test.negocioA.id, {
+    method: "PUT",
+    token: h.test.negA.token,
+    body: { nombre: "Hotel Los Andes Plaza" },
+  });
+  h.assertStatus(rename.status, 403, "vendedor no renombra 403");
+  h.assert(rename.json?.code === "RENOMBRAR_NO_PERMITIDO", "codigo RENOMBRAR_NO_PERMITIDO");
+
+  // Editar otros campos sí está permitido y el slug se conserva.
   const edit = await h.api("/api/businesses/" + h.test.negocioA.id, {
     method: "PUT",
     token: h.test.negA.token,
-    body: { nombre: "Hotel Los Andes Plaza", telefono: "3112223333" },
+    body: { telefono: "3112223333" },
   });
   h.assertStatus(edit.status, 200, "editar propio");
-  h.assert(edit.json?.data?.slug === "hotel-los-andes-plaza", `slug editado = ${edit.json?.data?.slug}`);
+  h.assert(edit.json?.data?.slug === "hotel-los-andes", `slug conservado = ${edit.json?.data?.slug}`);
   h.assert(edit.json?.data?.telefono === "3112223333", "teléfono actualizado");
+
+  // El ADMIN puede renombrar (override) y el slug se regenera.
+  const adminRename = await h.api("/api/businesses/" + h.test.negocioA.id, {
+    method: "PUT",
+    token: h.test.adminToken,
+    body: { nombre: "Hotel Los Andes Plaza" },
+  });
+  h.assertStatus(adminRename.status, 200, "ADMIN renombra");
+  h.assert(adminRename.json?.data?.slug === "hotel-los-andes-plaza", `slug admin = ${adminRename.json?.data?.slug}`);
+  h.test.negocioA = adminRename.json.data;
 
   const precios = await h.api("/api/businesses/" + h.test.negocioA.id, {
     method: "PUT", token: h.test.negA.token,

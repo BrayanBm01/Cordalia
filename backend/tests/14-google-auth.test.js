@@ -11,7 +11,8 @@
  *   - usuario nuevo de Google (crea con el rol publico permitido)
  *   - usuario existente con google_id (reutiliza, no duplica)
  *   - usuario existente local por email (vincula conservando rol y datos)
- *   - politica de sesion activa (403) y usuario sin rol (401)
+ *   - sesion activa con Google se sustituye; usuario sin rol (401)
+ *   - rol invalido en cuenta nueva (400)
  *   - error inesperado (500) y formato de respuesta exitosa
  *
  * No toca la base de datos ni modifica usuarios reales.
@@ -282,6 +283,16 @@ async function main() {
     restaurarDobles();
   });
 
+  await check("rol invalido en cuenta nueva -> 400 (no se crea cuenta)", async () => {
+    instalarDobles({ porGoogleId: null, porEmail: null });
+    googleResponde(payloadValido());
+    const res = mockResponse();
+    await authController.google(mockRequest({ idToken: "ok", rol: "SUPERADMIN" }), res);
+    assertEqual(res.statusCode, 400, "status");
+    assertEqual(llamadas.create.length, 0, "no crea cuenta con rol invalido");
+    restaurarDobles();
+  });
+
   await check("usuario EXISTENTE con google_id: reutiliza y NO duplica", async () => {
     const existente = {
       id: 7,
@@ -330,7 +341,7 @@ async function main() {
     restaurarDobles();
   });
 
-  await check("sesion activa VIGENTE -> 403 (politica de sesion unica)", async () => {
+  await check("sesion activa VIGENTE con Google -> se sustituye (reidentificacion explicita)", async () => {
     const jwt = require("jsonwebtoken");
     const vigente = jwt.sign({ id: 8, rol: "TOURIST" }, process.env.JWT_SECRET, {
       expiresIn: "2h",
@@ -348,10 +359,9 @@ async function main() {
     googleResponde(payloadValido());
     const res = mockResponse();
     await authController.google(mockRequest({ idToken: "ok" }), res);
-    assertEqual(res.statusCode, 403, "status");
-    assert(/sesión activa/.test(res.body.message), "mensaje");
-    assertEqual(llamadas.setToken.length, 0, "no reemplaza la sesion activa");
-    assertEqual(llamadas.clearToken.length, 0, "no limpia una sesion vigente");
+    assertEqual(res.statusCode, 200, "Google permite re-login sustituyendo la sesion");
+    assertEqual(llamadas.clearToken.length, 1, "revoca la sesion anterior");
+    assertEqual(llamadas.setToken.length, 1, "emite una sesion nueva");
     restaurarDobles();
   });
 

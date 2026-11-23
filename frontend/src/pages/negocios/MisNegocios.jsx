@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Plus, Store, Pencil, Trash2, Eye, ImageOff, MapPin, AlertTriangle } from 'lucide-react'
+import { Plus, Store, Pencil, Eye, ImageOff, MapPin, AlertTriangle } from 'lucide-react'
 import { businessesAPI } from '../../services/api'
 import { ESTADO_LABEL, ESTADO_BADGE, PUBLICACION_LABEL, estaOcultoAlPublico } from './businessUtils'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import EmptyState from '../../components/EmptyState'
-import ConfirmModal from '../../components/ConfirmModal'
 import { toast } from 'sonner'
 import { obtenerRuta, rutaCon } from '../../routes/offuscatedRoutes.js'
 
@@ -14,7 +13,6 @@ export default function MisNegocios() {
   const navigate = useNavigate()
   const [negocios, setNegocios] = useState([])
   const [loading, setLoading] = useState(true)
-  const [deleteTarget, setDeleteTarget] = useState(null)
 
   async function fetchNegocios() {
     try {
@@ -30,18 +28,6 @@ export default function MisNegocios() {
   useEffect(() => {
     fetchNegocios()
   }, [])
-
-  async function handleDelete() {
-    if (!deleteTarget) return
-    try {
-      const res = await businessesAPI.remove(deleteTarget.id)
-      toast.success(res.message || 'Negocio eliminado')
-      setDeleteTarget(null)
-      await fetchNegocios()
-    } catch (err) {
-      toast.error(err.message || 'No se pudo eliminar el negocio')
-    }
-  }
 
   if (loading) return <LoadingSpinner />
 
@@ -60,7 +46,7 @@ export default function MisNegocios() {
             <h1 className="text-3xl font-bold text-dark-900" style={{ fontFamily: 'var(--font-display)' }}>
               Mis negocios
             </h1>
-            <p className="text-dark-500 mt-1">Administra tus negocios y espera la aprobación del equipo.</p>
+            <p className="text-dark-500 mt-1">Administra la información de tus negocios.</p>
           </div>
           <button
             onClick={() => navigate(obtenerRuta('NEGOCIO_NUEVO'))}
@@ -100,7 +86,7 @@ export default function MisNegocios() {
             <EmptyState
               icon={Store}
               title="Aún no tienes negocios"
-              description="Crea tu primer negocio para aparecer en Cordalia. Un administrador lo revisará."
+              description="Crea tu primer negocio para aparecer en Cordalia. Con tu prueba gratuita vigente se publica automáticamente; si no, un administrador lo revisará."
             />
           </div>
         ) : (
@@ -160,13 +146,9 @@ export default function MisNegocios() {
                     >
                       <Pencil className="w-4 h-4" />
                     </button>
-                    <button
-                      onClick={() => setDeleteTarget(n)}
-                      className="p-2 rounded-lg text-dark-500 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-                      title="Eliminar"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {/* La eliminación de negocios es exclusiva del ADMIN:
+                        el vendedor no tiene acción de borrado (el backend
+                        también la rechaza con 403). */}
                   </div>
                 </div>
               </div>
@@ -174,15 +156,6 @@ export default function MisNegocios() {
           </div>
         )}
       </div>
-
-      <ConfirmModal
-        isOpen={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
-        title="Eliminar negocio"
-        message={`¿Eliminar "${deleteTarget?.nombre}"? Se borrarán también sus imágenes, servicios, horarios y redes.`}
-        confirmText="Eliminar"
-      />
     </motion.div>
   )
 }

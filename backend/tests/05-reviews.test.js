@@ -23,6 +23,12 @@ h.test("REV: setup y lectura pública de reseñas", async () => {
     h.assertStatus((await h.createUser(admin.token, { nombre: n, email: e, password: pass, rol_id: r })).status, 201, `crear ${e}`);
   }
 
+  // Suite de aprobacion manual: vendedores sin prueba vigente.
+  for (const e of [emailNeg, emailNeg2]) {
+    const { rows } = await h.q("SELECT id FROM usuarios WHERE email = $1", [e]);
+    await h.sinPruebaVigente(rows[0].id);
+  }
+
   const neg = await h.login(emailNeg, pass);
   const neg2 = await h.login(emailNeg2, pass);
   const t1 = await h.login(emailT1, pass);

@@ -1,5 +1,7 @@
 const BusinessModel = require("../models/businessModel");
 const LugarModel = require("../models/lugarModel");
+const SuscripcionModel = require("../models/suscripcionModel");
+const { normalizarNombreNegocio } = require("../utils/nombreNegocio");
 const { slugify } = require("../utils/slug");
 const { responderErrorServidor } = require("../utils/serverError");
 const {
@@ -22,6 +24,47 @@ const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "
 const IMAGEN_MAX_BYTES = 1500 * 1024; // 1.5 MB por imagen
 const IMAGENES_PERMITIDAS = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const PRECIO_MAX = 99999999.99; // DECIMAL(10,2) en PostgreSQL
+
+// Campos que NUNCA pueden llegar desde el cliente. Antes se ignoraban en
+// silencio; ahora se rechazan para que un intento de escalada no pase
+// desapercibido (auditoria en business_identity_audit).
+const CAMPOS_PROTEGIDOS = new Set([
+  "id", "owner_id", "slug", "estado", "publicacion_estado",
+  "is_verified", "is_featured", "nombre_normalizado",
+  "permite_nombre_duplicado", "duplicado_autorizado_por",
+  "created_at", "updated_at",
+  "rol_id", "estado_cuenta", "trial_inicio", "trial_fin",
+  "google_id", "proveedor", "password",
+]);
+
+function actorAuditoria(req) {
+  return {
+    actorId: req?.usuario?.id ?? null,
+    actorRol: req?.usuario?.rol ?? "ANONIMO",
+  };
+}
+
+async function auditarIdentidad(req, negocio, accion, detalle = {}) {
+  const { actorId, actorRol } = actorAuditoria(req);
+  try {
+    await BusinessModel.registrarIdentidad({
+      businessId: negocio?.id ?? null,
+      ownerId: negocio?.owner_id ?? req?.usuario?.id ?? null,
+      actorId,
+      actorRol,
+      accion,
+      nombreAnterior: detalle.nombreAnterior ?? null,
+      nombreNuevo: detalle.nombreNuevo ?? null,
+      normalizado: detalle.normalizado ?? null,
+      motivo: detalle.motivo ?? null,
+      permitido: Boolean(detalle.permitido),
+    });
+  } catch (error) {
+    // La auditoria no debe impedir una operacion ya validada, pero deja
+    // constancia del fallo para que operaciones pueda corregirlo.
+    console.error("[businesses] no se pudo registrar auditoria de identidad:", error.message);
+  }
+}
 
 // Monedas disponibles en los catálogos de la plataforma.
 const MONEDAS_PERMITIDAS = ["COP", "USD", "EUR", "MXN", "PEN"];
@@ -64,6 +107,15 @@ async function uniqueSlugFor(nombre, excludeId = null) {
 
 function validarBusiness(body, esCreacion = false) {
   const input = body && typeof body === "object" ? body : {};
+  const protegidos = Object.keys(input).filter((k) => CAMPOS_PROTEGIDOS.has(k));
+  if (protegidos.length > 0) {
+    return {
+      error: {
+        status: 400,
+        message: `Campos no permitidos: ${protegidos.sort().join(", ")}`,
+      },
+    };
+  }
   const {
     nombre, category_id, destination_id, descripcion, direccion, telefono, whatsapp,
     email_contacto, website, precio_min, precio_max, moneda, lat, lng, portada_url,
@@ -308,6 +360,26 @@ exports.create = async (req, res) => {
     const { error, data } = validarBusiness(req.body, true);
     if (error) return res.status(error.status).json({ success: false, message: error.message });
 
+    // Unicidad canonica: "Hotel Los Andes", "hotel-los-andes" y
+    // "HOTEL  LOS ANDES" colisionan. Se registra el intento para que el
+    // administrador tenga historial aunque el UNIQUE INDEX de BD gane la carrera.
+    const normalizado = normalizarNombreNegocio(data.nombre);
+    const duplicado = normalizado
+      ? await BusinessModel.findByNombreNormalizado(normalizado)
+      : null;
+    if (duplicado) {
+      await auditarIdentidad(req, { id: null, owner_id: req.usuario.id }, "duplicado_detectado", {
+        nombreNuevo: data.nombre,
+        normalizado,
+        motivo: `Ya existe el negocio #${duplicado.id} (${duplicado.nombre})`,
+      });
+      return res.status(409).json({
+        success: false,
+        code: "NOMBRE_DUPLICADO",
+        message: "Ya existe un negocio con ese nombre (se ignoran mayúsculas, acentos, espacios y signos).",
+      });
+    }
+
     if (data.category_id) {
       const categoria = await BusinessModel.findCategoryById(data.category_id);
       if (!categoria) {
@@ -327,11 +399,18 @@ exports.create = async (req, res) => {
     }
 
     const slug = await uniqueSlugFor(data.nombre);
+
+    // Publicacion automatica SOLO para una prueba gratuita REAL y vigente.
+    // Un vendedor con suscripcion pagada, sin politica, suspendido o con
+    // la prueba vencida sigue requiriendo aprobacion manual del ADMIN.
+    const autoAprobar = req.usuario.rol === "BUSINESS" &&
+      (await SuscripcionModel.tienePruebaGratuitaVigente(req.usuario.id));
+
     const negocio = await BusinessModel.create({
       ...data,
       owner_id: req.usuario.id,
       slug,
-      estado: "pending",
+      estado: autoAprobar ? "approved" : "pending",
       moneda: data.moneda || "COP",
       descripcion: data.descripcion || "",
       direccion: data.direccion || "",
@@ -347,12 +426,33 @@ exports.create = async (req, res) => {
       precio_max: data.precio_max ?? null,
     });
 
+    await auditarIdentidad(req, negocio, "crear", {
+      nombreNuevo: negocio.nombre,
+      normalizado,
+      motivo: autoAprobar ? "Prueba gratuita vigente: publicado automáticamente" : "Pendiente de aprobación",
+      permitido: autoAprobar,
+    });
+
     return res.status(201).json({
       success: true,
-      message: "Negocio creado correctamente. Quedó pendiente de aprobación",
+      message: autoAprobar
+        ? "Negocio creado y publicado automáticamente durante tu prueba gratuita"
+        : "Negocio creado correctamente. Quedó pendiente de aprobación",
       data: negocio,
     });
   } catch (error) {
+    if (error && error.code === "23505" && /nombre_normalizado/.test(error.message || "")) {
+      await auditarIdentidad(req, { id: null, owner_id: req.usuario.id }, "duplicado_detectado", {
+        nombreNuevo: req.body?.nombre ?? null,
+        normalizado: normalizarNombreNegocio(req.body?.nombre),
+        motivo: "El UNIQUE INDEX rechazó un nombre duplicado (carrera concurrente)",
+      });
+      return res.status(409).json({
+        success: false,
+        code: "NOMBRE_DUPLICADO",
+        message: "Ya existe un negocio con ese nombre (se ignoran mayúsculas, acentos, espacios y signos).",
+      });
+    }
     return serverError(res, error, "create negocio");
   }
 };
@@ -386,8 +486,52 @@ exports.update = async (req, res) => {
       });
     }
 
-    if (data.nombre && data.nombre !== req.business.nombre) {
-      data.slug = await uniqueSlugFor(data.nombre, req.business.id);
+    if (data.nombre !== undefined) {
+      const normalizado = normalizarNombreNegocio(data.nombre);
+      const normalizadoActual = normalizarNombreNegocio(req.business.nombre);
+      const cambiaNombre = normalizado !== normalizadoActual;
+
+      if (!cambiaNombre) {
+        // El formulario envia el nombre intacto en modo edicion: no es un
+        // renombrado, se conserva el valor y el slug originales.
+        data.nombre = req.business.nombre;
+      } else if (req.usuario.rol !== "ADMIN") {
+        await auditarIdentidad(req, req.business, "intento_renombrar_rechazado", {
+          nombreAnterior: req.business.nombre,
+          nombreNuevo: data.nombre,
+          normalizado,
+          motivo: "El nombre del negocio es identidad protegida; solo un ADMIN puede cambiarlo",
+        });
+        return res.status(403).json({
+          success: false,
+          code: "RENOMBRAR_NO_PERMITIDO",
+          message: "El nombre del negocio no se puede cambiar. Solicita el cambio al administrador de Cordalia.",
+        });
+      } else {
+        const duplicado = normalizado
+          ? await BusinessModel.findByNombreNormalizado(normalizado, req.business.id)
+          : null;
+        if (duplicado) {
+          data.permite_nombre_duplicado = true;
+          data.duplicado_autorizado_por = req.usuario.id;
+          await auditarIdentidad(req, req.business, "duplicado_autorizado", {
+            nombreAnterior: req.business.nombre,
+            nombreNuevo: data.nombre,
+            normalizado,
+            motivo: `Excepcion ADMIN frente al negocio #${duplicado.id}`,
+            permitido: true,
+          });
+        } else {
+          await auditarIdentidad(req, req.business, "renombrar", {
+            nombreAnterior: req.business.nombre,
+            nombreNuevo: data.nombre,
+            normalizado,
+            motivo: "Renombrado autorizado por ADMIN",
+            permitido: true,
+          });
+        }
+        data.slug = await uniqueSlugFor(data.nombre, req.business.id);
+      }
     }
 
     if (data.category_id || req.business.category_id) {
@@ -412,6 +556,19 @@ exports.update = async (req, res) => {
     const updated = await BusinessModel.update(req.params.id, data);
     return res.json({ success: true, message: "Negocio actualizado correctamente", data: updated });
   } catch (error) {
+    if (error && error.code === "23505" && /nombre_normalizado/.test(error.message || "")) {
+      await auditarIdentidad(req, req.business, "duplicado_detectado", {
+        nombreAnterior: req.business?.nombre ?? null,
+        nombreNuevo: req.body?.nombre ?? null,
+        normalizado: normalizarNombreNegocio(req.body?.nombre),
+        motivo: "El UNIQUE INDEX rechazó un renombre duplicado (carrera concurrente)",
+      });
+      return res.status(409).json({
+        success: false,
+        code: "NOMBRE_DUPLICADO",
+        message: "Ya existe un negocio con ese nombre (se ignoran mayúsculas, acentos, espacios y signos).",
+      });
+    }
     return serverError(res, error, "update negocio");
   }
 };
@@ -434,6 +591,26 @@ exports.setEstado = async (req, res) => {
 
 exports.remove = async (req, res) => {
   try {
+    // Un negocio es identidad publica e historial de reseñas/planes:
+    // ningun vendedor puede borrarlo, ni siquiera con la prueba vigente.
+    // El ADMIN conserva la capacidad de hacerlo (override).
+    if (req.usuario.rol !== "ADMIN") {
+      await auditarIdentidad(req, req.business, "intento_eliminar_rechazado", {
+        nombreAnterior: req.business?.nombre ?? null,
+        motivo: "Solo un ADMIN puede eliminar negocios",
+      });
+      return res.status(403).json({
+        success: false,
+        code: "ELIMINAR_NO_PERMITIDO",
+        message: "Los vendedores no pueden eliminar negocios. Contacta al administrador de Cordalia.",
+      });
+    }
+
+    await auditarIdentidad(req, req.business, "eliminar", {
+      nombreAnterior: req.business?.nombre ?? null,
+      motivo: "Eliminación autorizada por ADMIN",
+      permitido: true,
+    });
     const deleted = await BusinessModel.delete(req.params.id);
     if (!deleted) {
       return res.status(404).json({ success: false, message: "Negocio no encontrado" });

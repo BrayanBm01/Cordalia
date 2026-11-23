@@ -40,12 +40,8 @@ function describirError(err) {
   const status = err?.status
   const msg = (err?.message || '').trim()
 
-  if (status === 403 && /sesi[oó]n activa/i.test(msg)) {
-    return {
-      titulo: 'Ya hay una sesión activa',
-      detalle: 'Cierra la sesión actual antes de iniciar una nueva.',
-    }
-  }
+  // Google reidentifica al usuario y sustituye la sesión anterior: ya no
+  // existe el 403 "sesión activa" en este flujo (solo en login por password).
   if (status === 429) {
     return { titulo: 'Demasiados intentos', detalle: msg || 'Espera unos minutos e inténtalo de nuevo.' }
   }

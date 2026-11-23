@@ -93,9 +93,29 @@ function getUserAgent(req) {
  * Solo permite TOURIST (1) o BUSINESS (2).
  * Cualquier intento de ADMIN (0) es ignorado/forzado a default.
  */
+function resolverRolPublico(rol) {
+  // Valores ausentes = flujo clasico (Google desde Login): siempre turista.
+  if (rol === undefined || rol === null || rol === "") {
+    return { rolId: ROLES.TOURIST };
+  }
+  if (rol === "BUSINESS" || rol === "VENDEDOR" || Number(rol) === ROLES.BUSINESS) {
+    return { rolId: ROLES.BUSINESS };
+  }
+  if (rol === "TOURIST" || rol === "TURISTA" || Number(rol) === ROLES.TOURIST) {
+    return { rolId: ROLES.TOURIST };
+  }
+  // Intento de escalada: nunca se concede ADMIN y queda registrado.
+  if (rol === "ADMIN" || Number(rol) === ROLES.ADMIN) {
+    console.warn("[auth] rol ADMIN solicitado en registro público; forzado a TOURIST");
+    return { rolId: ROLES.TOURIST };
+  }
+  return { error: { status: 400, message: "Tipo de cuenta no válido" } };
+}
+
+// Se mantiene por compatibilidad con los tests unitarios existentes.
 function resolvePublicRol(rol) {
-  if (rol === "BUSINESS" || Number(rol) === ROLES.BUSINESS) return ROLES.BUSINESS;
-  return ROLES.TOURIST;
+  const resultado = resolverRolPublico(rol);
+  return resultado.rolId ?? ROLES.TOURIST;
 }
 
 function buildSessionResponse(usuario, token, rolNombre) {
@@ -177,9 +197,17 @@ exports.register = async (req, res) => {
       return res.status(409).json({ success: false, message: "El email ya está registrado" });
     }
 
-    // El backend es la autoridad sobre el rol: nunca confiar en el cliente.
-    // Solo TOURIST o BUSINESS son valido para registro publico.
-    const rolFinal = resolvePublicRol(rol);
+    // El backend solo admite TOURIST/BUSINESS. ADMIN y cualquier valor
+    // desconocido se rechazan o se fuerzan a turista; nunca se concede
+    // un rol privilegiado desde el registro público.
+    const resolucionRol = resolverRolPublico(rol);
+    if (resolucionRol.error) {
+      return res.status(resolucionRol.error.status).json({
+        success: false,
+        message: resolucionRol.error.message,
+      });
+    }
+    const rolFinal = resolucionRol.rolId;
 
     const hashed = await hashPassword(password);
 
@@ -337,12 +365,114 @@ exports.login = async (req, res) => {
   }
 };
 
+// Emite la sesión de Google manteniendo la política de una sola sesión
+// activa. La reidentificación explícita con Google sustituye la sesión
+// anterior (a diferencia del login por contraseña, que responde 403).
+async function responderSesionGoogle(req, res, usuario) {
+  if (usuario.token_activo) {
+    try {
+      verificarToken(usuario.token_activo);
+      await UsuarioModel.clearToken(usuario.id);
+      usuario.token_activo = null;
+    } catch {
+      await UsuarioModel.clearToken(usuario.id);
+      usuario.token_activo = null;
+    }
+  }
+
+  if (usuario.rol_id === null || usuario.rol_id === undefined) {
+    return res.status(401).json({ success: false, message: "Usuario sin rol asignado" });
+  }
+
+  const { token, rolNombre } = await iniciarSesion(usuario, req);
+  return res.status(200).json({
+    success: true,
+    message: "Login con Google exitoso",
+    data: buildSessionResponse(usuario, token, rolNombre),
+  });
+}
+
+// Vincula una cuenta existente a Google SIN tocar rol_id ni password.
+async function vincularCuentaGoogle(porEmail, googleId, avatarUrl) {
+  await UsuarioModel.update(porEmail.id, {
+    google_id: googleId,
+    proveedor: "google",
+    avatar_url: avatarUrl || porEmail.avatar_url || null,
+  });
+  return {
+    ...porEmail,
+    google_id: googleId,
+    proveedor: "google",
+    avatar_url: avatarUrl || porEmail.avatar_url || null,
+  };
+}
+
+// Resolución de cuenta con recuperación de carreras concurrentes: si dos
+// peticiones intentan crear/vincular la misma identidad, el UNIQUE INDEX
+// gana y aquí se reutiliza la cuenta existente en lugar de duplicarla.
+async function resolverCuentaGoogle({ googleId, email, nombre, avatarUrl, rolFinal }) {
+  let usuario = await UsuarioModel.findByGoogleId(googleId);
+  if (usuario) return usuario;
+
+  const porEmail = await UsuarioModel.findByEmail(email);
+  if (porEmail) {
+    try {
+      return await vincularCuentaGoogle(porEmail, googleId, avatarUrl);
+    } catch (error) {
+      // Otra petición vinculó este google_id mientras tanto: se reutiliza.
+      if (error && error.code === "23505") {
+        const existente = await UsuarioModel.findByGoogleId(googleId);
+        if (existente) return existente;
+      }
+      throw error;
+    }
+  }
+
+  let nombreGoogle = sanitizeString(nombre || "");
+  if (!nombreGoogle) nombreGoogle = sanitizeString(email.split("@")[0]);
+  nombreGoogle = nombreGoogle.slice(0, 100);
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    usuario = await UsuarioModel.create(nombreGoogle, email, null, rolFinal, {
+      proveedor: "google",
+      google_id: googleId,
+      avatar_url: avatarUrl || null,
+    }, client);
+    if (rolFinal === ROLES.BUSINESS) {
+      await SuscripcionModel.asignarPruebaGratuita(usuario.id, client);
+    }
+    await client.query("COMMIT");
+    return usuario;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    if (error && error.code === "23505") {
+      const existentePorGoogle = await UsuarioModel.findByGoogleId(googleId);
+      if (existentePorGoogle) return existentePorGoogle;
+      const existentePorEmail = await UsuarioModel.findByEmail(email);
+      if (existentePorEmail) {
+        return vincularCuentaGoogle(existentePorEmail, googleId, avatarUrl);
+      }
+      return null; // conflicto no recuperable -> 409 arriba
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 /**
  * POST /auth/google
  * Recibe { idToken, rol }.
  * El idToken se verifica contra Google (firma/audiencia/exp).
  * El rol solo se usa en cuentas NUEVAS y se restringe a TOURIST/BUSINESS.
  * Para cuentas existentes, el rol SIEMPRE se conserva desde la BD.
+ *
+ * No se usa el parámetro OAuth `state` para el rol: Google Identity
+ * Services no lo expone de forma fiable en el callback de credencial.
+ * La defensa es la validación estricta del valor y las constricciones
+ * de BD (uq_usuarios_email_lower / uq_usuarios_google_id).
  */
 exports.google = async (req, res) => {
   try {
@@ -350,6 +480,14 @@ exports.google = async (req, res) => {
     if (!idToken || typeof idToken !== "string") {
       return res.status(400).json({ success: false, message: "Token de Google requerido" });
     }
+    const resolucionRol = resolverRolPublico(rol);
+    if (resolucionRol.error) {
+      return res.status(resolucionRol.error.status).json({
+        success: false,
+        message: resolucionRol.error.message,
+      });
+    }
+    const rolFinal = resolucionRol.rolId;
 
     let verified;
     try {
@@ -374,91 +512,20 @@ exports.google = async (req, res) => {
 
     const { googleId, email, nombre, avatarUrl } = verified;
 
-    let usuario = await UsuarioModel.findByGoogleId(googleId);
-
-    if (usuario) {
-      // Usuario ya vinculado a este google_id: conserva su rol y datos.
-      // (flujo de cuenta existente)
-    } else {
-      // No vinculado por google_id: buscar por email para vincular (evitar duplicados).
-      const porEmail = await UsuarioModel.findByEmail(email);
-
-      if (porEmail) {
-        // Vincular la cuenta existente (tradicional o google) a este google_id.
-        // Se conserva el ROL y todos los datos del usuario existente.
-        await UsuarioModel.update(porEmail.id, {
-          google_id: googleId,
-          proveedor: "google",
-          avatar_url: avatarUrl || porEmail.avatar_url || null,
-        });
-        usuario = {
-          ...porEmail,
-          google_id: googleId,
-          proveedor: "google",
-          avatar_url: avatarUrl || porEmail.avatar_url || null,
-        };
-      } else {
-        // Crear usuario nuevo. Rol restringido a TOURIST (default) o BUSINESS.
-        // La cuenta y su prueba gratuita se crean en UNA sola transaccion
-        // (igual que en /auth/register): si algo falla, no queda ninguna
-        // cuenta a medias.
-        const rolFinal = resolvePublicRol(rol);
-        // El nombre visible de Google puede traer caracteres especiales;
-        // se normaliza y se limita a la columna. Nunca se confia en el
-        // cliente para el rol (resolvePublicRol) ni para identidad.
-        let nombreGoogle = sanitizeString(nombre || "");
-        if (!nombreGoogle) nombreGoogle = sanitizeString(email.split("@")[0]);
-        nombreGoogle = nombreGoogle.slice(0, 100);
-        const client = await pool.connect();
-        try {
-          await client.query("BEGIN");
-          usuario = await UsuarioModel.create(nombreGoogle, email, null, rolFinal, {
-            proveedor: "google",
-            google_id: googleId,
-            avatar_url: avatarUrl || null,
-          }, client);
-          // Vendedor nuevo (tambien con Google) -> prueba gratuita de 7 dias.
-          // NO se crea ninguna suscripcion de pago ni se inicia ningun cobro.
-          if (rolFinal === ROLES.BUSINESS) {
-            await SuscripcionModel.asignarPruebaGratuita(usuario.id, client);
-          }
-          await client.query("COMMIT");
-        } catch (error) {
-          await client.query("ROLLBACK");
-          throw error;
-        } finally {
-          client.release();
-        }
-      }
-    }
-
-    // Con Google el usuario se reidentifica explicitamente. Si existe una
-    // sesion vigente en otro dispositivo/navegador, se sustituye por la nueva
-    // (sigue habiendo UNA sola sesion activa). Esto corrige el re-login con
-    // Google sin romper la politica de sesion unica.
-    if (usuario.token_activo) {
-      try {
-        verificarToken(usuario.token_activo);
-        // Hay sesion vigente: se revoca para permitir el re-login con Google.
-        await UsuarioModel.clearToken(usuario.id);
-        usuario.token_activo = null;
-      } catch {
-        await UsuarioModel.clearToken(usuario.id);
-        usuario.token_activo = null;
-      }
-    }
-
-    if (usuario.rol_id === null || usuario.rol_id === undefined) {
-      return res.status(401).json({ success: false, message: "Usuario sin rol asignado" });
-    }
-
-    const { token, rolNombre } = await iniciarSesion(usuario, req);
-
-    return res.status(200).json({
-      success: true,
-      message: "Login con Google exitoso",
-      data: buildSessionResponse(usuario, token, rolNombre),
+    // Cuenta existente por google_id -> se conserva tal cual.
+    // Cuenta existente por email -> se vincula SIN cambiar rol ni password.
+    // Cuenta nueva -> rol validado (TOURIST/BUSINESS) + prueba si BUSINESS.
+    const usuario = await resolverCuentaGoogle({
+      googleId, email, nombre, avatarUrl, rolFinal,
     });
+    if (!usuario) {
+      return res.status(409).json({
+        success: false,
+        message: "No se pudo vincular la cuenta de Google. Intenta iniciar sesión de nuevo.",
+      });
+    }
+
+    return responderSesionGoogle(req, res, usuario);
   } catch (error) {
     if (error instanceof GoogleAuthError) {
       console.error(

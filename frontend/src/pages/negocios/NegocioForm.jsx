@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ArrowLeft, Save, Loader2, Info } from 'lucide-react'
+import { ArrowLeft, Save, Loader2, Info, Lock } from 'lucide-react'
 import { businessesAPI, lugaresAPI } from '../../services/api'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import ImageUploader from '../../components/ImageUploader'
@@ -223,8 +223,8 @@ export default function NegocioForm() {
         </h1>
         <p className="text-dark-500 mb-8">
           {isEdit
-            ? 'Actualiza la información de tu negocio.'
-            : 'Completa la información. Tu negocio quedará pendiente de aprobación.'}
+            ? 'Actualiza la información de tu negocio. El nombre es fijo y no se puede cambiar.'
+            : 'Completa la información. Si tu prueba gratuita está vigente, tu negocio se publica automáticamente; si no, quedará pendiente de aprobación.'}
         </p>
 
         <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-2xl border border-dark-100 p-6 md:p-8 space-y-6">
@@ -232,8 +232,25 @@ export default function NegocioForm() {
             <label className="block text-sm font-medium text-dark-700 mb-1.5">
               Nombre del negocio <span className="text-red-500">*</span>
             </label>
-            <input {...register('nombre')} placeholder="Ej: Hotel Los Andes" className={inputClass} />
-            {errors.nombre && <p className="text-red-500 text-xs mt-1">{errors.nombre.message}</p>}
+            {/* El nombre es la identidad del negocio: al editar queda
+                bloqueado (el backend también rechaza renombrar con 403).
+                Se envía intacto para que el resto de campos se guarden. */}
+            <input
+              {...register('nombre')}
+              placeholder="Ej: Hotel Los Andes"
+              className={inputClass}
+              readOnly={isEdit}
+              aria-readonly={isEdit}
+              style={isEdit ? { backgroundColor: 'var(--color-cream-100)', color: 'var(--color-dark-500)' } : undefined}
+            />
+            {isEdit ? (
+              <p className="flex items-start gap-1.5 text-xs text-dark-400 mt-1.5">
+                <Lock className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                El nombre no se puede cambiar. Si necesitas modificarlo, contacta al administrador de Cordalia.
+              </p>
+            ) : (
+              errors.nombre && <p className="text-red-500 text-xs mt-1">{errors.nombre.message}</p>
+            )}
           </div>
 
           <div>

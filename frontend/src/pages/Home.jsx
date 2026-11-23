@@ -204,13 +204,19 @@ export default function Home() {
       {/* 1. HERO PRINCIPAL — Inspirado en TerraGo                      */}
       {/* ============================================================ */}
       <section className="relative min-h-[580px] md:min-h-[660px] lg:min-h-[84vh] flex items-center justify-center overflow-hidden bg-moss-950">
-        {/* Background Image: Panorámica de naturaleza exuberante */}
-        <div
-          className="absolute inset-0 bg-cover bg-center transition-transform duration-1000 scale-100"
-          style={{
-            backgroundImage: 'url("/img/hero/hero-nature.jpg")',
-          }}
-        >
+        {/* Background Image: río y selva del Sinú (WebP responsivo, self-hosted) */}
+        <div className="absolute inset-0">
+          <img
+            src="/img/hero/hero-inicio-1600.webp"
+            srcSet="/img/hero/hero-inicio-960.webp 960w, /img/hero/hero-inicio-1600.webp 1600w, /img/hero/hero-inicio-2200.webp 2200w"
+            sizes="100vw"
+            alt=""
+            aria-hidden="true"
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
           {/* Overlay gradiente editorial: asegura perfecta legibilidad preservando la belleza fotográfica */}
           <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/55 to-black/35" />
           <div className="absolute inset-0 bg-gradient-to-t from-cream-50 via-transparent to-black/40" />

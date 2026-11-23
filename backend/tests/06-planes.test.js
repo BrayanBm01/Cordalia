@@ -32,6 +32,12 @@ h.test("PLN: setup (admin, negocios y turista)", async () => {
     h.assertStatus((await h.createUser(admin.token, { nombre: n, email: e, password: pass, rol_id: r })).status, 201, `crear ${e}`);
   }
 
+  // Suite de aprobacion manual: vendedores sin prueba vigente.
+  for (const e of [emailA, emailB, emailC]) {
+    const { rows } = await h.q("SELECT id FROM usuarios WHERE email = $1", [e]);
+    await h.sinPruebaVigente(rows[0].id);
+  }
+
   const A = await h.login(emailA, pass);
   const B = await h.login(emailB, pass);
   const C = await h.login(emailC, pass);

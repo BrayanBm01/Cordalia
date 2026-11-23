@@ -23,6 +23,12 @@ h.test("GPL: setup (admin, negocios aprobados y turista)", async () => {
     h.assertStatus((await h.createUser(admin.token, { nombre: n, email: e, password: pass, rol_id: r })).status, 201, `crear ${e}`);
   }
 
+  // Suite de aprobacion manual: vendedores sin prueba vigente.
+  for (const e of [emailO, emailO2]) {
+    const { rows } = await h.q("SELECT id FROM usuarios WHERE email = $1", [e]);
+    await h.sinPruebaVigente(rows[0].id);
+  }
+
   const O = await h.login(emailO, pass);
   const O2 = await h.login(emailO2, pass);
   const T = await h.login(emailT, pass);
@@ -262,9 +268,16 @@ h.test("GPL: salidas con cupo (crear, listar, expiradas ocultas, ajeno 403)", as
   const id = h.test.neg.id;
   const pid = h.test.plan.id;
 
+  // Fechas RELATIVAS a la ejecucion: una salida "futura" hardcodeada
+  // dejaba de serlo al pasar el dia y la suite fallaba sin motivo.
+  const iso = (d) => d.toISOString().slice(0, 10);
+  const fechaFutura = iso(new Date(Date.now() + 10 * 86400000));
+  const fechaLimite = iso(new Date(Date.now() + 5 * 86400000));
+  const fechaAjena = iso(new Date(Date.now() + 20 * 86400000));
+
   const creada = await h.api(`/api/businesses/${id}/planes/${pid}/salidas`, {
     method: "POST", token: h.test.O.token,
-    body: { fecha: "2026-11-15", hora: "07:30", cupo_maximo: 12, fecha_limite: "2026-11-10" },
+    body: { fecha: fechaFutura, hora: "07:30", cupo_maximo: 12, fecha_limite: fechaLimite },
   });
   h.assertStatus(creada.status, 201, "crear salida");
   h.assert(Number(creada.json.data.cupo_maximo) === 12, "cupo maximo 12");
@@ -287,7 +300,7 @@ h.test("GPL: salidas con cupo (crear, listar, expiradas ocultas, ajeno 403)", as
   h.assert(ownerList.json.data.some((s) => s.fecha === "2020-01-01"), "owner ve salidas pasadas");
 
   const ajeno = await h.api(`/api/businesses/${h.test.neg.id}/planes/${pid}/salidas`, {
-    method: "POST", token: h.test.O2.token, body: { fecha: "2026-12-01", cupo_maximo: 5 },
+    method: "POST", token: h.test.O2.token, body: { fecha: fechaAjena, cupo_maximo: 5 },
   });
   h.assertStatus(ajeno.status, 403, "otro dueño no programa salida → 403");
 

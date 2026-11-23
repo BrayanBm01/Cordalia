@@ -249,6 +249,12 @@
     height: 100%;
     object-fit: cover;
   }
+  /* Variante con fotografía más alta (4/3) para la exploración de
+     negocios: la imagen gana protagonismo sin romper el contrato
+     .card-media (recorte cover y proporción uniforme por tarjeta). */
+  .card-media-lg {
+    aspect-ratio: 4 / 3;
+  }
   .card-title {
     font-size: clamp(1.125rem, 1rem + 0.45vw, 1.6rem);
     line-height: 1.25;

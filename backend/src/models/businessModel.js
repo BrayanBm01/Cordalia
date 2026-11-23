@@ -5,6 +5,7 @@ const COLUMNS = `b.id, b.owner_id, b.category_id, b.destination_id, b.nombre, b.
        b.descripcion, b.direccion, b.telefono, b.whatsapp, b.email_contacto,
        b.website, b.precio_min, b.precio_max, b.moneda, b.lat, b.lng,
        b.portada_url, b.estado, b.publicacion_estado, b.is_verified, b.is_featured,
+       b.nombre_normalizado, b.permite_nombre_duplicado,
        b.created_at, b.updated_at`;
 
 const BusinessModel = {
@@ -102,6 +103,44 @@ const BusinessModel = {
     return rows.length > 0;
   },
 
+  // Busca colisiones por nombre canonico (migracion 024). Se usa antes de
+  // crear/renombrar para devolver un 409 claro y dejar constancia en la
+  // auditoria. El UNIQUE INDEX de BD es la barrera final.
+  async findByNombreNormalizado(normalizado, excludeId = null) {
+    const { rows } = await pool.query(
+      `SELECT id, nombre, owner_id, permite_nombre_duplicado
+         FROM businesses
+        WHERE nombre_normalizado = $1
+          AND ($2::int IS NULL OR id <> $2)
+          AND COALESCE(permite_nombre_duplicado, false) = false
+        LIMIT 1`,
+      [normalizado, excludeId]
+    );
+    return rows[0] || null;
+  },
+
+  async registrarIdentidad({
+    businessId = null,
+    ownerId = null,
+    actorId = null,
+    actorRol = null,
+    accion,
+    nombreAnterior = null,
+    nombreNuevo = null,
+    normalizado = null,
+    motivo = null,
+    permitido = false,
+  }) {
+    await pool.query(
+      `INSERT INTO business_identity_audit
+        (business_id, owner_id, actor_id, actor_rol, accion,
+         nombre_anterior, nombre_nuevo, nombre_normalizado, motivo, permitido)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      [businessId, ownerId, actorId, actorRol, accion, nombreAnterior,
+       nombreNuevo, normalizado, motivo, permitido]
+    );
+  },
+
   async create(data) {
     const {
       owner_id, category_id, destination_id, nombre, slug, descripcion, direccion, telefono,
@@ -132,6 +171,8 @@ const BusinessModel = {
       "category_id", "destination_id", "nombre", "slug", "descripcion", "direccion", "telefono",
       "whatsapp", "email_contacto", "website", "precio_min", "precio_max",
       "moneda", "lat", "lng", "portada_url", "estado",
+      // Solo los fija el controlador cuando un ADMIN autoriza una excepcion.
+      "permite_nombre_duplicado", "duplicado_autorizado_por",
     ];
     const safeKeys = keys.filter((k) => allowed.includes(k));
     if (safeKeys.length === 0) return null;
@@ -150,7 +191,9 @@ const BusinessModel = {
       `UPDATE businesses SET ${setClauses.join(", ")} WHERE id=$${values.length}
        RETURNING id, owner_id, category_id, destination_id, nombre, slug, descripcion, direccion,
                  telefono, whatsapp, email_contacto, website, precio_min, precio_max,
-                 moneda, lat, lng, portada_url, estado, created_at, updated_at`,
+                 moneda, lat, lng, portada_url, estado, publicacion_estado,
+                 nombre_normalizado, permite_nombre_duplicado, duplicado_autorizado_por,
+                 created_at, updated_at`,
       values
     );
     return rows[0] || null;

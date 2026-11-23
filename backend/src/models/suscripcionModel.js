@@ -78,6 +78,35 @@ const SuscripcionModel = {
   },
 
   /**
+   * ¿El vendedor tiene AHORA una prueba gratuita de 168 horas vigente?
+   *
+   * Esta comprobacion es mas estricta que `estadoComercial`: una
+   * suscripcion pagada activa NO cuenta, un vendedor legado sin politica
+   * NO cuenta y una cuenta suspendida NUNCA cuenta. Ademas se verifica
+   * que la ventana sea exactamente la prevista (168 horas desde su
+   * inicio), para no autoaprobar datos manipulados.
+   *
+   * Se usa para la PUBLICACION AUTOMATICA al crear un negocio. El reloj
+   * es el de PostgreSQL (NOW()), igual que en la regla de visibilidad.
+   */
+  async tienePruebaGratuitaVigente(usuarioId) {
+    const { rows } = await pool.query(
+      `SELECT 1
+         FROM usuarios
+        WHERE id = $1
+          AND rol_id = 2
+          AND estado_cuenta = 'TRIALING'
+          AND trial_inicio IS NOT NULL
+          AND trial_fin IS NOT NULL
+          AND trial_fin > NOW()
+          AND trial_fin = trial_inicio + make_interval(hours => $2)
+        LIMIT 1`,
+      [usuarioId, HORAS_PRUEBA]
+    );
+    return rows.length > 0;
+  },
+
+  /**
    * Marca la prueba como VENCIDA en la base de datos cuando ya paso su
    * fecha de fin. Es una operacion perezosa e idempotente: el estado se
    * detecta en el servidor aunque el vendedor no vuelva a iniciar sesion

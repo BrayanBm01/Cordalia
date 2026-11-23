@@ -305,10 +305,11 @@ h.test("CONT: validaciones de negocios (moneda y precios por categoría)", async
   h.test.restaurante = restaurante.json.data;
 
   // Actualización (no creación): editar restaurante sin precios es válido.
+  // El nombre es identidad protegida: se edita otro campo, no el nombre.
   const editSinPrecio = await h.api(`/api/businesses/${restaurante.json.data.id}`, {
     method: "PUT",
     token: neg.token,
-    body: { nombre: "F1test Restaurante Valido Edit" },
+    body: { descripcion: "Editado sin precios" },
   });
   h.assertStatus(editSinPrecio.status, 200, "editar restaurante sin precios en update 200");
 

@@ -13,7 +13,7 @@ const { esErrorDeEsquema } = require("./sqlErrors");
 
 const MENSAJE_MIGRACIONES =
   "La base de datos no tiene aplicadas las migraciones requeridas. " +
-  "Aplica las migraciones 018, 019, 020 y 023 y vuelve a intentarlo.";
+  "Aplica las migraciones 018, 019, 020, 023, 024 y 025 y vuelve a intentarlo.";
 
 function registrarError(context, error) {
   const tecnico = {

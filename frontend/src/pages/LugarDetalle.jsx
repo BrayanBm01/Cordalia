@@ -153,13 +153,14 @@ function BusinessCard({ business }) {
   return (
     <Link
       to={rutaCon('NEGOCIOS_PUBLICOS', business.id)}
-      className="group bg-white rounded-[22px] border border-cream-200 overflow-hidden hover:shadow-card-hover transition-all duration-300"
+      className="group flex flex-col bg-white rounded-[22px] border border-cream-200 overflow-hidden shadow-card hover:shadow-card-hover hover:-translate-y-0.5 transition-all duration-300"
     >
-      <div className="aspect-[16/9] bg-cream-100 overflow-hidden relative">
+      <div className="card-media card-media-lg">
         {portada && !imgError ? (
           <img
             src={portada}
             alt={business.nombre}
+            loading="lazy"
             onError={() => setImgError(true)}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
           />

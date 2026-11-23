@@ -144,12 +144,18 @@ export default function Lugares() {
     <div className="min-h-screen bg-cream-50">
       {/* Editorial Hero Banner */}
       <section className="relative bg-moss-950 text-white py-20 md:py-28 overflow-hidden">
-        <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{
-            backgroundImage: 'url("/img/hero/hero-nature.jpg")',
-          }}
-        >
+        <div className="absolute inset-0">
+          <img
+            src="/img/hero/hero-destinos-1600.webp"
+            srcSet="/img/hero/hero-destinos-960.webp 960w, /img/hero/hero-destinos-1600.webp 1600w, /img/hero/hero-destinos-2200.webp 2200w"
+            sizes="100vw"
+            alt=""
+            aria-hidden="true"
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
           <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/65 to-black/45" />
           <div className="absolute inset-0 bg-gradient-to-t from-cream-50 via-transparent to-black/30" />
         </div>
