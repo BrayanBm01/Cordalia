@@ -86,12 +86,12 @@
   --font-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
   --font-body: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-script: 'Caveat', cursive, sans-serif;
-  /* Voz propia de la exploración de negocios: display editorial con carved
-     corners. Se usa SOLO en Negocios; el resto del sitio conserva Playfair. */
+  /* Voz propia de la ficha de negocio: display editorial con carved
+     corners. El resto del sitio conserva Playfair. */
   --font-bazaar: 'Fraunces', 'Playfair Display', Georgia, serif;
 
   /* Acento cálido turístico (atardecer cordobés). coral-700/800 se usan
-     para texto y botones sobre blanco: contraste AA verificado (5.7:1). */
+     para texto y botones sobre blanco: contraste AA verificado. */
   --color-coral-50: #fff5f0;
   --color-coral-100: #ffe3d6;
   --color-coral-200: #ffc7ae;

@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import {
   ArrowLeft, Pencil, MapPin, Phone, Globe, Mail, Star,
   Building2, Clock, Share2, Plus, Trash2, Loader2, Image as ImageIcon,
-  CheckCircle2, Map as MapIcon, Ticket, ArrowRight, Store,
+  CheckCircle2, Map as MapIcon, Ticket, ArrowRight, Store, UtensilsCrossed,
+  BedDouble, Compass, Palette, Bus, Trees, Sparkles, BadgeCheck, ArrowUpRight,
 } from 'lucide-react'
-import { businessesAPI, lugaresAPI, businessPlanesAPI } from '../../services/api'
-import { esImagenDeRelleno } from '../../utils/media'
+import { businessesAPI, lugaresAPI, businessPlanesAPI, reviewsAPI } from '../../services/api'
+import { esImagenDeRelleno, getDestinoImagen } from '../../utils/media'
 import { useAuth } from '../../context/AuthContext'
 import { ESTADO_LABEL, ESTADO_BADGE, DIAS_LABEL, formatRango } from './businessUtils'
 import { formatMoney } from './businessUtils'
@@ -19,6 +20,47 @@ import PlanesNegocio from './PlanesNegocio'
 import ImageUploader from '../../components/ImageUploader'
 import { toast } from 'sonner'
 import { obtenerRuta, rutaCon } from '../../routes/offuscatedRoutes.js'
+import './negocioDetalle.css'
+
+/* ── Voz visual por categoría (icono + color vivo) ─────────────────── */
+const VISUALES = {
+  gastronomia: { icono: UtensilsCrossed, solido: '#df4f26', relleno: '#b83a1a' },
+  hospedaje: { icono: BedDouble, solido: '#0d9488', relleno: '#0f766e' },
+  tours: { icono: Compass, solido: '#ee9f1f', relleno: '#8a5604' },
+  artesanias: { icono: Palette, solido: '#4e8561', relleno: '#2f553d' },
+  transporte: { icono: Bus, solido: '#3b6b4c', relleno: '#244331' },
+  naturaleza: { icono: Trees, solido: '#0d9488', relleno: '#115e59' },
+  otro: { icono: Store, solido: '#3b6b4c', relleno: '#1c3d2f' },
+}
+
+function visualDe(categoria = '') {
+  const t = categoria.toLowerCase()
+  if (/restaurante|bar\b|caf[eé]|cafeter|gastronom|comida|pizzer/i.test(t)) return VISUALES.gastronomia
+  if (/hotel|hostal|alojamiento|posada|hosped|habitacion|caba[nñ]a/i.test(t)) return VISUALES.hospedaje
+  if (/artesan|tienda|mercado|taller/i.test(t)) return VISUALES.artesanias
+  if (/transporte|taxi|bus|colectivo|veh[ií]culo/i.test(t)) return VISUALES.transporte
+  if (/parque|reserva|natural|ecolog|selva|r[ií]o|playa/i.test(t)) return VISUALES.naturaleza
+  if (/tour|agencia|viaje|experiencia|excursi|operador/i.test(t)) return VISUALES.tours
+  return VISUALES.otro
+}
+
+function Estrellas({ promedio = 0 }) {
+  const llenas = Math.round(Number(promedio) || 0)
+  return (
+    <span
+      className="inline-flex items-center gap-0.5"
+      aria-label={promedio > 0 ? `Calificación ${Number(promedio).toFixed(1)} de 5` : 'Sin reseñas todavía'}
+    >
+      {[1, 2, 3, 4, 5].map((n) => (
+        <Star
+          key={n}
+          aria-hidden="true"
+          className={`nd-star ${n <= llenas ? 'fill-saffron-400 text-saffron-500' : 'text-white/45'}`}
+        />
+      ))}
+    </span>
+  )
+}
 
 const inputClass =
   'w-full px-3 py-2 rounded-lg border border-dark-200 text-sm bg-white text-dark-900 placeholder:text-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors'
@@ -228,8 +270,12 @@ function PublicPlanesSection({ businessId }) {
   if (loading || planes.length === 0) return null
 
   return (
-    <Section title="Planes y experiencias">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <section className="nd-panel nd-reveal" style={{ '--nd-delay': '450ms' }}>
+      <div className="nd-section-head">
+        <p className="nd-eyebrow">Vive la experiencia</p>
+        <h2 className="nd-section-title">Planes y experiencias</h2>
+      </div>
+      <div className="nd-planes">
         {planes.map((plan) => {
           const portada = plan.plan_imagenes?.find((i) => i.is_primary) || plan.plan_imagenes?.[0]
           const { efectivo, anterior } = planPrecios(plan)
@@ -237,40 +283,32 @@ function PublicPlanesSection({ businessId }) {
             <Link
               key={plan.id}
               to={rutaCon('PLANES_PUBLICOS', plan.id)}
-              className="group flex gap-4 rounded-xl border border-dark-100 p-3 hover:shadow-md hover:border-primary-200 transition-all"
+              className="nd-plan group"
             >
-              <div className="w-28 h-24 shrink-0 rounded-lg overflow-hidden bg-dark-100">
+              <div className="nd-plan-photo">
                 {portada?.url && !esImagenDeRelleno(portada.url) ? (
-                  <img src={portada.url} alt={plan.nombre} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  <img src={portada.url} alt={plan.nombre} loading="lazy" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary-700 via-ocean-700 to-dark-900 text-white/70">
-                    <Ticket className="w-7 h-7" />
-                  </div>
+                  <div className="nd-plan-fallback"><Ticket className="h-7 w-7" aria-hidden="true" /></div>
                 )}
               </div>
-              <div className="flex-1 min-w-0 flex flex-col">
-                <p className="text-xs font-semibold uppercase tracking-wide text-primary-600">
-                  {TIPO_PLAN_LABEL[plan.tipo_plan] || plan.tipo_plan}
-                </p>
-                <h4 className="font-semibold text-dark-900 truncate group-hover:text-primary-700 transition-colors">
-                  {plan.nombre}
-                </h4>
-                <p className="text-xs text-dark-500">{formatDuracion(plan.duracion_dias, plan.duracion_noches)}</p>
-                <div className="mt-auto flex items-center justify-between gap-2">
-                  <span className="text-sm font-bold text-dark-900">
-                    {anterior && <span className="text-xs text-dark-400 line-through mr-1">{formatMoney(anterior)}</span>}
+              <div className="nd-plan-body">
+                <p className="nd-plan-tipo">{TIPO_PLAN_LABEL[plan.tipo_plan] || plan.tipo_plan}</p>
+                <h3 className="nd-plan-nombre">{plan.nombre}</h3>
+                <p className="nd-plan-duracion">{formatDuracion(plan.duracion_dias, plan.duracion_noches)}</p>
+                <div className="nd-plan-precio">
+                  <span>
+                    {anterior && <s>{formatMoney(anterior)}</s>}
                     {efectivo ? formatMoney(efectivo) : 'Consultar'}
                   </span>
-                  <span className="inline-flex items-center gap-1 text-xs text-primary-600 group-hover:translate-x-0.5 transition-transform">
-                    Ver <ArrowRight className="w-3 h-3" />
-                  </span>
+                  <span className="nd-plan-ver">Ver <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" /></span>
                 </div>
               </div>
             </Link>
           )
         })}
       </div>
-    </Section>
+    </section>
   )
 }
 
@@ -287,6 +325,8 @@ export default function NegocioDetalle({ manage = false }) {
   const [redes, setRedes] = useState([])
   const [destinos, setDestinos] = useState([])
   const [lugares, setLugares] = useState([])
+  const [rating, setRating] = useState(null)
+  const reduceMotion = useReducedMotion()
 
   const isAdmin = user?.rol === 'ADMIN'
 
@@ -315,6 +355,22 @@ export default function NegocioDetalle({ manage = false }) {
   useEffect(() => {
     fetchDetail()
   }, [fetchDetail])
+
+  // Calificación real del negocio (promedio de reseñas publicadas).
+  useEffect(() => {
+    if (!id || manage) return undefined
+    let vigente = true
+    reviewsAPI.getByBusiness(id)
+      .then((res) => {
+        const data = res?.data || {}
+        if (vigente) setRating({
+          promedio: Number(data.promedio) || 0,
+          cantidad: Number(data.cantidad) || 0,
+        })
+      })
+      .catch(() => { if (vigente) setRating({ promedio: 0, cantidad: 0 }) })
+    return () => { vigente = false }
+  }, [id, manage])
 
   async function removeImage(imageId) {
     try {
@@ -398,14 +454,93 @@ export default function NegocioDetalle({ manage = false }) {
       : []),
   ]
 
+  const visual = visualDe(business.categoria)
+  const Icono = visual.icono
+  const portadaReal = business.portada_url && !esImagenDeRelleno(business.portada_url)
+  const imagenHero = portadaReal
+    ? business.portada_url
+    : (destinos[0] ? getDestinoImagen(destinos[0]) : '/img/hero/hero-negocios-1600.webp')
+  const rango = formatRango(business.precio_min, business.precio_max)
+  const fade = (delay) => (reduceMotion
+    ? {}
+    : {
+        initial: { opacity: 0, y: 24 },
+        animate: { opacity: 1, y: 0 },
+        transition: { duration: 0.5, delay, ease: [0.22, 1, 0.36, 1] },
+      })
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={reduceMotion ? false : { opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className={manage ? 'bg-dark-50' : 'bg-cream-50 min-h-screen'}
+      className={manage ? 'bg-dark-50 min-h-screen' : 'nd-page min-h-screen'}
     >
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+      {!manage && (
+        <section className="nd-hero relative isolate text-white">
+          <img
+            src={imagenHero}
+            alt=""
+            aria-hidden="true"
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
+            className="nd-hero-img absolute inset-0 h-full w-full object-cover"
+          />
+          <div className="nd-hero-veil absolute inset-0" aria-hidden="true" />
+          <div className="nd-hero-grid absolute inset-0" aria-hidden="true" />
+          <div className="nd-hero-glow absolute" aria-hidden="true" />
+          <div className="public-shell relative z-10 px-4 pb-24 pt-8 sm:px-6 md:pb-32 md:pt-12 lg:px-8">
+            <Link to={obtenerRuta('NEGOCIOS_PUBLICOS')} className="nd-back">
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+              Volver a negocios
+            </Link>
+            <motion.div className="nd-hero-body" {...fade(0.06)}>
+              <div className="max-w-3xl">
+                <span className="nd-kicker" style={{ '--nd-cat': visual.relleno }}>
+                  <Icono className="h-3.5 w-3.5" aria-hidden="true" />
+                  {business.categoria || 'Negocio local'}
+                </span>
+                <h1 className="nd-title">{business.nombre}</h1>
+                {business.descripcion && <p className="nd-subtitle">{business.descripcion}</p>}
+                <div className="nd-hero-meta">
+                  <span className="nd-rating">
+                    <Estrellas promedio={rating?.promedio || 0} />
+                    <span className="nd-rating-text">
+                      {rating?.cantidad
+                        ? `${Number(rating.promedio).toFixed(1)} · ${rating.cantidad} reseña${rating.cantidad !== 1 ? 's' : ''}`
+                        : 'Sin reseñas aún'}
+                    </span>
+                  </span>
+                  {business.direccion && (
+                    <span className="nd-meta-item">
+                      <MapPin className="h-4 w-4" aria-hidden="true" />
+                      {business.direccion}
+                    </span>
+                  )}
+                  {rango && (
+                    <span className="nd-price">
+                      <Ticket className="h-4 w-4" aria-hidden="true" />
+                      {rango}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="nd-seal" aria-hidden="true">
+                <div className="nd-seal-inner">
+                  <BadgeCheck className="h-7 w-7" />
+                  <span>100% CÓRDOBA<br />VERIFICADO</span>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        </section>
+      )}
+      <div className={manage
+        ? 'max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12'
+        : 'public-shell px-4 pb-20 pt-8 sm:px-6 lg:px-8'}>
+        {manage && (
+        <>
         <button
           onClick={() => navigate(manage ? obtenerRuta('MIS_NEGOCIOS') : obtenerRuta('NEGOCIOS_PUBLICOS'))}
           className="inline-flex items-center gap-2 text-sm text-dark-600 hover:text-moss-700 mb-5 transition-colors cursor-pointer"
@@ -459,6 +594,8 @@ export default function NegocioDetalle({ manage = false }) {
             )}
           </div>
         </div>
+        </>
+        )}
 
         {manage ? (
           <div className="space-y-6">
@@ -606,13 +743,92 @@ export default function NegocioDetalle({ manage = false }) {
             )}
           </div>
         ) : (
-          <>
-            <PublicInfo business={business} horarios={horarios} redes={redes} servicios={servicios} imagenes={imagenes} destinos={destinos} />
-            <PublicPlanesSection businessId={business.id} />
-            <div className="mt-6">
-              <ResenasSection businessId={business.id} businessOwnerId={business.owner_id || user?.id} businessEstado={business.estado} />
-            </div>
-          </>
+          <div className="nd-layout">
+            <main className="nd-main min-w-0">
+              <PublicInfo
+                business={business}
+                horarios={horarios}
+                redes={redes}
+                servicios={servicios}
+                imagenes={imagenes}
+                destinos={destinos}
+              />
+              <PublicPlanesSection businessId={business.id} />
+              <section className="nd-panel nd-resenas-panel">
+                <ResenasSection
+                  businessId={business.id}
+                  businessOwnerId={business.owner_id || user?.id}
+                  businessEstado={business.estado}
+                />
+              </section>
+            </main>
+
+            <aside className="nd-aside" aria-label="Contacto del negocio">
+              <div className="nd-contact">
+                <p className="nd-eyebrow">Planea tu visita</p>
+                <h2 className="nd-section-title">Hablemos</h2>
+                <p className="nd-contact-copy">
+                  Escribe o llama directamente a <strong>{business.nombre}</strong> para resolver tus dudas.
+                </p>
+
+                <div className="nd-contact-actions">
+                  {business.telefono && (
+                    <a href={`tel:${String(business.telefono).replace(/[^\d+]/g, '')}`} className="nd-contact-btn">
+                      <Phone className="h-4 w-4" aria-hidden="true" />
+                      <span className="min-w-0 flex-1 truncate">{business.telefono}</span>
+                      <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+                    </a>
+                  )}
+                  {business.whatsapp && (
+                    <a
+                      href={`https://wa.me/${String(business.whatsapp).replace(/\D/g, '')}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="nd-contact-btn"
+                    >
+                      <Share2 className="h-4 w-4" aria-hidden="true" />
+                      <span className="min-w-0 flex-1 truncate">WhatsApp</span>
+                      <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+                    </a>
+                  )}
+                  {business.email_contacto && (
+                    <a href={`mailto:${business.email_contacto}`} className="nd-contact-btn">
+                      <Mail className="h-4 w-4" aria-hidden="true" />
+                      <span className="min-w-0 flex-1 truncate">{business.email_contacto}</span>
+                      <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+                    </a>
+                  )}
+                  {business.website && (
+                    <a href={business.website} target="_blank" rel="noreferrer" className="nd-contact-btn">
+                      <Globe className="h-4 w-4" aria-hidden="true" />
+                      <span className="min-w-0 flex-1 truncate">Sitio web</span>
+                      <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+                    </a>
+                  )}
+                </div>
+
+                {rango && (
+                  <div className="nd-contact-price">
+                    <span>Rango orientativo</span>
+                    <strong>{rango}</strong>
+                    <small>COP</small>
+                  </div>
+                )}
+
+                <div className="nd-favorite">
+                  <FavoritoButton tipo="negocio" id={business.id} withLabel />
+                </div>
+
+                {destinos[0] && (
+                  <Link to={rutaCon('LUGARES', destinos[0].id)} className="nd-destino-link">
+                    <MapPin className="h-4 w-4" aria-hidden="true" />
+                    <span className="min-w-0 flex-1 truncate">Explorar {destinos[0].nombre}</span>
+                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </Link>
+                )}
+              </div>
+            </aside>
+          </div>
         )}
       </div>
     </motion.div>
@@ -620,109 +836,183 @@ export default function NegocioDetalle({ manage = false }) {
 }
 
 function PublicInfo({ business, horarios, redes, servicios, imagenes, destinos }) {
+  const Icono = visualDe(business.categoria).icono
+  const destino = destinos?.[0]
+  const galeria = Array.isArray(imagenes) ? imagenes : []
+  const fotos = galeria.length > 0
+    ? galeria.map((img, i) => ({
+        src: img.url,
+        alt: img.alt_text || `${business.nombre} — foto ${i + 1}`,
+      }))
+    : [
+        {
+          src: destino ? getDestinoImagen(destino) : '/img/hero/hero-negocios-1600.webp',
+          alt: `Paisaje de ${business.destino || 'Córdoba'}`,
+        },
+        { src: '/img/hero/hero-negocios-1600.webp', alt: 'Turismo en Córdoba, Colombia' },
+      ]
+  const tieneContacto = business.telefono || business.whatsapp || business.email_contacto || business.website
+  const rango = formatRango(business.precio_min, business.precio_max)
+
   return (
-    <div className="space-y-6">
-      {imagenes && imagenes.length > 0 && (
-        <Section title="Galería">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            {imagenes.map((img) => (
-              <div key={img.id} className="rounded-xl overflow-hidden border border-dark-100">
-                <img src={img.url} alt={img.alt_text || business.nombre} className="w-full h-36 object-cover" />
+    <>
+      <section className="nd-panel nd-reveal" style={{ '--nd-delay': '100ms' }}>
+        <div className="nd-section-head">
+          <p className="nd-eyebrow">{galeria.length > 0 ? 'Galería' : 'El entorno'}</p>
+          <h2 className="nd-section-title">
+            {galeria.length > 0 ? 'Así se ve este lugar' : 'Conoce el entorno'}
+          </h2>
+        </div>
+        <div className="nd-gallery-grid">
+          {fotos.slice(0, 4).map((foto, i) => (
+            <div key={`${foto.src}-${i}`} className={`nd-shot ${i === 0 ? 'nd-shot-main' : ''}`}>
+              <img src={foto.src} alt={foto.alt} loading="lazy" decoding="async" />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="nd-panel nd-reveal" style={{ '--nd-delay': '170ms' }}>
+        <div className="nd-section-head">
+          <p className="nd-eyebrow">Ficha del negocio</p>
+          <h2 className="nd-section-title">Datos útiles</h2>
+        </div>
+        <div className="nd-facts">
+          {business.categoria && (
+            <div className="nd-fact">
+              <span className="nd-fact-icon" style={{ backgroundColor: visualDe(business.categoria).relleno }}>
+                <Icono className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <div className="min-w-0">
+                <span>Tipo de negocio</span>
+                <strong>{business.categoria}</strong>
               </div>
-            ))}
-          </div>
-        </Section>
+            </div>
+          )}
+          {business.direccion && (
+            <div className="nd-fact">
+              <span className="nd-fact-icon nd-fact-icon-moss"><MapPin className="h-5 w-5" aria-hidden="true" /></span>
+              <div className="min-w-0">
+                <span>Dónde encontrarlo</span>
+                <strong>{business.direccion}</strong>
+              </div>
+            </div>
+          )}
+          {destino && (
+            <div className="nd-fact">
+              <span className="nd-fact-icon nd-fact-icon-teal"><Compass className="h-5 w-5" aria-hidden="true" /></span>
+              <div className="min-w-0">
+                <span>Destino</span>
+                <Link to={rutaCon('LUGARES', destino.id)} className="nd-fact-link">
+                  {destino.nombre} <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+                </Link>
+              </div>
+            </div>
+          )}
+          {rango && (
+            <div className="nd-fact">
+              <span className="nd-fact-icon nd-fact-icon-saffron"><Ticket className="h-5 w-5" aria-hidden="true" /></span>
+              <div className="min-w-0">
+                <span>Precio orientativo</span>
+                <strong>{rango} COP</strong>
+              </div>
+            </div>
+          )}
+        </div>
+        {business.descripcion && <p className="nd-description">{business.descripcion}</p>}
+        {!destino && (
+          <p className="nd-note">Este negocio todavía no está asociado a ningún destino.</p>
+        )}
+      </section>
+
+      {(tieneContacto || horarios?.length > 0) && (
+        <div className="nd-two-col">
+          {tieneContacto && (
+            <section className="nd-panel nd-reveal" style={{ '--nd-delay': '240ms' }}>
+              <div className="nd-section-head">
+                <p className="nd-eyebrow">Escríbenos</p>
+                <h2 className="nd-section-title">Contacto</h2>
+              </div>
+              <ul className="nd-contact-list">
+                {business.telefono && (
+                  <li><Phone className="h-4 w-4" aria-hidden="true" /><span>{business.telefono}</span></li>
+                )}
+                {business.whatsapp && (
+                  <li><Share2 className="h-4 w-4" aria-hidden="true" /><span>WhatsApp: {business.whatsapp}</span></li>
+                )}
+                {business.email_contacto && (
+                  <li><Mail className="h-4 w-4" aria-hidden="true" /><span className="break-all">{business.email_contacto}</span></li>
+                )}
+                {business.website && (
+                  <li>
+                    <Globe className="h-4 w-4" aria-hidden="true" />
+                    <a href={business.website} target="_blank" rel="noreferrer" className="nd-inline-link break-all">
+                      {business.website}
+                    </a>
+                  </li>
+                )}
+              </ul>
+            </section>
+          )}
+
+          {horarios?.length > 0 && (
+            <section className="nd-panel nd-reveal" style={{ '--nd-delay': '300ms' }}>
+              <div className="nd-section-head">
+                <p className="nd-eyebrow">Cuando visitar</p>
+                <h2 className="nd-section-title">Horarios</h2>
+              </div>
+              <ul className="nd-hours">
+                {horarios.map((h) => (
+                  <li key={h.id}>
+                    <span>{DIAS_LABEL[h.day_of_week]}</span>
+                    {h.is_closed
+                      ? <span className="nd-closed">Cerrado</span>
+                      : <strong>{h.open_time} – {h.close_time}</strong>}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {(business.telefono || business.whatsapp || business.email_contacto || business.website) && (
-          <Section title="Contacto">
-            <div className="space-y-3 text-sm">
-              {business.telefono && (
-                <p className="flex items-center gap-2 text-dark-700"><Phone className="w-4 h-4 text-dark-400" /> {business.telefono}</p>
-              )}
-              {business.whatsapp && (
-                <p className="flex items-center gap-2 text-dark-700"><Share2 className="w-4 h-4 text-dark-400" /> WhatsApp: {business.whatsapp}</p>
-              )}
-              {business.email_contacto && (
-                <p className="flex items-center gap-2 text-dark-700"><Mail className="w-4 h-4 text-dark-400" /> {business.email_contacto}</p>
-              )}
-              {business.website && (
-                <a href={business.website} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-primary-600 hover:underline">
-                  <Globe className="w-4 h-4" /> {business.website}
-                </a>
-              )}
-            </div>
-          </Section>
-        )}
-
-        {horarios && horarios.length > 0 && (
-          <Section title="Horarios">
-            <ul className="space-y-2 text-sm">
-              {horarios.map((h) => (
-                <li key={h.id} className="flex justify-between gap-3">
-                  <span className="text-dark-600 font-medium">{DIAS_LABEL[h.day_of_week]}</span>
-                  {h.is_closed ? (
-                    <span className="text-red-600 font-medium">Cerrado</span>
-                  ) : (
-                    <span className="text-dark-700">{h.open_time} - {h.close_time}</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </Section>
-        )}
-      </div>
-
-      {servicios && servicios.length > 0 && (
-        <Section title="Servicios">
-          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      {servicios?.length > 0 && (
+        <section className="nd-panel nd-reveal" style={{ '--nd-delay': '350ms' }}>
+          <div className="nd-section-head">
+            <p className="nd-eyebrow">Lo que encontrarás</p>
+            <h2 className="nd-section-title">Servicios</h2>
+          </div>
+          <ul className="nd-services">
             {servicios.map((s) => (
-              <li key={s.id} className="flex items-start gap-2 text-sm text-dark-700">
-                <CheckCircle2 className="w-4 h-4 text-primary-500 mt-0.5 shrink-0" />
-                <span>{s.descripcion ? `${s.nombre} — ${s.descripcion}` : s.nombre}</span>
+              <li key={s.id}>
+                <CheckCircle2 className="h-5 w-5 shrink-0" aria-hidden="true" />
+                <span>
+                  <strong>{s.nombre}</strong>
+                  {s.descripcion && <small>{s.descripcion}</small>}
+                </span>
               </li>
             ))}
           </ul>
-        </Section>
+        </section>
       )}
 
-      {redes && redes.length > 0 && (
-        <Section title="Redes sociales">
-          <div className="flex flex-wrap gap-3">
+      {redes?.length > 0 && (
+        <section className="nd-panel nd-reveal" style={{ '--nd-delay': '400ms' }}>
+          <div className="nd-section-head">
+            <p className="nd-eyebrow">Síguelos</p>
+            <h2 className="nd-section-title">Redes sociales</h2>
+          </div>
+          <div className="nd-socials">
             {redes.map((r) => (
-              <a
-                key={r.id}
-                href={r.url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-dark-50 text-dark-700 text-sm hover:bg-primary-50 hover:text-primary-700 transition-colors capitalize"
-              >
-                <Share2 className="w-4 h-4" />
-                {r.plataforma}
+              <a key={r.id} href={r.url} target="_blank" rel="noreferrer" className="nd-social">
+                <Share2 className="h-4 w-4" aria-hidden="true" />
+                <span className="capitalize">{r.plataforma}</span>
+                <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
               </a>
             ))}
           </div>
-        </Section>
+        </section>
       )}
-
-      {destinos && destinos.length > 0 ? (
-        <Section title="Destinos">
-          <Link
-            to={rutaCon('LUGARES', destinos[0].id)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary-50 text-primary-700 text-sm font-medium hover:bg-primary-100 transition-colors"
-          >
-            <MapPin className="w-4 h-4" />
-            {destinos[0].nombre}
-          </Link>
-        </Section>
-      ) : (
-        <Section title="Destinos">
-          <p className="text-sm text-dark-500">
-            Este negocio todavía no está asociado a ningún destino.
-          </p>
-        </Section>
-      )}
-    </div>
+    </>
   )
 }
