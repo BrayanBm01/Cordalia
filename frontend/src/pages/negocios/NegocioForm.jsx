@@ -3,110 +3,18 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
 import { ArrowLeft, Save, Loader2, Info, Lock } from 'lucide-react'
 import { businessesAPI, lugaresAPI } from '../../services/api'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import ImageUploader from '../../components/ImageUploader'
 import MoneyInput from '../../components/MoneyInput'
-import {
-  PRECIO_MAX,
-  isEmail,
-  isValidBusinessName,
-  isValidHttpUrl,
-  isValidPhone,
-} from '../../utils/validation'
 import { toast } from 'sonner'
 import { obtenerRuta, rutaCon } from '../../routes/offuscatedRoutes.js'
-
-const MONEDAS = ['COP', 'USD', 'EUR', 'MXN', 'PEN']
-
-// Categorías que manejan rango de precios en su ficha pública.
-const CATEGORIAS_CON_PRECIO = [
-  'Restaurante', 'Hotel', 'Hostal', 'Tour', 'Agencia de viajes',
-  'Experiencia turistica', 'Atraccion turistica',
-]
-
-function buildSchema(categorias = []) {
-  const nombresPorId = new Map(categorias.map((c) => [String(c.id), c.nombre]))
-
-  const precioSchema = z.preprocess(
-    (v) => (v === '' || v === null || v === undefined ? undefined : v),
-    z.coerce
-      .number()
-      .finite('Precio inválido')
-      .min(0, 'El precio no puede ser negativo')
-      .max(PRECIO_MAX, `El precio máximo permitido es ${PRECIO_MAX}`)
-      .refine(
-        (v) => Math.round(v * 100) === v * 100,
-        'El precio admite como máximo 2 decimales'
-      )
-  )
-
-  return z
-    .object({
-      nombre: z
-        .string()
-        .trim()
-        .min(1, 'El nombre es obligatorio')
-        .refine(
-          isValidBusinessName,
-          'El nombre debe tener entre 2 y 200 caracteres y contener letras o números'
-        ),
-      category_id: z.string().transform((v) => (v === '' ? '' : Number(v))),
-      destination_id: z.string().transform((v) => (v === '' ? '' : Number(v))),
-      descripcion: z.string().max(5000, 'Máximo 5000 caracteres').optional().or(z.literal('')),
-      direccion: z.string().max(300, 'Máximo 300 caracteres').optional().or(z.literal('')),
-      telefono: z
-        .string()
-        .refine((v) => v === '' || isValidPhone(v), 'Teléfono inválido (7 a 15 dígitos)')
-        .optional()
-        .or(z.literal('')),
-      whatsapp: z
-        .string()
-        .refine((v) => v === '' || isValidPhone(v), 'WhatsApp inválido (7 a 15 dígitos)')
-        .optional()
-        .or(z.literal('')),
-      email_contacto: z
-        .string()
-        .refine((v) => v === '' || isEmail(v), 'Email de contacto inválido')
-        .optional()
-        .or(z.literal('')),
-      website: z
-        .string()
-        .refine((v) => v === '' || isValidHttpUrl(v), 'URL inválida (http/https)')
-        .optional()
-        .or(z.literal('')),
-      portada_url: z
-        .string()
-        .refine(
-          (v) => v === '' || isValidHttpUrl(v) || /^data:image\//i.test(v),
-          'URL inválida (http/https o imagen base64)'
-        )
-        .optional()
-        .or(z.literal('')),
-      moneda: z.enum(MONEDAS, { message: 'Selecciona una moneda válida' }),
-      precio_min: precioSchema.optional(),
-      precio_max: precioSchema.optional(),
-    })
-    .superRefine((d, ctx) => {
-      const nombre = nombresPorId.get(String(d.category_id))
-      const requierePrecio = !!nombre && CATEGORIAS_CON_PRECIO.includes(nombre)
-
-      if (requierePrecio) {
-        if (d.precio_min === undefined || d.precio_min === '') {
-          ctx.addIssue({ code: 'custom', path: ['precio_min'], message: 'Requerido para esta categoría' })
-        }
-        if (d.precio_max === undefined || d.precio_max === '') {
-          ctx.addIssue({ code: 'custom', path: ['precio_max'], message: 'Requerido para esta categoría' })
-        }
-      }
-
-      if (d.precio_max !== undefined && d.precio_min !== undefined && Number(d.precio_max) < Number(d.precio_min)) {
-        ctx.addIssue({ code: 'custom', path: ['precio_max'], message: 'El precio máximo no puede ser menor que el mínimo' })
-      }
-    })
-}
+import {
+  buildBusinessSchema,
+  CATEGORIAS_CON_PRECIO,
+  MONEDAS,
+} from './businessFormSchema.js'
 
 const inputClass =
   'w-full px-3 py-2.5 rounded-xl border border-dark-200 text-sm bg-white text-dark-900 placeholder:text-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-colors'
@@ -120,7 +28,7 @@ export default function NegocioForm() {
   const [loading, setLoading] = useState(isEdit)
   const [submitting, setSubmitting] = useState(false)
 
-  const resolver = useMemo(() => zodResolver(buildSchema(categorias)), [categorias])
+  const resolver = useMemo(() => zodResolver(buildBusinessSchema(categorias)), [categorias])
 
   const {
     control,

@@ -109,7 +109,12 @@ export const api = {
   get: (endpoint) => request(endpoint),
   post: (endpoint, body) => request(endpoint, { method: 'POST', body: JSON.stringify(body) }),
   put: (endpoint, body) => request(endpoint, { method: 'PUT', body: JSON.stringify(body) }),
-  delete: (endpoint) => request(endpoint, { method: 'DELETE' }),
+  // `body` es opcional: el borrado administrativo de negocios envía el motivo.
+  delete: (endpoint, body) =>
+    request(endpoint, {
+      method: 'DELETE',
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    }),
 }
 
 export const authAPI = {
@@ -200,6 +205,25 @@ export const usuariosAPI = {
 export const adminAPI = {
   stats: () => api.get('/admin/stats'),
   loginHistory: () => api.get('/admin/login-history'),
+}
+
+// CRUD administrativo de negocios. Todas las rutas están protegidas en el
+// backend con requireAuth + requireAdmin (401/403 ante peticiones manipuladas).
+export const adminNegociosAPI = {
+  list: (params = {}) => {
+    const query = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') query.set(key, value)
+    })
+    const suffix = query.toString()
+    return api.get(`/admin/negocios${suffix ? `?${suffix}` : ''}`)
+  },
+  getById: (id) => api.get(`/admin/negocios/${id}`),
+  create: (data) => api.post('/admin/negocios', data),
+  update: (id, data) => api.put(`/admin/negocios/${id}`, data),
+  setEstado: (id, datos) => api.put(`/admin/negocios/${id}/estado`, datos),
+  remove: (id, motivo) => api.delete(`/admin/negocios/${id}`, { data: { motivo } }),
+  restore: (id) => api.post(`/admin/negocios/${id}/restaurar`),
 }
 
 export const businessesAPI = {

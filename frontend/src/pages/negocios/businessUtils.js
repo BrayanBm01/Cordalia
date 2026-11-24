@@ -19,18 +19,21 @@ export const ESTADO_BADGE = {
 // Estado de PUBLICACION COMERCIAL del negocio (separado de la moderacion).
 // 'oculto_suscripcion' = oculto al publico por falta de prueba/suscripcion
 // vigente; se restaura automaticamente al renovar.
+// 'oculto_admin' = oculto por decision del ADMIN; el cron NO lo restaura.
 export const PUBLICACION_LABEL = {
   visible: 'Visible al público',
   oculto_suscripcion: 'Oculto al público',
+  oculto_admin: 'Oculto por el administrador',
 }
 
 export const PUBLICACION_BADGE = {
   visible: 'bg-emerald-100 text-emerald-700',
   oculto_suscripcion: 'bg-amber-100 text-amber-700',
+  oculto_admin: 'bg-red-100 text-red-700',
 }
 
 export function estaOcultoAlPublico(negocio) {
-  return negocio?.publicacion_estado === 'oculto_suscripcion'
+  return ['oculto_suscripcion', 'oculto_admin'].includes(negocio?.publicacion_estado)
 }
 
 export const DIAS_LABEL = [

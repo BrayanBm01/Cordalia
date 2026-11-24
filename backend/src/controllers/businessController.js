@@ -19,6 +19,11 @@ const {
 } = require("../utils/validators");
 
 const ESTADOS = ["draft", "pending", "approved", "rejected", "suspended", "inactive"];
+// `oculto_admin` es exclusivo del ADMIN: el cron de suscripciones no lo
+// restaura automaticamente (solo mueve `oculto_suscripcion` -> visible).
+const PUBLICACIONES = ["visible", "oculto_suscripcion", "oculto_admin"];
+// El ADMIN puede fijar moderacion y publicacion; el vendedor no.
+const CAMPOS_ESTADO_ADMIN = new Set(["estado", "publicacion_estado"]);
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
 const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 const IMAGEN_MAX_BYTES = 1500 * 1024; // 1.5 MB por imagen
@@ -105,9 +110,12 @@ async function uniqueSlugFor(nombre, excludeId = null) {
   return candidate;
 }
 
-function validarBusiness(body, esCreacion = false) {
+function validarBusiness(body, esCreacion = false, opciones = {}) {
   const input = body && typeof body === "object" ? body : {};
-  const protegidos = Object.keys(input).filter((k) => CAMPOS_PROTEGIDOS.has(k));
+  const admin = Boolean(opciones.admin);
+  const protegidos = Object.keys(input).filter(
+    (k) => CAMPOS_PROTEGIDOS.has(k) && !(admin && CAMPOS_ESTADO_ADMIN.has(k))
+  );
   if (protegidos.length > 0) {
     return {
       error: {
@@ -298,6 +306,21 @@ function validarBusiness(body, esCreacion = false) {
     data.lng = n;
   }
 
+  if (admin) {
+    if (input.estado !== undefined) {
+      if (!ESTADOS.includes(input.estado)) {
+        return { error: { status: 400, message: "Estado de moderación inválido" } };
+      }
+      data.estado = input.estado;
+    }
+    if (input.publicacion_estado !== undefined) {
+      if (!PUBLICACIONES.includes(input.publicacion_estado)) {
+        return { error: { status: 400, message: "Estado de publicación inválido" } };
+      }
+      data.publicacion_estado = input.publicacion_estado;
+    }
+  }
+
   return { data };
 }
 
@@ -306,8 +329,10 @@ function serverError(res, error, context) {
 }
 
 // Valida el rango de precios según la categoría del negocio:
-// - categorías CON_PRECIO: precio min/max obligatorios al crear.
 // - categorías SIN_PRECIO: no se aceptan precios en la ficha.
+// - categorías CON_PRECIO: se valida el rango cuando el cliente lo envía;
+//   que ambos valores sean obligatorios lo exige el formulario compartido
+//   (vendedor y ADMIN), sin romper los negocios históricos creados sin precios.
 function validarPreciosPorCategoria(categoriaNombre, data) {
   if (!categoriaNombre) return null;
   const conPrecio = CATEGORIAS_CON_PRECIO.has(categoriaNombre);
@@ -355,91 +380,110 @@ exports.getById = async (req, res) => {
   return res.json({ success: true, data });
 };
 
-exports.create = async (req, res) => {
-  try {
-    const { error, data } = validarBusiness(req.body, true);
-    if (error) return res.status(error.status).json({ success: false, message: error.message });
+const MENSAJE_DUPLICADO =
+  "Ya existe un negocio con ese nombre (se ignoran mayúsculas, acentos, espacios y signos).";
 
-    // Unicidad canonica: "Hotel Los Andes", "hotel-los-andes" y
-    // "HOTEL  LOS ANDES" colisionan. Se registra el intento para que el
-    // administrador tenga historial aunque el UNIQUE INDEX de BD gane la carrera.
-    const normalizado = normalizarNombreNegocio(data.nombre);
-    const duplicado = normalizado
-      ? await BusinessModel.findByNombreNormalizado(normalizado)
-      : null;
-    if (duplicado) {
-      await auditarIdentidad(req, { id: null, owner_id: req.usuario.id }, "duplicado_detectado", {
-        nombreNuevo: data.nombre,
-        normalizado,
-        motivo: `Ya existe el negocio #${duplicado.id} (${duplicado.nombre})`,
-      });
-      return res.status(409).json({
-        success: false,
-        code: "NOMBRE_DUPLICADO",
-        message: "Ya existe un negocio con ese nombre (se ignoran mayúsculas, acentos, espacios y signos).",
-      });
-    }
+function falloDuplicado() {
+  return { status: 409, payload: { success: false, code: "NOMBRE_DUPLICADO", message: MENSAJE_DUPLICADO } };
+}
 
-    if (data.category_id) {
-      const categoria = await BusinessModel.findCategoryById(data.category_id);
-      if (!categoria) {
-        return res.status(400).json({ success: false, message: "La categoría seleccionada no existe" });
-      }
-      const precioError = validarPreciosPorCategoria(categoria.nombre, data, true);
-      if (precioError) {
-        return res.status(precioError.status).json({ success: false, message: precioError.message });
-      }
-    }
+async function crearNegocio(req, opciones = {}) {
+  const admin = Boolean(opciones.admin);
+  const { error, data } = validarBusiness(req.body, true, { admin });
+  if (error) return { status: error.status, payload: { success: false, message: error.message } };
 
-    if (data.destination_id) {
-      const destino = await LugarModel.findById(data.destination_id);
-      if (!destino) {
-        return res.status(400).json({ success: false, message: "El destino seleccionado no existe" });
-      }
-    }
-
-    const slug = await uniqueSlugFor(data.nombre);
-
-    // Publicacion automatica SOLO para una prueba gratuita REAL y vigente.
-    // Un vendedor con suscripcion pagada, sin politica, suspendido o con
-    // la prueba vencida sigue requiriendo aprobacion manual del ADMIN.
-    const autoAprobar = req.usuario.rol === "BUSINESS" &&
-      (await SuscripcionModel.tienePruebaGratuitaVigente(req.usuario.id));
-
-    const negocio = await BusinessModel.create({
-      ...data,
-      owner_id: req.usuario.id,
-      slug,
-      estado: autoAprobar ? "approved" : "pending",
-      moneda: data.moneda || "COP",
-      descripcion: data.descripcion || "",
-      direccion: data.direccion || "",
-      telefono: data.telefono || "",
-      whatsapp: data.whatsapp || "",
-      email_contacto: data.email_contacto || "",
-      website: data.website || "",
-      portada_url: data.portada_url || "",
-      destination_id: data.destination_id ?? null,
-      lat: data.lat ?? null,
-      lng: data.lng ?? null,
-      precio_min: data.precio_min ?? null,
-      precio_max: data.precio_max ?? null,
-    });
-
-    await auditarIdentidad(req, negocio, "crear", {
-      nombreNuevo: negocio.nombre,
+  // Unicidad canonica: "Hotel Los Andes", "hotel-los-andes" y
+  // "HOTEL  LOS ANDES" colisionan. El UNIQUE INDEX es la barrera final.
+  const normalizado = normalizarNombreNegocio(data.nombre);
+  const duplicado = normalizado
+    ? await BusinessModel.findByNombreNormalizado(normalizado)
+    : null;
+  if (duplicado) {
+    await auditarIdentidad(req, { id: null, owner_id: req.usuario.id }, "duplicado_detectado", {
+      nombreNuevo: data.nombre,
       normalizado,
-      motivo: autoAprobar ? "Prueba gratuita vigente: publicado automáticamente" : "Pendiente de aprobación",
-      permitido: autoAprobar,
+      motivo: `Ya existe el negocio #${duplicado.id} (${duplicado.nombre})`,
     });
+    return falloDuplicado();
+  }
 
-    return res.status(201).json({
+  if (data.category_id) {
+    const categoria = await BusinessModel.findCategoryById(data.category_id);
+    if (!categoria) {
+      return { status: 400, payload: { success: false, message: "La categoría seleccionada no existe" } };
+    }
+    const precioError = validarPreciosPorCategoria(categoria.nombre, data, true);
+    if (precioError) {
+      return { status: precioError.status, payload: { success: false, message: precioError.message } };
+    }
+  }
+
+  if (data.destination_id) {
+    const destino = await LugarModel.findById(data.destination_id);
+    if (!destino) {
+      return { status: 400, payload: { success: false, message: "El destino seleccionado no existe" } };
+    }
+  }
+
+  const slug = await uniqueSlugFor(data.nombre);
+
+  // Publicacion automatica SOLO para una prueba gratuita REAL y vigente.
+  // Un ADMIN no depende de vendedores: sus negocios son de la plataforma
+  // (owner_id NULL) y nacen aprobados/visibles salvo indicacion contraria.
+  const autoAprobar = !admin && req.usuario.rol === "BUSINESS" &&
+    (await SuscripcionModel.tienePruebaGratuitaVigente(req.usuario.id));
+
+  const negocio = await BusinessModel.create({
+    ...data,
+    owner_id: admin ? null : req.usuario.id,
+    creado_por_admin: admin ? req.usuario.id : null,
+    slug,
+    estado: admin ? (data.estado || "approved") : (autoAprobar ? "approved" : "pending"),
+    publicacion_estado: admin ? data.publicacion_estado : undefined,
+    moneda: data.moneda || "COP",
+    descripcion: data.descripcion || "",
+    direccion: data.direccion || "",
+    telefono: data.telefono || "",
+    whatsapp: data.whatsapp || "",
+    email_contacto: data.email_contacto || "",
+    website: data.website || "",
+    portada_url: data.portada_url || "",
+    destination_id: data.destination_id ?? null,
+    lat: data.lat ?? null,
+    lng: data.lng ?? null,
+    precio_min: data.precio_min ?? null,
+    precio_max: data.precio_max ?? null,
+  });
+
+  await auditarIdentidad(req, negocio, "crear", {
+    nombreNuevo: negocio.nombre,
+    normalizado,
+    motivo: admin
+      ? "Creado por ADMIN como negocio de la plataforma (sin vendedor)"
+      : autoAprobar
+        ? "Prueba gratuita vigente: publicado automáticamente"
+        : "Pendiente de aprobación",
+    permitido: admin || autoAprobar,
+  });
+
+  return {
+    status: 201,
+    payload: {
       success: true,
-      message: autoAprobar
-        ? "Negocio creado y publicado automáticamente durante tu prueba gratuita"
-        : "Negocio creado correctamente. Quedó pendiente de aprobación",
+      message: admin
+        ? "Negocio creado por el administrador y publicado correctamente"
+        : autoAprobar
+          ? "Negocio creado y publicado automáticamente durante tu prueba gratuita"
+          : "Negocio creado correctamente. Quedó pendiente de aprobación",
       data: negocio,
-    });
+    },
+  };
+}
+
+async function responderCreacion(req, res, opciones) {
+  try {
+    const { status, payload } = await crearNegocio(req, opciones);
+    return res.status(status).json(payload);
   } catch (error) {
     if (error && error.code === "23505" && /nombre_normalizado/.test(error.message || "")) {
       await auditarIdentidad(req, { id: null, owner_id: req.usuario.id }, "duplicado_detectado", {
@@ -447,114 +491,126 @@ exports.create = async (req, res) => {
         normalizado: normalizarNombreNegocio(req.body?.nombre),
         motivo: "El UNIQUE INDEX rechazó un nombre duplicado (carrera concurrente)",
       });
-      return res.status(409).json({
-        success: false,
-        code: "NOMBRE_DUPLICADO",
-        message: "Ya existe un negocio con ese nombre (se ignoran mayúsculas, acentos, espacios y signos).",
-      });
+      const { status, payload } = falloDuplicado();
+      return res.status(status).json(payload);
     }
     return serverError(res, error, "create negocio");
   }
-};
+}
 
-exports.update = async (req, res) => {
-  try {
-    const { error, data } = validarBusiness(req.body);
-    if (error) return res.status(error.status).json({ success: false, message: error.message });
+exports.create = async (req, res) => responderCreacion(req, res);
+exports.adminCreate = async (req, res) => responderCreacion(req, res, { admin: true });
 
-    if (Object.keys(data).length === 0) {
-      return res.status(400).json({ success: false, message: "No hay datos para actualizar" });
-    }
+async function actualizarNegocio(req, opciones = {}) {
+  const admin = Boolean(opciones.admin);
+  const { error, data } = validarBusiness(req.body, false, { admin });
+  if (error) return { status: error.status, payload: { success: false, message: error.message } };
 
-    // En una edicion parcial hay que comparar los precios EFECTIVOS
-    // (los nuevos y los que ya tenia el negocio). Si no, cambiar solo
-    // precio_min podria dejar un rango invalido en la base de datos.
-    const preciosEfectivos = {
-      precio_min:
-        data.precio_min !== undefined ? data.precio_min : req.business.precio_min,
-      precio_max:
-        data.precio_max !== undefined ? data.precio_max : req.business.precio_max,
+  if (Object.keys(data).length === 0) {
+    return { status: 400, payload: { success: false, message: "No hay datos para actualizar" } };
+  }
+
+  // En una edicion parcial hay que comparar los precios EFECTIVOS
+  // (los nuevos y los que ya tenia el negocio). Si no, cambiar solo
+  // precio_min podria dejar un rango invalido en la base de datos.
+  const preciosEfectivos = {
+    precio_min:
+      data.precio_min !== undefined ? data.precio_min : req.business.precio_min,
+    precio_max:
+      data.precio_max !== undefined ? data.precio_max : req.business.precio_max,
+  };
+  if (
+    preciosEfectivos.precio_min != null &&
+    preciosEfectivos.precio_max != null &&
+    Number(preciosEfectivos.precio_max) < Number(preciosEfectivos.precio_min)
+  ) {
+    return {
+      status: 400,
+      payload: { success: false, message: "El precio máximo no puede ser menor que el mínimo" },
     };
-    if (
-      preciosEfectivos.precio_min != null &&
-      preciosEfectivos.precio_max != null &&
-      Number(preciosEfectivos.precio_max) < Number(preciosEfectivos.precio_min)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "El precio máximo no puede ser menor que el mínimo",
+  }
+
+  if (data.nombre !== undefined) {
+    const normalizado = normalizarNombreNegocio(data.nombre);
+    const normalizadoActual = normalizarNombreNegocio(req.business.nombre);
+    const cambiaNombre = normalizado !== normalizadoActual;
+
+    if (!cambiaNombre) {
+      // El formulario envia el nombre intacto en modo edicion: no es un
+      // renombrado, se conserva el valor y el slug originales.
+      data.nombre = req.business.nombre;
+    } else if (req.usuario.rol !== "ADMIN") {
+      await auditarIdentidad(req, req.business, "intento_renombrar_rechazado", {
+        nombreAnterior: req.business.nombre,
+        nombreNuevo: data.nombre,
+        normalizado,
+        motivo: "El nombre del negocio es identidad protegida; solo un ADMIN puede cambiarlo",
       });
-    }
-
-    if (data.nombre !== undefined) {
-      const normalizado = normalizarNombreNegocio(data.nombre);
-      const normalizadoActual = normalizarNombreNegocio(req.business.nombre);
-      const cambiaNombre = normalizado !== normalizadoActual;
-
-      if (!cambiaNombre) {
-        // El formulario envia el nombre intacto en modo edicion: no es un
-        // renombrado, se conserva el valor y el slug originales.
-        data.nombre = req.business.nombre;
-      } else if (req.usuario.rol !== "ADMIN") {
-        await auditarIdentidad(req, req.business, "intento_renombrar_rechazado", {
-          nombreAnterior: req.business.nombre,
-          nombreNuevo: data.nombre,
-          normalizado,
-          motivo: "El nombre del negocio es identidad protegida; solo un ADMIN puede cambiarlo",
-        });
-        return res.status(403).json({
+      return {
+        status: 403,
+        payload: {
           success: false,
           code: "RENOMBRAR_NO_PERMITIDO",
           message: "El nombre del negocio no se puede cambiar. Solicita el cambio al administrador de Cordalia.",
+        },
+      };
+    } else {
+      const duplicado = normalizado
+        ? await BusinessModel.findByNombreNormalizado(normalizado, req.business.id)
+        : null;
+      if (duplicado) {
+        data.permite_nombre_duplicado = true;
+        data.duplicado_autorizado_por = req.usuario.id;
+        await auditarIdentidad(req, req.business, "duplicado_autorizado", {
+          nombreAnterior: req.business.nombre,
+          nombreNuevo: data.nombre,
+          normalizado,
+          motivo: `Excepcion ADMIN frente al negocio #${duplicado.id}`,
+          permitido: true,
         });
       } else {
-        const duplicado = normalizado
-          ? await BusinessModel.findByNombreNormalizado(normalizado, req.business.id)
-          : null;
-        if (duplicado) {
-          data.permite_nombre_duplicado = true;
-          data.duplicado_autorizado_por = req.usuario.id;
-          await auditarIdentidad(req, req.business, "duplicado_autorizado", {
-            nombreAnterior: req.business.nombre,
-            nombreNuevo: data.nombre,
-            normalizado,
-            motivo: `Excepcion ADMIN frente al negocio #${duplicado.id}`,
-            permitido: true,
-          });
-        } else {
-          await auditarIdentidad(req, req.business, "renombrar", {
-            nombreAnterior: req.business.nombre,
-            nombreNuevo: data.nombre,
-            normalizado,
-            motivo: "Renombrado autorizado por ADMIN",
-            permitido: true,
-          });
-        }
-        data.slug = await uniqueSlugFor(data.nombre, req.business.id);
+        await auditarIdentidad(req, req.business, "renombrar", {
+          nombreAnterior: req.business.nombre,
+          nombreNuevo: data.nombre,
+          normalizado,
+          motivo: "Renombrado autorizado por ADMIN",
+          permitido: true,
+        });
       }
+      data.slug = await uniqueSlugFor(data.nombre, req.business.id);
     }
+  }
 
-    if (data.category_id || req.business.category_id) {
-      const catId = data.category_id || req.business.category_id;
-      const categoria = await BusinessModel.findCategoryById(catId);
-      if (!categoria) {
-        return res.status(400).json({ success: false, message: "La categoría seleccionada no existe" });
-      }
-      const precioError = validarPreciosPorCategoria(categoria.nombre, preciosEfectivos);
-      if (precioError) {
-        return res.status(precioError.status).json({ success: false, message: precioError.message });
-      }
+  if (data.category_id || req.business.category_id) {
+    const catId = data.category_id || req.business.category_id;
+    const categoria = await BusinessModel.findCategoryById(catId);
+    if (!categoria) {
+      return { status: 400, payload: { success: false, message: "La categoría seleccionada no existe" } };
     }
-
-    if (data.destination_id) {
-      const destino = await LugarModel.findById(data.destination_id);
-      if (!destino) {
-        return res.status(400).json({ success: false, message: "El destino seleccionado no existe" });
-      }
+    const precioError = validarPreciosPorCategoria(categoria.nombre, preciosEfectivos);
+    if (precioError) {
+      return { status: precioError.status, payload: { success: false, message: precioError.message } };
     }
+  }
 
-    const updated = await BusinessModel.update(req.params.id, data);
-    return res.json({ success: true, message: "Negocio actualizado correctamente", data: updated });
+  if (data.destination_id) {
+    const destino = await LugarModel.findById(data.destination_id);
+    if (!destino) {
+      return { status: 400, payload: { success: false, message: "El destino seleccionado no existe" } };
+    }
+  }
+
+  const updated = await BusinessModel.update(req.params.id, data);
+  return {
+    status: 200,
+    payload: { success: true, message: "Negocio actualizado correctamente", data: updated },
+  };
+}
+
+async function responderActualizacion(req, res, opciones) {
+  try {
+    const { status, payload } = await actualizarNegocio(req, opciones);
+    return res.status(status).json(payload);
   } catch (error) {
     if (error && error.code === "23505" && /nombre_normalizado/.test(error.message || "")) {
       await auditarIdentidad(req, req.business, "duplicado_detectado", {
@@ -563,15 +619,15 @@ exports.update = async (req, res) => {
         normalizado: normalizarNombreNegocio(req.body?.nombre),
         motivo: "El UNIQUE INDEX rechazó un renombre duplicado (carrera concurrente)",
       });
-      return res.status(409).json({
-        success: false,
-        code: "NOMBRE_DUPLICADO",
-        message: "Ya existe un negocio con ese nombre (se ignoran mayúsculas, acentos, espacios y signos).",
-      });
+      const { status, payload } = falloDuplicado();
+      return res.status(status).json(payload);
     }
     return serverError(res, error, "update negocio");
   }
-};
+}
+
+exports.update = async (req, res) => responderActualizacion(req, res);
+exports.adminUpdate = async (req, res) => responderActualizacion(req, res, { admin: true });
 
 exports.setEstado = async (req, res) => {
   try {
@@ -606,18 +662,133 @@ exports.remove = async (req, res) => {
       });
     }
 
-    await auditarIdentidad(req, req.business, "eliminar", {
-      nombreAnterior: req.business?.nombre ?? null,
-      motivo: "Eliminación autorizada por ADMIN",
-      permitido: true,
+    // Borrado logico transaccional: conserva inscripciones, pagos y auditoria.
+    // La funcion de BD valida el rol y escribe la auditoria atomicamente.
+    await BusinessModel.archivar(
+      req.params.id,
+      req.usuario.id,
+      "Eliminación autorizada por ADMIN desde /api/businesses/:id"
+    );
+    return res.json({
+      success: true,
+      message: "Negocio eliminado correctamente. Su historial se conserva archivado.",
     });
-    const deleted = await BusinessModel.delete(req.params.id);
-    if (!deleted) {
-      return res.status(404).json({ success: false, message: "Negocio no encontrado" });
-    }
-    return res.json({ success: true, message: "Negocio eliminado correctamente" });
   } catch (error) {
     return serverError(res, error, "remove negocio");
+  }
+};
+
+// ============================================================
+// Administracion dedicada (/api/admin/negocios)
+// Todas estas rutas pasan por requireAuth + requireAdmin. La BD vuelve
+// a comprobar el rol dentro de las funciones de archivado.
+// ============================================================
+exports.adminList = async (req, res) => {
+  try {
+    const texto = typeof req.query.search === "string" ? req.query.search.trim().slice(0, 120) : "";
+    const archivados = ["solo", "todos"].includes(req.query.archivados)
+      ? req.query.archivados
+      : "no";
+    const negocios = await BusinessModel.adminList({
+      search: texto || null,
+      estado: ESTADOS.includes(req.query.estado) ? req.query.estado : null,
+      publicacion_estado: PUBLICACIONES.includes(req.query.publicacion_estado)
+        ? req.query.publicacion_estado
+        : null,
+      archivados,
+    });
+    return res.json({ success: true, data: negocios });
+  } catch (error) {
+    return serverError(res, error, "adminList negocios");
+  }
+};
+
+exports.adminGetById = async (req, res) => {
+  try {
+    const negocio = await BusinessModel.findById(req.params.id, true);
+    if (!negocio) {
+      return res.status(404).json({ success: false, message: "Negocio no encontrado" });
+    }
+    const relaciones = await BusinessModel.contarRelaciones(req.params.id);
+    return res.json({ success: true, data: { ...negocio, relaciones } });
+  } catch (error) {
+    return serverError(res, error, "adminGetById negocio");
+  }
+};
+
+exports.adminSetEstado = async (req, res) => {
+  try {
+    const { estado, publicacion_estado } = req.body || {};
+    if (estado === undefined && publicacion_estado === undefined) {
+      return res.status(400).json({ success: false, message: "No hay datos para actualizar" });
+    }
+    const datos = {};
+    if (estado !== undefined) {
+      if (!ESTADOS.includes(estado)) {
+        return res.status(400).json({ success: false, message: "Estado inválido" });
+      }
+      datos.estado = estado;
+    }
+    if (publicacion_estado !== undefined) {
+      if (!PUBLICACIONES.includes(publicacion_estado)) {
+        return res.status(400).json({ success: false, message: "Estado de publicación inválido" });
+      }
+      datos.publicacion_estado = publicacion_estado;
+    }
+
+    const negocio = await BusinessModel.findById(req.params.id, true);
+    if (!negocio) {
+      return res.status(404).json({ success: false, message: "Negocio no encontrado" });
+    }
+    const updated = await BusinessModel.update(req.params.id, datos);
+    await auditarIdentidad(req, negocio, datos.estado ? "cambiar_estado" : (
+      datos.publicacion_estado === "visible" ? "publicar" : "ocultar"
+    ), {
+      nombreAnterior: negocio.nombre,
+      motivo: `ADMIN: ${JSON.stringify(datos)}`,
+      permitido: true,
+    });
+    return res.json({ success: true, message: "Estado actualizado correctamente", data: updated });
+  } catch (error) {
+    return serverError(res, error, "adminSetEstado negocio");
+  }
+};
+
+exports.adminRemove = async (req, res) => {
+  try {
+    const motivo = typeof req.body?.motivo === "string" ? req.body.motivo.slice(0, 500) : null;
+    const negocio = await BusinessModel.findById(req.params.id, true);
+    if (!negocio) {
+      return res.status(404).json({ success: false, message: "Negocio no encontrado" });
+    }
+    if (negocio.eliminado_at) {
+      return res.status(409).json({ success: false, message: "El negocio ya está archivado" });
+    }
+    const relaciones = await BusinessModel.contarRelaciones(req.params.id);
+    const resultado = await BusinessModel.archivar(req.params.id, req.usuario.id, motivo);
+    return res.json({
+      success: true,
+      message: "Negocio eliminado. Quedó archivado y su historial se conserva intacto.",
+      data: { ...resultado, relaciones },
+    });
+  } catch (error) {
+    return serverError(res, error, "adminRemove negocio");
+  }
+};
+
+exports.adminRestore = async (req, res) => {
+  try {
+    const negocio = await BusinessModel.findById(req.params.id, true);
+    if (!negocio) {
+      return res.status(404).json({ success: false, message: "Negocio no encontrado" });
+    }
+    if (!negocio.eliminado_at) {
+      return res.status(409).json({ success: false, message: "El negocio no está archivado" });
+    }
+    const resultado = await BusinessModel.restaurar(req.params.id, req.usuario.id);
+    return res.json({ success: true, message: "Negocio restaurado correctamente", data: resultado });
+  } catch (error) {
+    return serverError(res, error, "adminRestore negocio");
   }
 };
 

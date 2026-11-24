@@ -41,7 +41,8 @@ function ownerEntitledSql(ownerAlias = "u") {
 function publicBusinessSql(businessAlias = "b", ownerAlias = "u") {
   const b = businessAlias;
   return `(
-    ${b}.estado = 'approved'
+    ${b}.eliminado_at IS NULL
+    AND ${b}.estado = 'approved'
     AND ${b}.publicacion_estado = 'visible'
     AND ${ownerEntitledSql(ownerAlias)}
   )`;
@@ -56,6 +57,7 @@ function publicBusinessSql(businessAlias = "b", ownerAlias = "u") {
 // `new Date()` solo aplica a objetos construidos a mano en pruebas.
 function esVisiblePublicamente(business) {
   if (!business) return false;
+  if (business.eliminado_at) return false;
   if (typeof business.es_publico === "boolean") return business.es_publico;
   if (business.estado !== "approved") return false;
   if (business.publicacion_estado !== "visible") return false;

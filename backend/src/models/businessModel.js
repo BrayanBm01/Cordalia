@@ -6,6 +6,7 @@ const COLUMNS = `b.id, b.owner_id, b.category_id, b.destination_id, b.nombre, b.
        b.website, b.precio_min, b.precio_max, b.moneda, b.lat, b.lng,
        b.portada_url, b.estado, b.publicacion_estado, b.is_verified, b.is_featured,
        b.nombre_normalizado, b.permite_nombre_duplicado,
+       b.creado_por_admin, b.eliminado_at, b.eliminado_por, b.motivo_eliminacion,
        b.created_at, b.updated_at`;
 
 const BusinessModel = {
@@ -35,18 +36,19 @@ const BusinessModel = {
       LEFT JOIN business_categories c ON c.id = b.category_id
       LEFT JOIN lugares l ON l.id = b.destination_id
       LEFT JOIN usuarios u ON u.id = b.owner_id
+      WHERE b.eliminado_at IS NULL
     `;
     const params = [];
     if (rol === "ADMIN") {
-      // todos los negocios
+      // Todos los vigentes. Los archivados se consultan en /api/admin/negocios.
     } else if (rol === "BUSINESS") {
-      query += " WHERE b.owner_id = $1";
+      query += " AND b.owner_id = $1";
       params.push(userId);
     } else {
       // Publico (visitante o turista): aprobado por moderacion Y con
       // publicacion comercial vigente (prueba/suscripcion). La regla se
       // evalua en la BASE DE DATOS con NOW(), no en el navegador.
-      query += ` WHERE ${publicBusinessSql("b", "u")}`;
+      query += ` AND ${publicBusinessSql("b", "u")}`;
     }
     query += " ORDER BY b.id DESC";
     const { rows } = await pool.query(query, params);
@@ -60,6 +62,7 @@ const BusinessModel = {
       LEFT JOIN business_categories c ON c.id = b.category_id
       LEFT JOIN usuarios u ON u.id = b.owner_id
       WHERE b.destination_id = $1
+        AND b.eliminado_at IS NULL
     `;
     const params = [destinoId];
     if (!rol || rol === "TOURIST") {
@@ -75,7 +78,7 @@ const BusinessModel = {
     return rows;
   },
 
-  async findById(id) {
+  async findById(id, includeDeleted = false) {
     const { rows } = await pool.query(
       `SELECT ${COLUMNS}, c.nombre AS categoria,
               l.nombre AS destino, l.slug AS destino_slug,
@@ -89,7 +92,7 @@ const BusinessModel = {
        LEFT JOIN business_categories c ON c.id = b.category_id
        LEFT JOIN lugares l ON l.id = b.destination_id
        LEFT JOIN usuarios u ON u.id = b.owner_id
-       WHERE b.id = $1`,
+       WHERE b.id = $1 ${includeDeleted ? "" : "AND b.eliminado_at IS NULL"}`,
       [id]
     );
     return rows[0] || null;
@@ -145,20 +148,22 @@ const BusinessModel = {
     const {
       owner_id, category_id, destination_id, nombre, slug, descripcion, direccion, telefono,
       whatsapp, email_contacto, website, precio_min, precio_max, moneda,
-      lat, lng, portada_url, estado,
+      lat, lng, portada_url, estado, publicacion_estado, creado_por_admin,
     } = data;
     const { rows } = await pool.query(
       `INSERT INTO businesses
         (owner_id, category_id, destination_id, nombre, slug, descripcion, direccion, telefono,
          whatsapp, email_contacto, website, precio_min, precio_max, moneda,
-         lat, lng, portada_url, estado)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+         lat, lng, portada_url, estado, publicacion_estado, creado_por_admin)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,
+               COALESCE($19, 'visible'), $20)
        RETURNING id, owner_id, category_id, destination_id, nombre, slug, descripcion, direccion,
                  telefono, whatsapp, email_contacto, website, precio_min, precio_max,
-                 moneda, lat, lng, portada_url, estado, publicacion_estado, created_at, updated_at`,
+                 moneda, lat, lng, portada_url, estado, publicacion_estado, creado_por_admin,
+                 created_at, updated_at`,
       [owner_id, category_id, destination_id, nombre, slug, descripcion, direccion, telefono,
        whatsapp, email_contacto, website, precio_min, precio_max, moneda,
-       lat, lng, portada_url, estado]
+       lat, lng, portada_url, estado, publicacion_estado ?? null, creado_por_admin ?? null]
     );
     return rows[0];
   },
@@ -170,7 +175,7 @@ const BusinessModel = {
     const allowed = [
       "category_id", "destination_id", "nombre", "slug", "descripcion", "direccion", "telefono",
       "whatsapp", "email_contacto", "website", "precio_min", "precio_max",
-      "moneda", "lat", "lng", "portada_url", "estado",
+      "moneda", "lat", "lng", "portada_url", "estado", "publicacion_estado",
       // Solo los fija el controlador cuando un ADMIN autoriza una excepcion.
       "permite_nombre_duplicado", "duplicado_autorizado_por",
     ];
@@ -211,6 +216,87 @@ const BusinessModel = {
   async delete(id) {
     const { rowCount } = await pool.query("DELETE FROM businesses WHERE id = $1", [id]);
     return rowCount > 0;
+  },
+
+  // Listado administrativo: incluye cualquier estado y, si se pide, los
+  // archivados. Filtros opcionales 100% parametrizados.
+  async adminList({ search, estado, publicacion_estado, archivados } = {}) {
+    const where = [];
+    const params = [];
+    if (archivados === "solo") where.push("b.eliminado_at IS NOT NULL");
+    else if (archivados !== "todos") where.push("b.eliminado_at IS NULL");
+    if (estado) { params.push(estado); where.push(`b.estado = $${params.length}`); }
+    if (publicacion_estado) {
+      params.push(publicacion_estado);
+      where.push(`b.publicacion_estado = $${params.length}`);
+    }
+    if (search) {
+      params.push(`%${search.toLowerCase()}%`);
+      where.push(`(
+        LOWER(COALESCE(b.nombre, '')) LIKE $${params.length}
+        OR LOWER(COALESCE(c.nombre, '')) LIKE $${params.length}
+        OR LOWER(COALESCE(u.nombre, '')) LIKE $${params.length}
+        OR LOWER(COALESCE(l.nombre, '')) LIKE $${params.length}
+      )`);
+    }
+    const sql = `
+      SELECT ${COLUMNS}, c.nombre AS categoria, l.nombre AS destino,
+             u.nombre AS owner_nombre,
+             (SELECT COUNT(*)::int FROM business_images bi WHERE bi.business_id = b.id) AS imagenes_count,
+             (SELECT COUNT(*)::int FROM reviews r WHERE r.business_id = b.id) AS resenas_count
+      FROM businesses b
+      LEFT JOIN business_categories c ON c.id = b.category_id
+      LEFT JOIN lugares l ON l.id = b.destination_id
+      LEFT JOIN usuarios u ON u.id = b.owner_id
+      ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+      ORDER BY b.eliminado_at IS NOT NULL, b.id DESC
+    `;
+    const { rows } = await pool.query(sql, params);
+    return rows;
+  },
+
+  // Archivado/restauracion: la transaccion y la comprobacion de rol viven
+  // en la funcion de PostgreSQL. Se usa una conexion dedicada para que
+  // BEGIN/COMMIT envuelvan toda la operacion.
+  async transaccionArchivo(fn, params) {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const { rows } = await client.query(`SELECT ${fn}($1, $2${params.length > 2 ? ", $3" : ""}) AS resultado`, params);
+      await client.query("COMMIT");
+      return rows[0]?.resultado || null;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  },
+
+  async archivar(id, actorId, motivo) {
+    return this.transaccionArchivo("fn_archivar_negocio_admin", [id, actorId, motivo ?? null]);
+  },
+
+  async restaurar(id, actorId) {
+    return this.transaccionArchivo("fn_restaurar_negocio_admin", [id, actorId]);
+  },
+
+  // Conteo de relaciones para el aviso de eliminacion y las pruebas.
+  async contarRelaciones(id) {
+    const { rows } = await pool.query(
+      `SELECT
+         (SELECT COUNT(*)::int FROM reviews WHERE business_id = $1) AS resenas,
+         (SELECT COUNT(*)::int FROM business_images WHERE business_id = $1) AS imagenes,
+         (SELECT COUNT(*)::int FROM favorite_negocios WHERE business_id = $1) AS favoritos,
+         (SELECT COUNT(*)::int FROM subscriptions WHERE business_id = $1) AS suscripciones,
+         (SELECT COUNT(*)::int FROM suscripcion_pagos sp
+            JOIN subscriptions s ON s.id = sp.suscripcion_id WHERE s.business_id = $1) AS pagos,
+         (SELECT COUNT(*)::int FROM tour_plans WHERE business_id = $1) AS planes,
+         (SELECT COUNT(*)::int FROM inscripciones i
+            JOIN tour_plans tp ON tp.id = i.plan_id WHERE tp.business_id = $1) AS inscripciones`,
+      [id]
+    );
+    return rows[0] || null;
   },
 
   // ---------- Imágenes ----------
