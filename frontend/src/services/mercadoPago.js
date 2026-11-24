@@ -23,13 +23,13 @@
 
 /**
  * Catálogo informativo de la membresía de vendedor.
- * El precio y la vigencia REALES los fija el backend (tabla `plans`):
- * esta lista es solo para textos informativos de la interfaz.
+ * El precio y la vigencia REALES los fija el backend (tabla `plans`).
+ * Aqui NO se guarda ningún importe: un precio duplicado en el navegador
+ * quedaría desactualizado y contradeciría lo que cobra el servidor.
  */
 export const VENDOR_MEMBERSHIP_PLAN = {
   id: 'plan_vendedor_cordalia',
   nombre: 'Membresía Vendedor Cordalia',
-  precioCOP: 49000,
   moneda: 'COP',
   intervalo: 'mensual',
   caracteristicas: [

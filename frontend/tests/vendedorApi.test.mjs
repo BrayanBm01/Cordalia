@@ -153,21 +153,30 @@ async function main() {
     }
   })
 
-  await check('vendedorAPI.contratar envía SOLO el plan_id (el importe lo fija el servidor)', async () => {
+  await check('vendedorAPI.contratar envía plan y método; NUNCA importe ni precio', async () => {
     const env = crearEntorno()
     try {
-      let cuerpo = null
+      const cuerpos = []
       let url = null
       globalThis.fetch = async (u, opts) => {
         url = u
-        cuerpo = JSON.parse(opts.body)
-        return respuesta(201, { data: { suscripcion: { id: 1, monto: 49000 } } })
+        cuerpos.push(JSON.parse(opts.body))
+        return respuesta(201, { data: { suscripcion: { id: 1, monto: 49900 } } })
       }
       const { vendedorAPI } = await importarApi()
       const res = await vendedorAPI.contratar(2)
+      const resNequi = await vendedorAPI.contratar(2, 'nequi')
       assert.ok(String(url).endsWith('/vendedor/suscripciones'), `url inesperada: ${url}`)
-      assert.deepEqual(cuerpo, { plan_id: 2 }, 'no debe enviar monto ni precio')
-      assert.equal(res.data.suscripcion.monto, 49000)
+      assert.deepEqual(
+        cuerpos[0], { plan_id: 2, metodo: 'mercadopago' },
+        'solo el plan y la preferencia de método; el importe lo fija el servidor'
+      )
+      assert.deepEqual(cuerpos[1], { plan_id: 2, metodo: 'nequi' })
+      for (const cuerpo of cuerpos) {
+        assert.ok(!('monto' in cuerpo) && !('precio' in cuerpo), 'el cliente no envía importes')
+      }
+      assert.equal(res.data.suscripcion.monto, 49900)
+      assert.equal(resNequi.data.suscripcion.monto, 49900)
     } finally {
       env.restaurar()
     }

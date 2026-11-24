@@ -66,6 +66,13 @@ Se configuran en *Render → Environment* del servicio web del backend.
 | `PAYMENT_PROVIDER` | No | `mercadopago` | `mock` = sandbox, `mercadopago` = cobros reales |
 | `MERCADOPAGO_ACCESS_TOKEN` | **Sí** | token de la app | Crear preferencias y consultar pagos |
 | `MERCADOPAGO_WEBHOOK_SECRET` | **Sí** | secreto de la webhook | Verificar la firma `x-signature` |
+| `PAYMENT_RESULT_PATH` | No | `/gJvs5ksh` | Ruta pública YA existente (`PLANES_PUBLICOS`) de retorno del checkout |
+| `PAYMENT_MOCK_FAIL` | No | (vacío) | Solo local: `1` simula un pago rechazado en modo `mock` |
+| `NEQUI_CLIENT_ID` | No | (vacío) | Reservado; **no habilita** el medio |
+| `NEQUI_CLIENT_SECRET` | **Sí** | (vacío) | Reservado; **no habilita** el medio |
+| `NEQUI_AUTH_URL` | No | `https://oauth.sandbox.nequi.com` | Reservado; aún no se usa para cobrar |
+| `NEQUI_API_URL` | No | `https://api.sandbox.nequi.com` | Reservado; aún no se usa para cobrar |
+| `NEQUI_WEBHOOK_SECRET` | **Sí** | (vacío) | Reservado; aún no se usa para cobrar |
 | `MAIL_PROVIDER` | No | `http` | `log` = solo desarrollo |
 | `MAIL_API_URL` | No | endpoint del proveedor de correo | Envío de correos |
 | `MAIL_API_KEY` | **Sí** | clave del proveedor | Envío de correos |
@@ -110,6 +117,10 @@ destructivas**. Orden de aplicación (las nuevas al final):
 021_restaurar_catalogo_cordoba.sql       ← Catálogo demo de Córdoba (solo inserta)
 022_indices_rendimiento.sql              ← Índices de lectura (solo índices)
 023_publicacion_suscripcion.sql          ← Publicación comercial y vigencias en UTC
+024_unicidad_nombres_negocios.sql        ← Nombre de negocio único/normalizado
+025_integridad_cuentas_oauth.sql         ← Roles y emails OAuth íntegros
+026_administracion_negocios.sql          ← Negocios creados por ADMIN + archivado
+027_precios_planes_900.sql               ← Planes 49.900 / 129.900 COP (NO toca pagos)
 ```
 
 ### Cómo aplicarlas (con revisión previa)
@@ -145,6 +156,10 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/020_password_rese
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/021_restaurar_catalogo_cordoba.sql
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/022_indices_rendimiento.sql
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/023_publicacion_suscripcion.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/024_unicidad_nombres_negocios.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/025_integridad_cuentas_oauth.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/026_administracion_negocios.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/027_precios_planes_900.sql
 
 # 3. Verificar (las columnas deben salir en true)
 psql "$DATABASE_URL" -f database/COMPROBACIONES-PRODUCCION.sql
@@ -225,11 +240,20 @@ Qué hace cada una (resumen, sin datos destructivos):
 - **URL de notificación**:
   `https://cordalia.onrender.com/api/suscripciones/webhook/mercadopago`
 - **Eventos**: *Pagos* (y *Suscripciones* si se activan en el futuro).
-- El backend **verifica la firma `x-signature`** (HMAC-SHA256 de
-  `id:timestamp:body`) y **rechaza** la petición si la firma no es válida,
-  si falta o si el timestamp está fuera de una ventana de 5 minutos.
+- El backend **verifica la firma oficial `x-signature: ts=…,v1=…`** con el
+  validador del SDK de Mercado Pago sobre el manifiesto
+  `id:<data.id>;request-id:<x-request-id>;ts:<ts>;` (NO sobre el cuerpo).
+  Exige además que el `data.id` del cuerpo coincida con el `data.id` firmado
+  en la URL, y **rechaza** la petición si la firma no es válida, si falta o
+  si el timestamp está fuera de la ventana permitida.
   Si `MERCADOPAGO_WEBHOOK_SECRET` no está configurado, la webhook
   responde **401** y no procesa nada (*fail closed*).
+- Después de verificar la firma, **consulta el pago a la API de Mercado
+  Pago**. Solo activa la suscripción si el pago consultado está `approved`,
+  su `external_reference` es la de esa suscripción, el `usuario_id` de los
+  metadatos coincide y el importe/moneda son exactamente los contratados.
+  Los estados `pending`, `in_process`, `rejected` y `cancelled` se registran
+  en el historial (idempotente) pero **nunca activan ni renuevan** un plan.
 
 ### 5.3 Activar los cobros reales
 
@@ -265,6 +289,40 @@ La suscripción **no** se activa por abrir la página de pago ni por
 volver de la redirección: solo un evento verificado la activa. Un evento
 repetido no la activa dos veces (clave de idempotencia única en
 `suscripcion_pagos.idempotency_key`).
+
+### 5.5 Retorno y pantalla de resultado
+
+Las `back_urls` apuntan a la ruta pública **ya existente**
+`/gJvs5ksh` (`PLANES_PUBLICOS` en `offuscatedRoutes.js`), con
+`?pago=…&referencia=…` ( configurable con `PAYMENT_RESULT_PATH` ). No se
+creó una ruta nueva. Esa página consulta
+`GET /api/vendedor/pagos/:referencia/estado` y muestra **aprobado,
+pendiente, rechazado, cancelado o error** según el estado real consultado
+en backend/proveedor. El parámetro `?pago=aprobado` de la URL **nunca**
+confirma una compra: solo sirve como referencia visual mientras carga.
+
+### 5.6 Nequi (medio NO habilitado)
+
+Nequi se muestra como opción informativa, pero cualquier intento de
+pago responde **501 `NEQUI_NOT_ENABLED`**. Para habilitarlo se necesita
+registro comercial, contrato del producto (QR o PUSH) con Nequi y la
+integración oficial con credenciales reales. Las variables `NEQUI_*` de
+Render están documentadas, pero **definirlas no habilita el cobro**: no se
+inventan endpoints ni se simula una transacción.
+
+### 5.7 Precios y beneficios
+
+Los precios de catálogo son **Gratis 0**, **Profesional 49.900 COP** y
+**Premium 129.900 COP** (migración `027_precios_planes_900.sql`). El
+backend fija el importe desde la tabla `plans`; el navegador nunca envía
+precio y ya no hay importes duplicados en el bundle. El pago es de
+**contado, sin cuotas ni financiación**.
+
+Los beneficios anunciados se aplican en el servidor: la prueba gratuita
+(168 h) y las cuentas anteriores conservan el acceso completo; con una
+suscripción pagada vigente se respetan los límites de imágenes/servicios
+de `plans` y se exige el beneficio de promociones donde corresponde. El
+ADMIN no está sujeto a esos límites.
 
 ---
 

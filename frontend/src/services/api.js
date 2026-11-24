@@ -144,8 +144,22 @@ export const vendedorAPI = {
   estado: () => api.get('/vendedor/estado'),
   // Catálogo de planes (ruta autenticada del panel).
   planes: () => api.get('/vendedor/planes'),
-  // Contratar/renovar un plan. El importe lo fija el servidor.
-  contratar: (plan_id) => api.post('/vendedor/suscripciones', { plan_id }),
+  // Contratar/renovar un plan. El importe y el plan los fija el servidor:
+  // el navegador solo envía el plan elegido y el método preferido (Nequi
+  // está rechazado en el backend hasta su habilitación real).
+  contratar: (plan_id, metodo = 'mercadopago') =>
+    api.post('/vendedor/suscripciones', { plan_id, metodo }),
+  // Estado REAL de una operación de pago, para la pantalla de resultado.
+  // La URL de retorno solo aporta la referencia; el estado lo consulta el
+  // backend (webhook verificado + proveedor). Nunca aprueba desde el URL.
+  estadoPago: (referencia, params = {}) => {
+    const query = new URLSearchParams()
+    Object.entries(params).forEach(([clave, valor]) => {
+      if (valor !== undefined && valor !== null && valor !== '') query.set(clave, String(valor))
+    })
+    const sufijo = query.toString()
+    return api.get(`/vendedor/pagos/${encodeURIComponent(referencia)}/estado${sufijo ? `?${sufijo}` : ''}`)
+  },
   // Cancelar la suscripción vigente.
   cancelar: (suscripcionId) => api.put(`/vendedor/suscripciones/${suscripcionId}/cancelar`),
 }

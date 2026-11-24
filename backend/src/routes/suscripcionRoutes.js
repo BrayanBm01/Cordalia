@@ -30,19 +30,24 @@ router.get("/planes-comerciales", suscripcionController.planesPublicos);
 // vendedor (y del administrador). Un turista autenticado recibe 403.
 router.get("/vendedor/planes", requireAuth, requireBusinessRole, suscripcionController.planes);
 router.get("/vendedor/estado", requireAuth, requireBusinessRole, suscripcionController.estado);
+// Resultado del pago: consulta el estado real (webhook + proveedor).
+router.get(
+  "/vendedor/pagos/:referencia/estado",
+  requireAuth,
+  requireBusinessRole,
+  suscripcionController.estadoPago
+);
 router.post("/vendedor/suscripciones", requireAuth, requireBusinessRole, suscripcionController.contratar);
 router.put("/vendedor/suscripciones/:suscripcionId/cancelar", requireAuth, requireBusinessRole, suscripcionController.cancelar);
 
 module.exports = router;
 
 // La webhook la publica el proveedor: NO exige sesion, pero SI exige
-// firma valida (verificada en el controlador).
+// firma valida (verificada en el controlador). Se monta UNA sola vez en
+// app.js (/api + esta ruta): Express ya tolera la barra final, y los
+// montajes duplicados solo multiplican el mismo evento.
 module.exports.webhookRouter = express.Router();
 module.exports.webhookRouter.post(
   "/suscripciones/webhook/mercadopago",
-  suscripcionController.webhookMercadopago
-);
-module.exports.webhookRouter.post(
-  "/suscripciones/webhook/mercadopago/",
   suscripcionController.webhookMercadopago
 );

@@ -13,6 +13,13 @@
 //                     suscripcion real fuera de este modo.
 //   * 'mercadopago'   Integracion real con el SDK oficial.
 //
+// Metodos de pago seleccionables por el vendedor:
+//   * 'mercadopago'   Checkout Pro (pago de contado, sin cuotas).
+//   * 'nequi'         Solo se habilita tras registro comercial,
+//                     contrato de API y credenciales oficiales. Mientras
+//                     no exista esa habilitacion se rechaza explicitamente:
+//                     NO se simula ni se inventa un endpoint.
+//
 // REGLAS (Parte 5 del requerimiento):
 //   - El importe y el plan SIEMPRE los valida el servidor: el
 //     navegador nunca fija el precio.
@@ -61,17 +68,55 @@ function generarReferencia(prefix = "CORD") {
  */
 function estadoProveedor() {
   const esMp = PROVEEDOR === "mercadopago";
+  const mpListo = esMp && Boolean(process.env.MERCADOPAGO_ACCESS_TOKEN);
+  // Nequi existe como OPCION visible, pero no se presenta como disponible
+  // hasta que exista habilitacion comercial + credenciales + contrato de
+  // producto (QR/PUSH). La presence de credenciales NO habilita el cobro:
+  // todavia falta implementar el cliente oficial contra la API documentada.
+  const nequiCredenciales = Boolean(
+    process.env.NEQUI_CLIENT_ID && process.env.NEQUI_CLIENT_SECRET
+  );
   return {
     proveedor: PROVEEDOR,
     real: esMp,
-    credencialesConfiguradas: esMp
-      ? Boolean(process.env.MERCADOPAGO_ACCESS_TOKEN)
-      : false,
+    credencialesConfiguradas: mpListo,
     sandbox: PROVEEDOR === "mock",
     // En produccion el modo simulado queda bloqueado: no habilita cobros.
     bloqueadoEnProduccion: PROVEEDOR === "mock" && esProduccion(),
     pagosTuristicos: false, // los planes turisticos no tienen pagos
+    metodos: {
+      // En sandbox local el checkout simulado esta disponible sin token;
+      // en produccion solo se ofrece si hay credenciales reales.
+      mercadopago: {
+        disponible: mpListo || (PROVEEDOR === "mock" && !esProduccion()),
+        sandbox: PROVEEDOR === "mock",
+      },
+      nequi: {
+        disponible: false,
+        credencialesConfiguradas: nequiCredenciales,
+        motivo:
+          "Nequi requiere registro comercial, habilitacion del producto (QR o PUSH) y credenciales oficiales. " +
+          "No se activa ningun cobro hasta que esa integracion este implementada y probada.",
+      },
+    },
   };
+}
+
+/**
+ * Ruta publica de retorno tras el pago. Es la ruta ofuscada YA existente
+ * `PLANES_PUBLICOS` de frontend/src/routes/offuscatedRoutes.js; se permite
+ * sobreescribirla por entorno para no acoplar un deploy del backend a un
+ * cambio de ofuscacion del frontend. Nunca se inventa una ruta nueva.
+ */
+function rutaResultadoPago(parametros = {}) {
+  const ruta = (process.env.PAYMENT_RESULT_PATH || "/gJvs5ksh").trim();
+  const base = ruta.startsWith("/") ? ruta : `/${ruta}`;
+  const query = new URLSearchParams();
+  Object.entries(parametros).forEach(([clave, valor]) => {
+    if (valor !== undefined && valor !== null && valor !== "") query.set(clave, String(valor));
+  });
+  const sufijo = query.toString();
+  return `${base}${sufijo ? `?${sufijo}` : ""}`;
 }
 
 // ------------------------------------------------------------
@@ -122,12 +167,33 @@ function frontendUrl(ruta) {
  * @param {number} args.monto       - importe en COP (viene del servidor).
  * @param {string} args.referencia  - referencia interna de la operacion.
  * @param {string} args.usuarioEmail - email del vendedor (para la preferencia).
+ * @param {string} [args.metodo] - 'mercadopago' (contado) o 'nequi'.
  * @returns {Promise<{proveedor, referencia, estado, monto, moneda, url, sandbox}>}
  */
-async function crearPago({ planId, nombrePlan, monto, referencia, usuarioEmail, idUsuario }) {
+async function crearPago({
+  planId, nombrePlan, monto, referencia, usuarioEmail, idUsuario, metodo = "mercadopago",
+}) {
   const valor = Math.round(Number(monto) || 0);
   if (valor <= 0) {
     throw Object.assign(new Error("El plan no tiene un importe válido"), { status: 500 });
+  }
+
+  // El frontend puede mostrar Nequi, pero NO puede iniciar un cobro con un
+  // proveedor que no esta habilitado. Respuesta explicita, nunca simulada.
+  if (metodo === "nequi") {
+    throw Object.assign(
+      new Error(
+        "Nequi todavía no está habilitado en Cordalia. Solicita registro comercial, " +
+          "producto (QR o PUSH) y credenciales oficiales antes de usarlo."
+      ),
+      { status: 501, code: "NEQUI_NOT_ENABLED" }
+    );
+  }
+  if (metodo !== "mercadopago") {
+    throw Object.assign(new Error("Método de pago no válido"), {
+      status: 400,
+      code: "INVALID_PAYMENT_METHOD",
+    });
   }
 
   if (PROVEEDOR === "mercadopago") {
@@ -151,11 +217,18 @@ async function crearPago({ planId, nombrePlan, monto, referencia, usuarioEmail, 
       // Identificador externo: permite reconciliar la preferencia con
       // la suscripcion creada en nuestra base de datos.
       external_reference: referencia,
-      back_urls: {
-        success: frontendUrl("/panel-vendedor?pago=aprobado") || undefined,
-        pending: frontendUrl("/panel-vendedor?pago=pendiente") || undefined,
-        failure: frontendUrl("/panel-vendedor?pago=rechazado") || undefined,
-      },
+      // Retorno a la ruta PUBLICA de planes YA existente (ofuscada).
+      // El estado del pago NO se decide aqui: la pagina de resultado
+      // consulta al backend, y el backend solo cree en el webhook verificado.
+      back_urls: frontendUrl(rutaResultadoPago({ pago: "aprobado", referencia }))
+        ? {
+            success: frontendUrl(rutaResultadoPago({ pago: "aprobado", referencia })),
+            pending: frontendUrl(rutaResultadoPago({ pago: "pendiente", referencia })),
+            failure: frontendUrl(rutaResultadoPago({ pago: "rechazado", referencia })),
+          }
+        : undefined,
+      // Pago de contado: sin cuotas ni financiacion. auto_return solo
+      // mejora la experiencia; nunca confirma la suscripcion.
       auto_return: "approved",
       notification_url: backendUrl("/api/suscripciones/webhook/mercadopago") || undefined,
       // No enviamos datos personales del pagador al proveedor. Mercado Pago
@@ -274,7 +347,7 @@ async function verificarPago(pago = {}) {
  *
  * @returns {{valido: boolean, motivo?: string}}
  */
-function validarFirmaWebhook({ headers = {}, bodyRaw = "", query = {} } = {}) {
+function validarFirmaWebhook({ headers = {}, bodyRaw = "", query = {}, body = {} } = {}) {
   // `bodyRaw` se conserva en la firma por compatibilidad con el
   // controlador, pero NO forma parte del manifiesto oficial.
   void bodyRaw;
@@ -287,7 +360,16 @@ function validarFirmaWebhook({ headers = {}, bodyRaw = "", query = {} } = {}) {
   const xSignature = headers["x-signature"];
   if (!xSignature) return { valido: false, motivo: "Falta la cabecera x-signature" };
 
-  const dataId = query["data.id"] || query?.data?.id || "";
+  // El SDK valida la firma del id que viene en la QUERY (`data.id`).
+  // Si el cuerpo notificara OTRO id, una firma valida para A servira para
+  // consultar/activar B. Por eso se exige que ambos ids sean el mismo.
+  const idFirmado = query["data.id"] || query?.data?.id || "";
+  const idCuerpo = body?.data?.id || "";
+  if (!idFirmado) return { valido: false, motivo: "Falta data.id en la URL notificada" };
+  if (idCuerpo && String(idCuerpo) !== String(idFirmado)) {
+    return { valido: false, motivo: "El id del cuerpo no coincide con el id firmado" };
+  }
+  const dataId = idFirmado;
   const xRequestId = headers["x-request-id"] || "";
 
   try {
@@ -319,4 +401,5 @@ module.exports = {
   validarFirmaWebhook,
   generarReferencia,
   estadoProveedor,
+  rutaResultadoPago,
 };

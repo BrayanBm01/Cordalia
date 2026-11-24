@@ -22,6 +22,16 @@ function serverError(res, error, context) {
   return res.status(500).json({ success: false, message: "Error interno del servidor" });
 }
 
+// Estados del proveedor -> estados permitidos en `suscripcion_pagos`.
+// NINGUNO de estos estados activa la suscripcion; solo 'approved' lo hace.
+function estadoEventoPago(estado) {
+  const e = String(estado || "").toLowerCase();
+  if (e === "rejected") return "rejected";
+  if (e === "cancelled" || e === "canceled") return "cancelled";
+  if (e === "approved") return "approved";
+  return "pending"; // in_process, pending, etc.
+}
+
 // ---------- GET /api/planes-comerciales (PÚBLICO) ----------
 // Catálogo de planes comerciales: nombre, precio y beneficios.
 //
@@ -43,6 +53,9 @@ exports.planesPublicos = async (req, res) => {
         moneda: p.moneda,
         meses: p.meses,
         features: p.features || [],
+        max_images: p.max_images ?? null,
+        max_services: p.max_services ?? null,
+        destacado: Boolean(p.is_featured),
       })),
     });
   } catch (error) {
@@ -66,6 +79,20 @@ exports.estado = async (req, res) => {
 
     const suscripciones = await SuscripcionModel.listSuscripciones(req.usuario.id);
     const pagos = await SuscripcionModel.listPagos(req.usuario.id);
+    const beneficios = await SuscripcionModel.beneficiosVigentes(req.usuario.id);
+    // Las estadisticas son informativas: un problema en una consulta de
+    // agregacion NO debe impedir consultar el estado ni contratar un plan.
+    let estadisticas = null;
+    if (beneficios.estadisticas) {
+      try {
+        estadisticas = await SuscripcionModel.estadisticasVendedor(
+          req.usuario.id,
+          beneficios.estadisticas
+        );
+      } catch (error) {
+        console.error("Error estadisticas del vendedor:", error && error.message);
+      }
+    }
 
     let planActual = null;
     if (est.plan_activo_id) {
@@ -79,6 +106,8 @@ exports.estado = async (req, res) => {
         plan_actual: planActual,
         suscripciones,
         pagos,
+        beneficios,
+        estadisticas,
         proveedor: paymentService.estadoProveedor(),
       },
     });
@@ -96,6 +125,83 @@ exports.planes = async (req, res) => {
     return res.json({ success: true, data: planes });
   } catch (error) {
     return serverError(res, error, "listar planes comerciales");
+  }
+};
+
+// ---------- GET /api/vendedor/pagos/:referencia/estado ----------
+// Estado REAL de una operacion para la pantalla de resultado.
+// La URL de retorno SOLO aporta la referencia y el id del pago: el estado
+// se lee de la BD (webhook verificado) y, si hay id de pago, se confirma
+// consultando al proveedor. NUNCA activa una suscripcion: eso solo lo
+// hace el webhook con firma valida.
+exports.estadoPago = async (req, res) => {
+  try {
+    const referencia = String(req.params.referencia || "").trim();
+    if (!referencia) {
+      return res.status(400).json({ success: false, message: "Referencia de pago inválida" });
+    }
+    const sub = await SuscripcionModel.findSuscripcionPorReferencia(req.usuario.id, referencia);
+    if (!sub) {
+      return res.status(404).json({ success: false, message: "Operación de pago no encontrada" });
+    }
+
+    let verificado = null;
+    let errorProveedor = false;
+    const idProveedor = String(req.query.payment_id || req.query.collection_id || "").trim();
+    if (
+      idProveedor &&
+      sub.proveedor === "mercadopago" &&
+      paymentService.PROVEEDOR === "mercadopago" &&
+      paymentService.estadoProveedor().credencialesConfiguradas
+    ) {
+      try {
+        const consulta = await paymentService.verificarPago({
+          externo: idProveedor,
+          pago_id: idProveedor,
+        });
+        // Un payment_id ajeno no puede cambiar el estado de esta operacion.
+        if (consulta.referencia && String(consulta.referencia) !== String(sub.referencia_externa)) {
+          errorProveedor = true;
+          console.error("[estado pago] el pago consultado pertenece a otra operación");
+        } else {
+          verificado = consulta;
+        }
+      } catch (error) {
+        errorProveedor = true;
+        console.error("[estado pago] no se pudo consultar al proveedor:", error && error.message);
+      }
+    }
+
+    let estado = "pending";
+    if (sub.estado === "cancelled") estado = "cancelled";
+    else if (verificado && ["rejected", "cancelled"].includes(String(verificado.estado))) {
+      estado = verificado.estado === "cancelled" ? "cancelled" : "rejected";
+    } else if (sub.estado === "active") estado = "approved";
+    else if (verificado && verificado.confirmado) estado = "pending"; // falta el webhook
+    else if (verificado && ["in_process", "pending"].includes(String(verificado.estado))) {
+      estado = "pending";
+    } else if (errorProveedor) estado = "error";
+    else if (sub.estado === "rejected") estado = "rejected";
+
+    return res.json({
+      success: true,
+      data: {
+        estado,
+        estadoSuscripcion: sub.estado,
+        confirmadoPorWebhook: sub.estado === "active",
+        pendienteActivacion: Boolean(verificado && verificado.confirmado && sub.estado !== "active"),
+        referencia: sub.referencia_externa,
+        plan: { id: sub.plan_id, nombre: sub.plan_nombre || null },
+        monto: Number(sub.monto),
+        moneda: sub.moneda,
+        fecha: sub.created_at,
+        vencimiento: sub.ends_at,
+        proveedor: sub.proveedor,
+        metodo: sub.proveedor,
+      },
+    });
+  } catch (error) {
+    return serverError(res, error, "estado de pago");
   }
 };
 
@@ -128,6 +234,9 @@ exports.contratar = async (req, res) => {
 
     const usuario = await UsuarioModel.findById(usuarioId);
     const referencia = paymentService.generarReferencia("CORD-SUB");
+    // El metodo es una PREFERENCIA del navegador; nunca el importe ni
+    // el plan. Si el metodo no esta habilitado, el servicio falla cerrado.
+    const metodo = String(req.body?.metodo || "mercadopago");
 
     const pago = await paymentService.crearPago({
       planId,
@@ -136,6 +245,7 @@ exports.contratar = async (req, res) => {
       referencia,
       usuarioEmail: usuario?.email || null,
       idUsuario: usuarioId,
+      metodo,
     });
 
     const idempotencyKey = `sub:${usuarioId}:${referencia}`;
@@ -245,6 +355,7 @@ exports.webhookMercadopago = async (req, res) => {
       headers: req.headers,
       bodyRaw,
       query: req.query || {},
+      body: req.body || {},
     });
     if (!firma.valido) {
       console.error(`[webhook mp] firma rechazada: ${firma.motivo}`);
@@ -262,7 +373,9 @@ exports.webhookMercadopago = async (req, res) => {
 
     // 2) Datos del evento.
     const data = (req.body && req.body.data) || {};
-    const id = data.id || (req.query && req.query["data.id"]) || null;
+    // Se usa SIEMPRE el id firmado en la URL: el cuerpo no puede cambiar
+    // el pago que se va a consultar.
+    const id = (req.query && req.query["data.id"]) || data.id || null;
     if (!id) {
       return res.status(400).json({ success: false, message: "Notificación sin id de pago" });
     }
@@ -270,6 +383,32 @@ exports.webhookMercadopago = async (req, res) => {
     // 3) Consulta al proveedor: el cuerpo NO es fuente de verdad.
     const verificado = await paymentService.verificarPago({ externo: id, pago_id: id });
     if (!verificado.confirmado) {
+      // Se registra el estado real para el historial (idempotente), pero
+      // NUNCA se activa ni se renueva una suscripcion con un pago no aprobado.
+      const referenciaRechazada = verificado.referencia || null;
+      const { rows: subsRechazadas } = await pool.query(
+        `SELECT id, usuario_id, plan_id FROM subscriptions
+          WHERE referencia_externa = $1 OR pago_id = $2
+          ORDER BY id DESC LIMIT 1`,
+        [referenciaRechazada, String(id)]
+      );
+      const subRechazada = subsRechazadas[0] || null;
+      if (subRechazada) {
+        await SuscripcionModel.registrarPago({
+          suscripcionId: subRechazada.id,
+          usuarioId: subRechazada.usuario_id,
+          planId: subRechazada.plan_id,
+          proveedor: "mercadopago",
+          evento: "estado_proveedor",
+          estado: estadoEventoPago(verificado.estado),
+          referenciaExterna: referenciaRechazada,
+          pagoId: verificado.pago_id || String(id),
+          monto: verificado.monto ?? null,
+          moneda: verificado.moneda || "COP",
+          idempotencyKey: `mp-estado:${verificado.pago_id || id}:${verificado.estado || "desconocido"}`,
+          payload: verificado.datos || null,
+        });
+      }
       return res.status(200).json({
         success: true,
         accepted: false,
@@ -285,7 +424,7 @@ exports.webhookMercadopago = async (req, res) => {
     const referenciaInterna = verificado.referencia;
     const idProveedor = verificado.pago_id || id;
     const { rows: subs } = await pool.query(
-      `SELECT id, usuario_id, plan_id, monto, moneda FROM subscriptions
+      `SELECT id, usuario_id, plan_id, monto, moneda, referencia_externa FROM subscriptions
         WHERE referencia_externa = $1 OR pago_id = $2
         ORDER BY id DESC LIMIT 1`,
       [referenciaInterna, idProveedor]
@@ -295,6 +434,24 @@ exports.webhookMercadopago = async (req, res) => {
       return res.status(404).json({ success: false, message: "Suscripción no encontrada" });
     }
     const sub = subs[0];
+
+    // 4.a) Referencia y usuario: un pago ajeno nunca activa el plan de
+    //      otro vendedor, aunque el importe y la moneda coincidan.
+    if (!referenciaInterna || String(referenciaInterna) !== String(sub.referencia_externa)) {
+      console.error("[webhook mp] la referencia pagada no corresponde a la suscripción");
+      return res.status(400).json({
+        success: false,
+        message: "La referencia del pago no corresponde a la suscripción",
+      });
+    }
+    const idUsuarioMetadata = verificado.datos?.metadata?.usuario_id;
+    if (!idUsuarioMetadata || Number(idUsuarioMetadata) !== Number(sub.usuario_id)) {
+      console.error("[webhook mp] el usuario del pago no corresponde a la suscripción");
+      return res.status(403).json({
+        success: false,
+        message: "El usuario del pago no corresponde a la suscripción",
+      });
+    }
 
     // 4.b) El importe y la moneda deben coincidir con lo contratado.
     //      Aunque la preferencia la crea el servidor, esta comprobacion

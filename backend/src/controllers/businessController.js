@@ -328,6 +328,34 @@ function serverError(res, error, context) {
   return responderErrorServidor(res, error, context);
 }
 
+/**
+ * El backend hace cumplir los limites del plan anunciados en la pagina.
+ * El ADMIN no esta sujeto a limites comerciales (crea negocios de la
+ * plataforma). La prueba gratuita y los vendedores anteriores conservan
+ * el acceso completo que ya tenian.
+ */
+async function verificarLimitePlan(req, res, tipo) {
+  if (req.usuario?.rol === "ADMIN") return true;
+  const beneficios = await SuscripcionModel.beneficiosVigentes(req.usuario.id);
+  const max = Number(beneficios.limites?.[tipo]) || 0;
+  const actuales =
+    tipo === "imagenes"
+      ? await BusinessModel.listImages(req.params.id)
+      : await BusinessModel.listServices(req.params.id);
+  if (actuales.length >= max) {
+    res.status(403).json({
+      success: false,
+      code: "LIMITE_PLAN",
+      message:
+        `Tu plan ${beneficios.plan_nombre || "actual"} permite hasta ${max} ` +
+        `${tipo === "imagenes" ? "imágenes" : "servicios"}. Renueva o cambia de plan para ampliar el límite.`,
+      data: { beneficios },
+    });
+    return false;
+  }
+  return true;
+}
+
 // Valida el rango de precios según la categoría del negocio:
 // - categorías SIN_PRECIO: no se aceptan precios en la ficha.
 // - categorías CON_PRECIO: se valida el rango cuando el cliente lo envía;
@@ -878,6 +906,7 @@ exports.addImage = async (req, res) => {
     if (is_primary !== undefined && typeof is_primary !== "boolean") {
       return res.status(400).json({ success: false, message: "is_primary debe ser verdadero o falso" });
     }
+    if (!(await verificarLimitePlan(req, res, "imagenes"))) return;
     const imagen = await BusinessModel.addImage(
       req.params.id,
       img,
@@ -984,6 +1013,7 @@ exports.addService = async (req, res) => {
     if (desc.error) {
       return res.status(400).json({ success: false, message: desc.error });
     }
+    if (!(await verificarLimitePlan(req, res, "servicios"))) return;
     const servicio = await BusinessModel.addService(req.params.id, sanitizeString(nombre), desc.value);
     return res.status(201).json({ success: true, message: "Servicio agregado", data: servicio });
   } catch (error) {

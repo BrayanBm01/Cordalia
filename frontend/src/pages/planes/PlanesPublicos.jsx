@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Search, Ticket, MapPin, Clock, ArrowRight, Users, Sprout, Tag, RefreshCw } from 'lucide-react'
 import { planesAPI, lugaresAPI } from '../../services/api'
@@ -7,6 +7,7 @@ import { getPlanImagen } from '../../utils/media'
 import { formatMoney } from '../negocios/businessUtils'
 import { TIPO_PLAN_LABEL, formatDuracion, planPrecios } from '../negocios/planUtils'
 import { rutaCon } from '../../routes/offuscatedRoutes.js'
+import ResultadoPago from './ResultadoPago.jsx'
 
 const DURACION_OPCIONES = [
   { label: 'Cualquier duración', dias_min: null, dias_max: null },
@@ -130,6 +131,11 @@ export function PlanCard({ plan, index = 0 }) {
 }
 
 export default function PlanesPublicos() {
+  // El retorno de Mercado Pago apunta a ESTA misma ruta ofuscada ya
+  // existente. Si viene con referencia, mostramos el resultado real del
+  // pago (consultado al backend) en lugar del catálogo turístico.
+  const [params] = useSearchParams()
+  const referenciaPago = params.get('referencia')
   const [planes, setPlanes] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -200,6 +206,8 @@ export default function PlanesPublicos() {
   function toggleIncluye(label) {
     setIncluyeFiltro((prev) => (prev.includes(label) ? prev.filter((x) => x !== label) : [...prev, label]))
   }
+
+  if (referenciaPago) return <ResultadoPago />
 
   return (
     <div className="min-h-screen bg-cream-50">

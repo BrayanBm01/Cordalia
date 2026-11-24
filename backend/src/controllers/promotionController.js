@@ -1,5 +1,6 @@
 const PromotionModel = require("../models/promotionModel");
 const PlanModel = require("../models/planModel");
+const SuscripcionModel = require("../models/suscripcionModel");
 const pool = require("../config/db");
 const { isNonEmptyString, sanitizeString } = require("../utils/validators");
 
@@ -46,6 +47,25 @@ function validarImagenDataUrl(dataUrl) {
 function serverError(res, error, context) {
   console.error(`Error ${context}:`, error);
   return res.status(500).json({ success: false, message: "Error interno del servidor" });
+}
+
+// "Promociones activas" es un beneficio anunciado en el plan Premium.
+// Durante la prueba gratuita (y para vendedores anteriores) se conserva
+// el acceso que ya existia; con un plan de pago se exige que el plan
+// contratado incluya realmente el beneficio.
+async function requiereBeneficioPromociones(req, res) {
+  if (req.usuario?.rol === "ADMIN") return true;
+  const beneficios = await SuscripcionModel.beneficiosVigentes(req.usuario.id);
+  if (beneficios.promociones) return true;
+  res.status(403).json({
+    success: false,
+    code: "BENEFICIO_NO_DISPONIBLE",
+    message:
+      `Tu plan ${beneficios.plan_nombre || "actual"} no incluye promociones activas. ` +
+      "Contrata el plan que incluya este beneficio para usarlo.",
+    data: { beneficios },
+  });
+  return false;
 }
 
 // owner/admin pueden ver todas; el resto solo activas vigentes.
@@ -226,6 +246,7 @@ exports.getById = async (req, res) => {
 // ---------- Crear ----------
 exports.create = async (req, res) => {
   try {
+    if (!(await requiereBeneficioPromociones(req, res))) return;
     const businessId = Number(getBusinessId(req));
     const { error, data } = await validarPromo(req.body, req.business, true);
     if (error) return res.status(error.status).json({ success: false, message: error.message });
@@ -270,6 +291,9 @@ exports.update = async (req, res) => {
     const fechaIniEf = data.fecha_inicio != null ? data.fecha_inicio : existing.fecha_inicio;
     const fechaFinEf = data.fecha_fin != null ? data.fecha_fin : existing.fecha_fin;
     const estadoEf = data.estado != null ? data.estado : existing.estado;
+    // Solo se exige el beneficio si la promocion queda ACTIVA: desactivar
+    // una promocion antigua siempre debe ser posible.
+    if (estadoEf === "activo" && !(await requiereBeneficioPromociones(req, res))) return;
     if (planIdEf && estadoEf === "activo" && fechaIniEf && fechaFinEf) {
       const solapa = await PromotionModel.hasActiveOverlap(planIdEf, fechaIniEf, fechaFinEf, promoId);
       if (solapa) {
@@ -299,6 +323,7 @@ exports.setEstado = async (req, res) => {
     const existing = await PromotionModel.findByBusinessAndId(businessId, promoId);
     if (!existing) return res.status(404).json({ success: false, message: "Promoción no encontrada" });
 
+    if (estado === "activo" && !(await requiereBeneficioPromociones(req, res))) return;
     if (estado === "activo" && existing.plan_id) {
       const solapa = await PromotionModel.hasActiveOverlap(
         existing.plan_id,

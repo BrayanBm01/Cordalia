@@ -87,9 +87,10 @@ app.use(
 // que como JSON ocupa hasta ~2.7 MB). Elevamos el limite del body para
 // permitir ese caso manteniendo un margen seguro para el resto de endpoints.
 //
-// `verify` conserva el CUERPO CRUDO de la peticion en `req.rawBody`:
-// es necesario para verificar la FIRMA de la webhook de Mercado Pago
-// (x-signature se calcula sobre el texto exacto recibido).
+// `verify` conserva el CUERPO CRUDO de la peticion en `req.rawBody` para
+// auditoria/depuracion. La firma oficial de Mercado Pago NO se calcula
+// sobre el cuerpo, sino sobre el manifiesto `id;request-id;ts` (ver
+// paymentService.validarFirmaWebhook).
 app.use(
   express.json({
     limit: "4mb",
@@ -130,7 +131,6 @@ app.use("/api", require("./routes/inscripcionRoutes"));
 app.use("/api", require("./routes/suscripcionRoutes"));
 // Webhook del proveedor de pagos (firma verificada, sin sesión).
 app.use("/api", require("./routes/suscripcionRoutes").webhookRouter);
-app.use("/", require("./routes/suscripcionRoutes").webhookRouter);
 
 app.get("/api/health", (req, res) => {
   res.json({ success: true, message: "API funcionando" });

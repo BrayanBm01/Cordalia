@@ -73,6 +73,8 @@ export default function PanelVendedor() {
   const [planes, setPlanes] = useState([])
   const [loading, setLoading] = useState(true)
   const [contratando, setContratando] = useState(null)
+  // El frontend solo elige un MÉTODO; nunca envía precio ni plan "activo".
+  const [metodo, setMetodo] = useState('mercadopago')
 
   async function cargar() {
     try {
@@ -96,7 +98,7 @@ export default function PanelVendedor() {
   async function contratar(plan) {
     setContratando(plan.id)
     try {
-      const res = await vendedorAPI.contratar(plan.id)
+      const res = await vendedorAPI.contratar(plan.id, metodo)
       if (res.data?.url) {
         // Mercado Pago real: el pago se confirma con la notificacion del
         // proveedor, NO al volver de la redireccion.
@@ -134,6 +136,10 @@ export default function PanelVendedor() {
   const info = ESTADO_INFO[estado?.estado] || null
   const Icono = info?.icon || BadgeCheck
   const bloqueado = estado?.estado === 'EXPIRED' || estado?.estado === 'SUSPENDED'
+  // Disponibilidad REAL informada por el backend; si el campo no viene
+  // (backend anterior) se mantiene el comportamiento previo de checkout.
+  const mpDisponible = estado?.proveedor?.metodos?.mercadopago?.disponible !== false
+  const nequiInfo = estado?.proveedor?.metodos?.nequi || { disponible: false }
 
   return (
     <div className="min-h-screen bg-cream-50">
@@ -307,15 +313,142 @@ export default function PanelVendedor() {
           </div>
         </div>
 
+        {/* Beneficios calculados en el SERVIDOR según prueba/plan vigente */}
+        {estado?.beneficios && (
+          <section className="bg-white rounded-2xl border border-dark-100 p-6 md:p-8 mb-8">
+            <h2 className="text-xl font-bold text-dark-900 mb-1 flex items-center gap-2" style={{ fontFamily: 'var(--font-display)' }}>
+              <Sparkles className="w-5 h-5 text-primary-600" /> Tus beneficios vigentes
+            </h2>
+            <p className="text-sm text-dark-500 mb-5">
+              Los calcula el servidor según tu prueba gratuita o tu suscripción pagada. La prueba
+              de 7 días y las cuentas anteriores conservan el acceso completo.
+            </p>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-xl border border-dark-100 bg-cream-50 p-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-dark-500">Beneficio aplicado</p>
+                <p className="font-bold text-dark-900 mt-1">
+                  {estado.beneficios.plan_nombre || 'Sin plan'}
+                </p>
+                <p className="text-xs text-dark-500 mt-1">
+                  Origen: {{
+                    prueba: 'prueba gratuita',
+                    legado: 'cuenta anterior',
+                    suscripcion: 'suscripción pagada',
+                    sin_plan: 'sin derecho vigente',
+                  }[estado.beneficios.origen] || estado.beneficios.origen}
+                </p>
+                {(estado.beneficios.limites?.imagenes != null ||
+                  estado.beneficios.limites?.servicios != null) && (
+                  <p className="text-xs text-dark-600 mt-3">
+                    Hasta {estado.beneficios.limites.imagenes} imágenes y{' '}
+                    {estado.beneficios.limites.servicios} servicios por negocio.
+                  </p>
+                )}
+              </div>
+              <div className="rounded-xl border border-dark-100 bg-cream-50 p-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-dark-500">Incluye</p>
+                <ul className="mt-2 space-y-1 text-xs text-dark-700">
+                  {(estado.beneficios.features || []).slice(0, 6).map((f) => (
+                    <li key={f} className="flex items-start gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-moss-600 shrink-0 mt-0.5" />
+                      <span>{f}</span>
+                    </li>
+                  ))}
+                  {(!estado.beneficios.features || estado.beneficios.features.length === 0) && (
+                    <li className="text-dark-500">Sin beneficios adicionales activos.</li>
+                  )}
+                </ul>
+              </div>
+            </div>
+            {estado.estadisticas && (
+              <dl className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mt-4">
+                {[
+                  ['Negocios', estado.estadisticas.negocios],
+                  ['Planes activos', estado.estadisticas.planes_activos],
+                  ['Inscripciones', estado.estadisticas.inscripciones],
+                  ['Promociones', estado.estadisticas.promociones_activas],
+                  ['Imágenes', estado.estadisticas.imagenes],
+                ].map(([label, valor]) => (
+                  <div key={label} className="rounded-xl bg-moss-50 border border-moss-100 p-3 text-center">
+                    <dt className="text-[11px] uppercase tracking-wide text-dark-500">{label}</dt>
+                    <dd className="text-lg font-bold text-moss-900">{Number(valor) || 0}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </section>
+        )}
+
         {/* Planes disponibles */}
         <section id="planes-comerciales" className="bg-white rounded-2xl border border-dark-100 p-6 md:p-8 mb-8 scroll-mt-6">
           <h2 className="text-xl font-bold text-dark-900 mb-1 flex items-center gap-2" style={{ fontFamily: 'var(--font-display)' }}>
             <Sparkles className="w-5 h-5 text-primary-600" /> Planes comerciales
           </h2>
-          <p className="text-sm text-dark-500 mb-6">
-            Todos los planes se cobran por un mes. Puedes contratar antes de que termine tu
-            prueba gratuita.
+          <p className="text-sm text-dark-500 mb-5">
+            Todos los planes se cobran por un mes, de contado y sin cuotas. Puedes contratar
+            antes de que termine tu prueba gratuita.
           </p>
+
+          {/* Método de pago: solo se envía la preferencia al backend. El
+              importe sigue fijándolo el servidor desde la base de datos. */}
+          <fieldset className="mb-6">
+            <legend className="text-xs font-bold uppercase tracking-wide text-dark-500 mb-2">
+              Método de pago
+            </legend>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label
+                className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-colors ${
+                  metodo === 'mercadopago'
+                    ? 'border-moss-400 bg-moss-50'
+                    : 'border-dark-100 bg-cream-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="metodo-pago"
+                  value="mercadopago"
+                  checked={metodo === 'mercadopago'}
+                  onChange={() => setMetodo('mercadopago')}
+                  className="mt-0.5 accent-moss-800"
+                />
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold text-dark-900">Mercado Pago</span>
+                  <span className="block text-[11px] text-dark-500 mt-0.5">
+                    Pago de contado con tarjeta o efectivo. Sin financiación ni cuotas.
+                  </span>
+                </span>
+              </label>
+              <label
+                className={`flex items-start gap-3 rounded-xl border p-3 border-dark-100 bg-cream-50 opacity-70 ${
+                  metodo === 'nequi' ? 'ring-2 ring-moss-300' : ''
+                }`}
+                title={nequiInfo.motivo || 'Medio no disponible'}
+              >
+                <input
+                  type="radio"
+                  name="metodo-pago"
+                  value="nequi"
+                  checked={false}
+                  disabled
+                  readOnly
+                  className="mt-0.5"
+                />
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold text-dark-900">Nequi</span>
+                  <span className="block text-[11px] text-dark-500 mt-0.5">
+                    No disponible todavía: requiere habilitación comercial y credenciales
+                    oficiales. No se simula este cobro.
+                  </span>
+                </span>
+              </label>
+            </div>
+            {!mpDisponible && (
+              <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-2.5 mt-3">
+                Mercado Pago no está configurado en este servidor. Configura
+                PAYMENT_PROVIDER=mercadopago y MERCADOPAGO_ACCESS_TOKEN para habilitar los cobros.
+              </p>
+            )}
+          </fieldset>
 
           <div className="grid gap-4 md:grid-cols-3">
             {planes.map((plan) => {
@@ -355,7 +488,7 @@ export default function PanelVendedor() {
                   <button
                     type="button"
                     onClick={() => contratar(plan)}
-                    disabled={contratando === plan.id || Number(plan.precio) <= 0}
+                    disabled={contratando === plan.id || Number(plan.precio) <= 0 || !mpDisponible}
                     className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-moss-900 text-white text-sm font-bold hover:bg-moss-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {contratando === plan.id ? (

@@ -24,6 +24,22 @@ const { ownerEntitledSql } = require("../utils/publicacion");
 const HORAS_PRUEBA = 168;
 const DIAS_PRUEBA = 7;
 
+// La prueba gratuita conserva TODAS las funcionalidades que ya tenia el
+// vendedor antes de esta politica (incluidas promociones y estadisticas).
+// No es un plan de pago: al vencer, los beneficios pasan a los del plan
+// contratado (o a los basicos si no hay suscripcion vigente).
+const BENEFICIOS_PRUEBA = Object.freeze([
+  "Pagina profesional",
+  "Estadisticas avanzadas",
+  "WhatsApp destacado",
+  "Promociones activas",
+  "Negocio destacado",
+  "Posicionamiento preferencial",
+  "Sin anuncios",
+  "Soporte dedicado",
+  "Badge de verificacion",
+]);
+
 // Estados comerciales.
 const ESTADOS = {
   TRIALING: "TRIALING",
@@ -255,13 +271,114 @@ const SuscripcionModel = {
     return true;
   },
 
+  /**
+   * Beneficios REALES que el servidor debe aplicar AHORA a un vendedor.
+   *
+   * La prueba gratuita de 168 h y los vendedores anteriores a la politica
+   * conservan el acceso completo que ya tenian (no se les quitan
+   * funcionalidades). Con una suscripcion PAGADA vigente se aplican los
+   * limites y banderas del plan contratado: ahi es donde el backend debe
+   * hacer cumplir lo anunciado, no solo mostrarlo en React.
+   */
+  async beneficiosVigentes(usuarioId) {
+    const { rows } = await pool.query(
+      `SELECT id, estado_cuenta, trial_inicio, trial_fin FROM usuarios WHERE id = $1`,
+      [usuarioId]
+    );
+    const u = rows[0];
+    if (!u) return this._beneficioBase("Sin usuario", null);
+    if (u.estado_cuenta === "SUSPENDED") {
+      return this._beneficioBase("Cuenta suspendida", null);
+    }
+
+    const { rows: planes } = await pool.query(
+      `SELECT p.id, p.nombre, p.max_images, p.max_services, p.is_featured,
+              p.is_promoted, p.features
+         FROM subscriptions s
+         JOIN plans p ON p.id = s.plan_id
+        WHERE s.usuario_id = $1
+          AND s.estado = 'active'
+          AND s.ends_at IS NOT NULL
+          AND s.ends_at > NOW()
+        ORDER BY s.ends_at DESC
+        LIMIT 1`,
+      [usuarioId]
+    );
+    if (planes[0]) return this._beneficioDesdePlan(planes[0], "suscripcion");
+
+    const pruebaVigente =
+      u.estado_cuenta === "TRIALING" && u.trial_fin && new Date(u.trial_fin) > new Date();
+    const vendedorAnterior = u.estado_cuenta === null && !u.trial_inicio;
+    if (pruebaVigente || vendedorAnterior) {
+      return {
+        plan_id: null,
+        plan_nombre: pruebaVigente ? "Prueba gratuita" : "Vendedor anterior",
+        origen: pruebaVigente ? "prueba" : "legado",
+        features: [...BENEFICIOS_PRUEBA],
+        limites: { imagenes: 50, servicios: 50 },
+        destacado: true,
+        promociones: true,
+        estadisticas: "avanzadas",
+        verificado: true,
+        sinAnuncios: true,
+        soporte: "prioritario",
+      };
+    }
+    return this._beneficioBase("Sin derecho vigente", null);
+  },
+
+  _beneficioBase(planNombre, planId) {
+    return {
+      plan_id: planId,
+      plan_nombre: planNombre,
+      origen: "sin_plan",
+      features: ["Pagina basica", "Informacion de contacto", "Horarios"],
+      limites: { imagenes: 5, servicios: 5 },
+      destacado: false,
+      promociones: false,
+      estadisticas: null,
+      verificado: false,
+      sinAnuncios: false,
+      soporte: null,
+    };
+  },
+
+  _beneficioDesdePlan(plan, origen) {
+    const features = Array.isArray(plan.features) ? plan.features : [];
+    return {
+      plan_id: plan.id,
+      plan_nombre: plan.nombre,
+      origen,
+      features,
+      limites: {
+        imagenes: Number(plan.max_images) || 0,
+        servicios: Number(plan.max_services) || 0,
+      },
+      destacado: Boolean(plan.is_featured || features.includes("Negocio destacado")),
+      promociones: features.includes("Promociones activas"),
+      estadisticas: features.includes("Estadisticas avanzadas")
+        ? "avanzadas"
+        : features.includes("Estadisticas basicas")
+          ? "basicas"
+          : null,
+      verificado: features.includes("Badge de verificacion"),
+      sinAnuncios: features.includes("Sin anuncios"),
+      soporte: features.includes("Soporte dedicado")
+        ? "dedicado"
+        : features.includes("Soporte prioritario")
+          ? "prioritario"
+          : null,
+    };
+  },
+
   // ------------------------------------------------------------
   // PLANES COMERCIALES
   // ------------------------------------------------------------
   async listPlanesComerciales({ soloActivos = true } = {}) {
     const { rows } = await pool.query(
       `SELECT id, nombre, slug, descripcion, precio, moneda, duracion_dias, meses,
-              categoria, features, activo, orden
+              categoria, features, max_images, max_services, is_featured, is_promoted,
+              activo, orden
          FROM plans
         ${soloActivos ? "WHERE activo = true" : ""}
         ORDER BY orden ASC, id ASC`
@@ -272,7 +389,8 @@ const SuscripcionModel = {
   async findPlanComercial(planId) {
     const { rows } = await pool.query(
       `SELECT id, nombre, slug, descripcion, precio, moneda, duracion_dias, meses,
-              categoria, features, activo
+              categoria, features, max_images, max_services, is_featured, is_promoted,
+              activo
          FROM plans WHERE id = $1`,
       [planId]
     );
@@ -326,6 +444,21 @@ const SuscripcionModel = {
          LEFT JOIN plans p ON p.id = s.plan_id
         WHERE s.id = $1`,
       [suscripcionId]
+    );
+    return rows[0] || null;
+  },
+
+  /** Suscripcion del usuario por referencia interna (para el resultado del pago). */
+  async findSuscripcionPorReferencia(usuarioId, referencia) {
+    const { rows } = await pool.query(
+      `SELECT s.id, s.usuario_id, s.plan_id, s.estado, s.proveedor, s.referencia_externa,
+              s.pago_id, s.monto, s.moneda, s.starts_at, s.ends_at, s.cancelada_at,
+              s.created_at, p.nombre AS plan_nombre
+         FROM subscriptions s
+         LEFT JOIN plans p ON p.id = s.plan_id
+        WHERE s.usuario_id = $1 AND s.referencia_externa = $2
+        ORDER BY s.id DESC LIMIT 1`,
+      [usuarioId, referencia]
     );
     return rows[0] || null;
   },
@@ -681,6 +814,37 @@ const SuscripcionModel = {
       [usuarioId]
     );
     return rows;
+  },
+
+  /** Datos reales para las estadisticas basicas/avanzadas anunciadas por plan. */
+  async estadisticasVendedor(usuarioId, nivel) {
+    const avanzadas = nivel === "avanzadas";
+    const { rows } = await pool.query(
+      `SELECT
+         (SELECT COUNT(*)::int FROM businesses b
+           WHERE b.owner_id = $1 AND b.eliminado_at IS NULL) AS negocios,
+         (SELECT COUNT(*)::int FROM tour_plans tp
+           JOIN businesses b ON b.id = tp.business_id
+          WHERE b.owner_id = $1 AND b.eliminado_at IS NULL AND tp.estado = 'activo') AS planes_activos,
+         (SELECT COUNT(*)::int FROM inscripciones i
+           JOIN tour_plan_salidas sal ON sal.id = i.salida_id
+           JOIN tour_plans tp ON tp.id = sal.plan_id
+           JOIN businesses b ON b.id = tp.business_id
+          WHERE b.owner_id = $1 AND b.eliminado_at IS NULL) AS inscripciones,
+         ${avanzadas ? `(SELECT COUNT(*)::int FROM promotions p
+           JOIN businesses b ON b.id = p.business_id
+          WHERE b.owner_id = $1 AND b.eliminado_at IS NULL
+            AND p.estado = 'activo'
+            AND NOW() BETWEEN p.fecha_inicio AND p.fecha_fin)` : `0::int`} AS promociones_activas,
+         ${avanzadas ? `(SELECT COUNT(*)::int FROM business_images bi
+           JOIN businesses b ON b.id = bi.business_id
+          WHERE b.owner_id = $1 AND b.eliminado_at IS NULL)` : `0::int`} AS imagenes,
+         ${avanzadas ? `(SELECT COUNT(*)::int FROM business_services bs
+           JOIN businesses b ON b.id = bs.business_id
+          WHERE b.owner_id = $1 AND b.eliminado_at IS NULL)` : `0::int`} AS servicios`,
+      [usuarioId]
+    );
+    return rows[0] || null;
   },
 
   // ------------------------------------------------------------

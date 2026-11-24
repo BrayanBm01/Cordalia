@@ -398,7 +398,7 @@ export default function Registro() {
                           <span className="text-xs font-bold text-moss-900">
                             {precioMembresia
                               ? `${formatMoney(precioMembresia.precio)} ${precioMembresia.moneda} / mes`
-                              : `${formatMoney(VENDOR_MEMBERSHIP_PLAN.precioCOP)} / mes`}
+                              : 'Consultar precio'}
                           </span>
                         </div>
                         <p className="text-xs text-dark-600 leading-relaxed md:leading-snug md:text-[11px]">

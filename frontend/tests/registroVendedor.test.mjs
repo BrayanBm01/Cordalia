@@ -270,7 +270,7 @@ async function main() {
         return respuesta(200, {
           success: true,
           data: [
-            { id: 2, nombre: 'Profesional', precio: 49000, moneda: 'COP', meses: 1, features: [] },
+            { id: 2, nombre: 'Profesional', precio: 49900, moneda: 'COP', meses: 1, features: [] },
           ],
         })
       }
@@ -282,7 +282,7 @@ async function main() {
 
       const planes = await vendedorAPI.planes()
       assert.equal(planes.data[0].nombre, 'Profesional', 'muestra el plan comercial')
-      assert.equal(Number(planes.data[0].precio), 49000, 'muestra el precio mensual')
+      assert.equal(Number(planes.data[0].precio), 49900, 'muestra el precio mensual')
     } finally {
       env.restaurar()
     }
@@ -338,7 +338,7 @@ async function main() {
           success: true,
           data: [
             { id: 1, nombre: 'Gratis', precio: 0, moneda: 'COP', meses: 1, features: [] },
-            { id: 2, nombre: 'Profesional', precio: 49000, moneda: 'COP', meses: 1, features: ['Soporte'] },
+            { id: 2, nombre: 'Profesional', precio: 49900, moneda: 'COP', meses: 1, features: ['Soporte'] },
           ],
         })
       }
@@ -348,7 +348,7 @@ async function main() {
       // Es público: no debe exigir token.
       assert.equal(headers.Authorization, undefined, 'no debe exigir sesión')
       const dePago = res.data.find((p) => Number(p.precio) > 0)
-      assert.equal(Number(dePago.precio), 49000, 'precio vigente del sistema')
+      assert.equal(Number(dePago.precio), 49900, 'precio vigente del sistema')
       assert.equal(dePago.moneda, 'COP', 'moneda COP')
     } finally {
       env.restaurar()
@@ -364,12 +364,12 @@ async function main() {
         return respuesta(201, {
           success: true,
           message: 'Pago aprobado (modo simulación). Tu plan quedó activo.',
-          data: { suscripcion: { id: 1, estado: 'active', monto: 49000 }, sandbox: true },
+          data: { suscripcion: { id: 1, estado: 'active', monto: 49900 }, sandbox: true },
         })
       }
       const { vendedorAPI } = await importarApi()
       const res = await vendedorAPI.contratar(2)
-      assert.deepEqual(cuerpo, { plan_id: 2 }, 'solo se envía el plan_id')
+      assert.deepEqual(cuerpo, { plan_id: 2, metodo: 'mercadopago' }, 'solo plan y método; nunca importe')
       assert.equal(res.data.sandbox, true, 'el modo simulación se indica (no es un pago real)')
       assert.equal(res.data.suscripcion.estado, 'active', 'la suscripción queda activa')
     } finally {

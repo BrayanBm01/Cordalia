@@ -239,7 +239,9 @@ h.test("REGV: el catálogo de planes es público y refleja el precio del sistema
 
   const dePago = r.json.data.find((p) => Number(p.precio) > 0);
   h.assert(dePago !== undefined, "hay al menos un plan de pago");
-  h.assert(Number(dePago.precio) === 49000, `precio vigente 49.000 (fue ${dePago.precio})`);
+  // Precio comercial vigente: 49.900 COP (migración 027). El histórico de
+  // pagos no se modify: aquí solo se valida el catálogo actual.
+  h.assert(Number(dePago.precio) === 49900, `precio vigente 49.900 (fue ${dePago.precio})`);
   h.assert(dePago.moneda === "COP", "moneda COP");
   h.assert(Number(dePago.meses) === 1, "duración de un mes");
   h.assert(Array.isArray(dePago.features) && dePago.features.length > 0, "beneficios listados");
@@ -361,7 +363,7 @@ h.test("REGV: tras el vencimiento se puede contratar un plan (modo simulado)", a
   h.assertStatus(r.status, 201, "contratar plan");
   h.assert(r.json.data.sandbox === true, "el pago queda marcado como simulación (sandbox)");
   h.assert(r.json.data.suscripcion.estado === "active", "suscripción activa");
-  h.assert(Number(r.json.data.suscripcion.monto) === 49000, "importe del plan del servidor");
+  h.assert(Number(r.json.data.suscripcion.monto) === 49900, "importe del plan del servidor (49.900 COP)");
 
   // Con la suscripción activa vuelven a estar permitidas las escrituras.
   const neg = await h.api("/api/businesses", {
